@@ -30,23 +30,6 @@ exports.handler = async (event) => {
     return res.json();
   };
 
-  // Kolom-IDs van de centrale Leadpool (board 5093190545)
-  // Zelfde structuur als Bellijst_Matthias/Maurits
-  const COL = {
-    telefoon:           "phone_mm1fzq2g",
-    email:              "email_mm1fnwvn",
-    datum_ontvangen:    "date_mm1f1fw2",
-    status:             "color_mm1f9atj",
-    warme_lead:         "boolean_mm1fnaay",
-    bezichtigd_adres:   "text_mm1frktj",
-    bij_wie:            "text_mm1fa4bf",
-    datum_bezichtiging: "date_mm1fs4t7",
-    adres_klant:        "text_mm1f7fzh",
-    opmerkingen:        "text_mm1f4g3q",
-    terugzetten:        "boolean_mm1nne68",
-    email_makelaar:     "text_mm1n99ky",
-  };
-
   const getCol = (cols, id) =>
     cols.find(c => c.id === id)?.text || "";
 
@@ -64,9 +47,9 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify(result) };
     }
 
-    // ── LEADS OPHALEN — gefilterd op makelaar email ────────────────────
+    // ── LEADS OPHALEN ─────────────────────────────────────────────────
     if (action === "get_leads") {
-      const { board_id, makelaar_email } = data;
+      const { board_id, makelaar_naam } = data;
 
       const result = await mondayFetch(`
         query ($boardId: ID!) {
@@ -84,33 +67,51 @@ exports.handler = async (event) => {
 
       const items = result?.data?.boards?.[0]?.items_page?.items || [];
 
-      const leads = items
-        .map(item => {
-          const cols = item.column_values || [];
-          return {
-            id: item.id,
-            naam: item.name,
-            telefoon:      getCol(cols, COL.telefoon),
-            email:         getCol(cols, COL.email),
-            adres:         getCol(cols, COL.bezichtigd_adres),
-            bij_wie:       getCol(cols, COL.bij_wie),
-            datum:         getCol(cols, COL.datum_ontvangen),
-            datum_bezichtiging: getCol(cols, COL.datum_bezichtiging),
-            adres_klant:   getCol(cols, COL.adres_klant),
-            status:        getCol(cols, COL.status),
-            warme_lead:    getCol(cols, COL.warme_lead),
-            opmerkingen:   getCol(cols, COL.opmerkingen),
-            email_makelaar: getCol(cols, COL.email_makelaar),
-          };
-        })
-        // Filter op makelaar als meegegeven
-        .filter(lead => {
-          if (!makelaar_email) return true;
-          if (!lead.email_makelaar) return true; // toon ook leads zonder toewijzing
-          return lead.email_makelaar.toLowerCase().includes(
-            makelaar_email.split('@')[0].toLowerCase()
-          );
-        });
+      // Haal alle kolom-waarden op als één platte map
+      const leads = items.map(item => {
+        const cols = item.column_values || [];
+        const colMap = {};
+        cols.forEach(c => { colMap[c.id] = c.text || ''; });
+
+        // Zoek "board afkomstig" kolom (bevat Bellijst_Maurits / Bellijst_Matthias)
+        const boardAfkomstig = cols.find(c =>
+          c.text && (c.text.includes('Bellijst') || c.text.includes('bellijst'))
+        )?.text || '';
+
+        // email_makelaar als fallback
+        const emailMakelaar = cols.find(c => c.id === 'text_mm1n99ky')?.text || '';
+
+        return {
+          id: item.id,
+          naam: item.name,
+          telefoon:      cols.find(c => c.id === 'phone_mm1fzq2g')?.text || '',
+          email:         cols.find(c => c.id === 'email_mm1fnwvn')?.text || '',
+          adres:         cols.find(c => c.id === 'text_mm1frktj')?.text || '',
+          bij_wie:       cols.find(c => c.id === 'text_mm1fa4bf')?.text || '',
+          datum:         cols.find(c => c.id === 'date_mm1f1fw2')?.text || '',
+          adres_klant:   cols.find(c => c.id === 'text_mm1f7fzh')?.text || '',
+          status:        cols.find(c => c.id === 'color_mm1f9atj')?.text || '',
+          warme_lead:    cols.find(c => c.id === 'boolean_mm1fnaay')?.text || '',
+          opmerkingen:   cols.find(c => c.id === 'text_mm1f4g3q')?.text || '',
+          email_makelaar: emailMakelaar,
+          board_afkomstig: boardAfkomstig,
+        };
+      }).filter(lead => {
+        // Filter op makelaar
+        if (!makelaar_naam) return true;
+        const board = lead.board_afkomstig.toLowerCase();
+        const email = lead.email_makelaar.toLowerCase();
+        const naam = makelaar_naam.toLowerCase();
+
+        // Match op board naam (Bellijst_Maurits / Bellijst_Matthias)
+        if (board && board.includes(naam.split(' ')[0])) return true;
+        // Match op email
+        if (email && email.includes(naam.split(' ')[0])) return true;
+        // Als beide leeg zijn: toon wel (niet-toegewezen leads)
+        if (!board && !email) return true;
+
+        return false;
+      });
 
       return { statusCode: 200, headers, body: JSON.stringify({ leads }) };
     }
