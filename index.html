@@ -392,6 +392,61 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── ROL KEUZE ── */
+    .rol-keuze {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .btn-rol {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 16px 12px;
+      background: white;
+      border: 2px solid var(--grijs-mid);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .btn-rol:hover { border-color: var(--navy); background: #f8f9ff; }
+    .btn-rol-geven:hover { border-color: var(--oranje); background: #fff8f5; }
+    .rol-icon { font-size: 28px; }
+    .rol-titel { font-size: 14px; font-weight: 700; color: var(--navy); }
+    .rol-sub { font-size: 11px; color: var(--grijs-tekst); text-align: center; }
+
+    /* ── BEZICHTIGING KAART (gevende makelaar) ── */
+    .bez-card {
+      background: white;
+      border-radius: 14px;
+      padding: 16px;
+      margin: 0 16px 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      border-left: 4px solid var(--grijs-mid);
+    }
+    .bez-card.al-gedeeld { border-left-color: var(--groen); opacity: .7; }
+    .bez-naam { font-size: 17px; font-weight: 700; color: var(--navy); }
+    .bez-adres { font-size: 13px; color: var(--grijs-tekst); margin-top: 3px; }
+    .bez-meta { display: flex; gap: 16px; margin-top: 8px; font-size: 12px; flex-wrap: wrap; }
+    .btn-naar-pool {
+      width: 100%;
+      padding: 13px;
+      margin-top: 12px;
+      background: var(--oranje);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-naar-pool:hover { background: var(--oranje-light); }
+    .btn-naar-pool:disabled { background: var(--grijs-mid); color: var(--grijs-tekst); cursor: default; }
+    .btn-naar-pool.gedeeld { background: var(--groen); }
+
     .hidden { display: none !important; }
 
     /* ── CLOZE BADGE ── */
@@ -430,15 +485,48 @@
 <div id="login-screen">
   <div class="login-card">
     <h2>Goedemorgen 👋</h2>
-    <p>Selecteer jouw naam om jouw leads te zien.</p>
+    <p>Selecteer jouw naam om verder te gaan.</p>
     <div class="form-group">
       <label>Wie ben jij?</label>
       <select id="makelaar-select">
         <option value="">— Laden... —</option>
       </select>
     </div>
-    <button class="btn-primary" onclick="login()">Mijn leads bekijken →</button>
+    <div class="rol-keuze">
+      <button class="btn-rol" onclick="login('ontvangen')">
+        <span class="rol-icon">📥</span>
+        <span class="rol-titel">Leads bellen</span>
+        <span class="rol-sub">Jouw bellijst bekijken</span>
+      </button>
+      <button class="btn-rol btn-rol-geven" onclick="login('geven')">
+        <span class="rol-icon">📤</span>
+        <span class="rol-titel">Lead doorgeven</span>
+        <span class="rol-sub">Bezichtiging naar pool</span>
+      </button>
+    </div>
   </div>
+</div>
+
+<!-- GEVEN SCHERM -->
+<div id="geven-screen" class="hidden">
+  <div class="stats-bar">
+    <div class="stat-card oranje">
+      <div class="stat-number" id="stat-geven-totaal">0</div>
+      <div class="stat-label">Bezichtigingen</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" id="stat-geven-nieuw">0</div>
+      <div class="stat-label">Nog niet gedeeld</div>
+    </div>
+    <div class="stat-card groen">
+      <div class="stat-number" id="stat-geven-gedeeld">0</div>
+      <div class="stat-label">Naar pool</div>
+    </div>
+  </div>
+  <div style="padding:0 16px 8px;font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em">
+    JOUW BEZICHTIGINGEN
+  </div>
+  <div id="geven-container"></div>
 </div>
 
 <!-- OVERZICHT SCHERM -->
@@ -576,7 +664,7 @@
   laadMakelaars();
 
   // ── LOGIN ───────────────────────────────────────────────────────────
-  function login() {
+  function login(rol) {
     const select = document.getElementById('makelaar-select');
     const opt = select.options[select.selectedIndex];
     if (!opt.value) { toonToast('Kies eerst jouw naam', 'fout'); return; }
@@ -589,9 +677,15 @@
 
     document.getElementById('header-naam').textContent = huidigeMakelaar.naam;
     document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('overzicht-screen').classList.remove('hidden');
 
-    laadLeads();
+    if (rol === 'geven') {
+      document.getElementById('geven-screen').classList.remove('hidden');
+      document.getElementById('header-badge').textContent = 'Bezichtigingen';
+      laadBezichtigingen();
+    } else {
+      document.getElementById('overzicht-screen').classList.remove('hidden');
+      laadLeads();
+    }
   }
 
   // ── LEADS LADEN (via monday API) ────────────────────────────────────
@@ -669,7 +763,101 @@
     ];
   }
 
-  // ── CLOZE CHECK — async badge per lead ──────────────────────────────
+  // ── BEZICHTIGINGEN LADEN (gevende makelaar) ─────────────────────────
+  async function laadBezichtigingen() {
+    const container = document.getElementById('geven-container');
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--grijs-tekst)"><div class="spinner"></div>Bezichtigingen laden...</div>';
+
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get_bezichtigingen',
+          data: { makelaar_naam: huidigeMakelaar.naam }
+        })
+      });
+      const json = await res.json();
+      const items = json?.bezichtigingen || [];
+
+      const totaal = items.length;
+      const gedeeld = items.filter(b => b.in_pool).length;
+      document.getElementById('stat-geven-totaal').textContent = totaal;
+      document.getElementById('stat-geven-nieuw').textContent = totaal - gedeeld;
+      document.getElementById('stat-geven-gedeeld').textContent = gedeeld;
+      document.getElementById('header-badge').textContent = totaal + ' bezichtigingen';
+
+      if (totaal === 0) {
+        container.innerHTML = `<div style="text-align:center;padding:60px 20px;color:var(--grijs-tekst)">
+          <div style="font-size:40px;margin-bottom:12px">🏠</div>
+          <h3 style="color:var(--navy)">Geen bezichtigingen</h3>
+          <p>Er zijn geen recente bezichtigingen gevonden voor ${huidigeMakelaar.naam}.</p>
+        </div>`;
+        return;
+      }
+
+      container.innerHTML = items.map(b => {
+        const alGedeeld = b.in_pool;
+        return `
+          <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''}" id="bez-${b.id}">
+            <div class="bez-naam">${b.naam}</div>
+            <div class="bez-adres">📍 ${b.adres || '—'}</div>
+            <div class="bez-meta">
+              ${b.datum ? `<span>📅 Bezichtiging: <strong>${b.datum}</strong></span>` : ''}
+              ${b.telefoon ? `<span>📞 ${b.telefoon}</span>` : ''}
+              ${b.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px">✉️ ${b.email}</span>` : ''}
+            </div>
+            <button
+              class="btn-naar-pool ${alGedeeld ? 'gedeeld' : ''}"
+              id="btn-${b.id}"
+              onclick="geefNaarPool('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
+              ${alGedeeld ? 'disabled' : ''}>
+              ${alGedeeld ? '✅ Al in de pool' : '📤 Geef door aan pool'}
+            </button>
+          </div>`;
+      }).join('');
+
+    } catch (err) {
+      container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--rood)">Kon bezichtigingen niet laden. Probeer opnieuw.</div>`;
+    }
+  }
+
+  // ── LEAD NAAR POOL STUREN ────────────────────────────────────────────
+  async function geefNaarPool(itemId, naam, adres) {
+    const btn = document.getElementById(`btn-${itemId}`);
+    btn.disabled = true;
+    btn.textContent = 'Bezig...';
+
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'push_naar_pool',
+          data: { item_id: itemId, makelaar_naam: huidigeMakelaar.naam }
+        })
+      });
+      const json = await res.json();
+
+      if (json.error) throw new Error(json.error);
+
+      btn.textContent = '✅ In de pool!';
+      btn.classList.add('gedeeld');
+      document.getElementById(`bez-${itemId}`).classList.add('al-gedeeld');
+
+      // Stats bijwerken
+      const gedeeld = parseInt(document.getElementById('stat-geven-gedeeld').textContent) + 1;
+      const nieuw = parseInt(document.getElementById('stat-geven-nieuw').textContent) - 1;
+      document.getElementById('stat-geven-gedeeld').textContent = gedeeld;
+      document.getElementById('stat-geven-nieuw').textContent = Math.max(0, nieuw);
+
+      toonToast(`✅ ${naam} staat in de pool!`, 'succes');
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = '📤 Geef door aan pool';
+      toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
+    }
+  }
   async function checkClozeBestaand() {
     for (const lead of leadsData) {
       if (!lead.email && !lead.telefoon) continue;

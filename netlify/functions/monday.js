@@ -181,6 +181,68 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ makelaars }) };
     }
 
+    // ── BEZICHTIGINGEN OPHALEN (gevende makelaar) ─────────────────────
+    if (action === "get_bezichtigingen") {
+      const { makelaar_naam } = data;
+      const result = await mondayFetch(`
+        query {
+          boards(ids: [5093190482]) {
+            items_page(limit: 100) {
+              items { id name column_values { id title text type } }
+            }
+          }
+        }
+      `);
+      const items = result?.data?.boards?.[0]?.items_page?.items || [];
+      const bezichtigingen = items.map(item => {
+        const cols = item.column_values || [];
+        const get = (...titles) => {
+          for (const t of titles) {
+            const col = cols.find(c =>
+              c.title?.toLowerCase().includes(t.toLowerCase()) || c.id === t
+            );
+            if (col?.text) return col.text;
+          }
+          return '';
+        };
+        return {
+          id: item.id,
+          naam: item.name,
+          adres:    get('bezichtigd adres', 'adres'),
+          makelaar: get('makelaar'),
+          datum:    get('datum'),
+          telefoon: get('telefoon', 'phone'),
+          email:    get('email'),
+          in_pool:  !!cols.find(c =>
+            (c.title?.toLowerCase().includes('leadpool') || c.title?.toLowerCase().includes('naar leadpool'))
+            && (c.text === 'true' || c.text === 'v')
+          ),
+        };
+      }).filter(b => {
+        if (!makelaar_naam) return true;
+        return b.makelaar?.toLowerCase().includes(makelaar_naam.split(' ')[0].toLowerCase());
+      });
+      return { statusCode: 200, headers, body: JSON.stringify({ bezichtigingen }) };
+    }
+
+    // ── PUSH NAAR LEADPOOL ─────────────────────────────────────────────
+    if (action === "push_naar_pool") {
+      const { item_id } = data;
+      // Trigger de "Naar Leadpool" knop via column update
+      // De automatisering in monday pikt dit op
+      const result = await mondayFetch(`
+        mutation ($itemId: ID!, $boardId: ID!) {
+          change_column_value(
+            item_id: $itemId
+            board_id: $boardId
+            column_id: "button_mm1f76g9"
+            value: "{}"
+          ) { id }
+        }
+      `, { itemId: item_id, boardId: "5093190482" });
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, result }) };
+    }
+
     return {
       statusCode: 400,
       headers,
@@ -194,5 +256,3 @@ exports.handler = async (event) => {
     };
   }
 };
-
-// Exported separately but added here for clarity - get_makelaars is handled below
