@@ -561,7 +561,7 @@
       // Parse monday items naar lead objecten
       leadsData = items.map(item => ({
         id: item.id,
-        naam: item.name,
+        naam: item.naam || item.name || '(geen naam)',
         telefoon:   item.telefoon   || '',
         email:      item.email      || '',
         adres:      item.adres      || '',
