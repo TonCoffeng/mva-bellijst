@@ -147,6 +147,39 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify(result) };
     }
 
+
+    // ── ACTIEVE MAKELAARS OPHALEN UIT MEEDOEN LEADPOOL ────────────────
+    if (action === "get_makelaars") {
+      const result = await mondayFetch(`
+        query {
+          boards(ids: [5093235823]) {
+            items_page(limit: 50) {
+              items {
+                id
+                name
+                column_values { id text value }
+              }
+            }
+          }
+        }
+      `);
+
+      const items = result?.data?.boards?.[0]?.items_page?.items || [];
+      const makelaars = items
+        .map(item => {
+          const cols = item.column_values || [];
+          const email     = cols.find(c => c.id === 'text_mm1nxwsn')?.text || '';
+          const meedoen   = cols.find(c => c.id === 'boolean_mm1g4fwm')?.text || '';
+          const vakantie  = cols.find(c => c.id === 'timerange_mm1gj38w')?.text || '';
+          const board     = cols.find(c => c.id === 'text_mm1gbj3q')?.text || '';
+          return { naam: item.name, email, meedoen, vakantie, board };
+        })
+        // Alleen actieve makelaars (meedoen = true, niet op vakantie)
+        .filter(m => m.meedoen === 'true' || m.meedoen === 'v');
+
+      return { statusCode: 200, headers, body: JSON.stringify({ makelaars }) };
+    }
+
     return {
       statusCode: 400,
       headers,
@@ -160,3 +193,5 @@ exports.handler = async (event) => {
     };
   }
 };
+
+// Exported separately but added here for clarity - get_makelaars is handled below

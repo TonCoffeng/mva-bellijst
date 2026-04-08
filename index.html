@@ -417,9 +417,7 @@
     <div class="form-group">
       <label>Wie ben jij?</label>
       <select id="makelaar-select">
-        <option value="">— Kies jouw naam —</option>
-        <option value="mauritsrodermond@makelaarsvan.nl" data-naam="Maurits Rodermond" data-board="5093190545">Maurits Rodermond</option>
-        <option value="matthiasmakdsi@makelaarsvan.nl" data-naam="Matthias Makdsi" data-board="5093190545">Matthias Makdsi</option>
+        <option value="">— Laden... —</option>
       </select>
     </div>
     <button class="btn-primary" onclick="login()">Mijn leads bekijken →</button>
@@ -521,6 +519,45 @@
   let gekozenStatus = null;
   let leadsData = [];
 
+  // ── MAKELAARS DYNAMISCH LADEN UIT MONDAY ────────────────────────────
+  async function laadMakelaars() {
+    const select = document.getElementById('makelaar-select');
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get_makelaars' })
+      });
+      const json = await res.json();
+      const makelaars = json?.makelaars || [];
+
+      if (makelaars.length === 0) {
+        // Fallback als monday niet bereikbaar is
+        select.innerHTML = `
+          <option value="">— Kies jouw naam —</option>
+          <option value="mauritsrodermond@makelaarsvan.nl" data-naam="Maurits Rodermond" data-board="5093190545">Maurits Rodermond</option>
+          <option value="matthiasmakdsi@makelaarsvan.nl" data-naam="Matthias Makdsi" data-board="5093190545">Matthias Makdsi</option>
+        `;
+        return;
+      }
+
+      select.innerHTML = '<option value="">— Kies jouw naam —</option>' +
+        makelaars.map(m => 
+          `<option value="${m.email}" data-naam="${m.naam}" data-board="5093190545">${m.naam}</option>`
+        ).join('');
+    } catch (err) {
+      // Fallback
+      select.innerHTML = `
+        <option value="">— Kies jouw naam —</option>
+        <option value="mauritsrodermond@makelaarsvan.nl" data-naam="Maurits Rodermond" data-board="5093190545">Maurits Rodermond</option>
+        <option value="matthiasmakdsi@makelaarsvan.nl" data-naam="Matthias Makdsi" data-board="5093190545">Matthias Makdsi</option>
+      `;
+    }
+  }
+
+  // Laad makelaars direct bij opstarten
+  laadMakelaars();
+
   // ── LOGIN ───────────────────────────────────────────────────────────
   function login() {
     const select = document.getElementById('makelaar-select');
@@ -529,8 +566,8 @@
 
     huidigeMakelaar = {
       email: opt.value,
-      naam: opt.dataset.naam,
-      boardId: opt.dataset.board,
+      naam: opt.dataset.naam || opt.text,
+      boardId: opt.dataset.board || '5093190545',
     };
 
     document.getElementById('header-naam').textContent = huidigeMakelaar.naam;
