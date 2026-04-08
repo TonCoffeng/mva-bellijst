@@ -556,22 +556,21 @@
       });
 
       const json = await res.json();
-      const items = json?.data?.boards?.[0]?.items_page?.items || [];
+      const items = json?.leads || [];
 
-      // Parse de monday items naar bruikbare lead objecten
-      leadsData = items.map(item => {
-        const cols = {};
-        item.column_values.forEach(c => { cols[c.id] = c.text; });
-        return {
-          id: item.id,
-          naam: item.name,
-          telefoon: cols['telefoon'] || cols['phone'] || '',
-          email: cols['email'] || '',
-          adres: cols['bezichtigd_adres'] || cols['text'] || '',
-          status: cols['status'] || '',
-          datum: cols['datum_ontvangen'] || cols['date'] || '',
-        };
-      });
+      // Parse monday items naar lead objecten
+      leadsData = items.map(item => ({
+        id: item.id,
+        naam: item.name,
+        telefoon:   item.telefoon   || '',
+        email:      item.email      || '',
+        adres:      item.adres      || '',
+        status:     item.status     || '',
+        datum:      item.datum      || '',
+        adres_klant: item.adres_klant || '',
+        warme_lead: item.warme_lead === 'true' || item.warme_lead === 'v',
+        opmerkingen: item.opmerkingen || '',
+      }));
 
       renderLeads();
     } catch (err) {
@@ -645,7 +644,9 @@
           <div class="lead-adres">📍 ${lead.adres}</div>
           <div class="lead-meta">
             <span class="lead-chip ${chipClass}">${chipLabel}</span>
+            ${lead.warme_lead ? `<span class="lead-chip" style="background:#fef9c3;color:#854d0e">🔥 Warm</span>` : ''}
             ${lead.datum ? `<span class="lead-chip chip-datum">📅 ${lead.datum}</span>` : ''}
+            ${lead.adres_klant ? `<span class="lead-chip chip-datum">🏠 ${lead.adres_klant}</span>` : ''}
           </div>
           <div class="lead-acties" onclick="event.stopPropagation()">
             <button class="btn-bel" onclick="bel('${lead.telefoon}', '${lead.naam}')">

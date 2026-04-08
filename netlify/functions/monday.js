@@ -13,8 +13,8 @@ exports.handler = async (event) => {
 
   const { action, data } = JSON.parse(event.body || "{}");
 
-  const token = MONDAY_TOKEN.startsWith('Bearer ') 
-    ? MONDAY_TOKEN 
+  const token = MONDAY_TOKEN.startsWith('Bearer ')
+    ? MONDAY_TOKEN
     : `Bearer ${MONDAY_TOKEN}`;
 
   const mondayFetch = async (query, variables = {}) => {
@@ -30,17 +30,27 @@ exports.handler = async (event) => {
     return res.json();
   };
 
-  // Slimme kolom-mapping: zoekt op meerdere mogelijke ID's
-  const getColValue = (cols, ...ids) => {
-    for (const id of ids) {
-      const col = cols.find(c => c.id === id || c.id.toLowerCase().includes(id.toLowerCase()));
-      if (col && col.text) return col.text;
-    }
-    return "";
+  // Exacte kolom-IDs van Bellijst_Matthias / Bellijst_Maurits
+  const COL = {
+    telefoon:          "phone_mm1fzq2g",
+    email:             "email_mm1fnwvn",
+    datum_ontvangen:   "date_mm1f1fw2",
+    status:            "color_mm1f9atj",
+    warme_lead:        "boolean_mm1fnaay",
+    bezichtigd_adres:  "text_mm1frktj",
+    bij_wie:           "text_mm1fa4bf",
+    datum_bezichtiging:"date_mm1fs4t7",
+    adres_klant:       "text_mm1f7fzh",
+    opmerkingen:       "text_mm1f4g3q",
+    terugzetten:       "boolean_mm1nne68",
+    email_makelaar:    "text_mm1n99ky",
   };
 
+  const getCol = (cols, id) =>
+    cols.find(c => c.id === id)?.text || "";
+
   try {
-    // ── 1. KOLOMMEN OPHALEN (debug) ────────────────────────────────────
+    // ── 1. KOLOMMEN DEBUG ──────────────────────────────────────────────
     if (action === "get_columns") {
       const result = await mondayFetch(`
         query ($boardId: ID!) {
@@ -55,8 +65,6 @@ exports.handler = async (event) => {
 
     // ── 2. LEADS OPHALEN ───────────────────────────────────────────────
     if (action === "get_leads") {
-      const { board_id } = data;
-
       const result = await mondayFetch(`
         query ($boardId: ID!) {
           boards(ids: [$boardId]) {
@@ -69,59 +77,54 @@ exports.handler = async (event) => {
             }
           }
         }
-      `, { boardId: board_id });
+      `, { boardId: data.board_id });
 
-      // Zet ruwe monday items om naar bruikbare lead-objecten
       const items = result?.data?.boards?.[0]?.items_page?.items || [];
       const leads = items.map(item => {
         const cols = item.column_values || [];
         return {
           id: item.id,
           naam: item.name,
-          // Probeer meerdere mogelijke kolom-namen
-          telefoon: getColValue(cols, "phone", "telefoon", "telefoon_nummer", "mobile", "tel"),
-          email: getColValue(cols, "email", "e_mail", "emailadres"),
-          adres: getColValue(cols, "bezichtigd_adres", "adres", "address", "text", "text0"),
-          status: getColValue(cols, "status", "status4", "lead_status"),
-          datum: getColValue(cols, "date", "datum", "datum_ontvangen", "date4"),
-          adres_klant: getColValue(cols, "adres_klant", "text1", "text2"),
-          // Bewaar ook de ruwe kolommen voor debugging
-          _raw: cols.map(c => ({ id: c.id, text: c.text })).filter(c => c.text)
+          telefoon:  getCol(cols, COL.telefoon),
+          email:     getCol(cols, COL.email),
+          adres:     getCol(cols, COL.bezichtigd_adres),
+          status:    getCol(cols, COL.status),
+          datum:     getCol(cols, COL.datum_ontvangen),
+          adres_klant: getCol(cols, COL.adres_klant),
+          bij_wie:   getCol(cols, COL.bij_wie),
+          warme_lead: getCol(cols, COL.warme_lead),
+          opmerkingen: getCol(cols, COL.opmerkingen),
         };
       });
 
-      return { statusCode: 200, headers, body: JSON.stringify({ leads, raw: result }) };
+      return { statusCode: 200, headers, body: JSON.stringify({ leads }) };
     }
 
     // ── 3. STATUS UPDATE ───────────────────────────────────────────────
     if (action === "update_status") {
-      const { item_id, board_id, status, status_col_id } = data;
+      const { item_id, board_id, status } = data;
 
       const statusLabels = {
-        bereikt_ja: "Bereikt",
-        bereikt_later: "Bel terug",
-        niet_bereikbaar: "Niet bereikbaar",
-        wellicht_later: "Wellicht later",
-        niet_geinteresseerd: "Niet geïnteresseerd",
-        voicemail: "Voicemail",
+        bereikt_ja:           "Bereikt",
+        bereikt_later:        "Bel terug",
+        niet_bereikbaar:      "Niet bereikbaar",
+        wellicht_later:       "Wellicht later",
+        niet_geinteresseerd:  "Niet geïnteresseerd",
+        voicemail:            "Voicemail",
       };
 
-      // Gebruik de kolom-ID die we van get_columns hebben gekregen
-      const colId = status_col_id || "status";
-
       const result = await mondayFetch(`
-        mutation ($itemId: ID!, $boardId: ID!, $colId: String!, $value: JSON!) {
+        mutation ($itemId: ID!, $boardId: ID!, $value: JSON!) {
           change_column_value(
-            item_id: $itemId,
-            board_id: $boardId,
-            column_id: $colId,
+            item_id: $itemId
+            board_id: $boardId
+            column_id: "color_mm1f9atj"
             value: $value
           ) { id }
         }
       `, {
         itemId: item_id,
         boardId: board_id,
-        colId: colId,
         value: JSON.stringify({ label: statusLabels[status] || status }),
       });
 
