@@ -14,11 +14,12 @@ exports.handler = async (event) => {
   const { action, data } = JSON.parse(event.body || "{}");
 
   const mondayFetch = async (query, variables = {}) => {
+    const token = MONDAY_TOKEN.startsWith('Bearer ') ? MONDAY_TOKEN : `Bearer ${MONDAY_TOKEN}`;
     const res = await fetch("https://api.monday.com/v2", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: MONDAY_TOKEN,
+        Authorization: token,
         "API-Version": "2024-01",
       },
       body: JSON.stringify({ query, variables }),
