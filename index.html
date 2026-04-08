@@ -579,16 +579,17 @@
         return {
           id: item.id,
           naam: item.naam || item.name || '(geen naam)',
-          telefoon:      item.telefoon || '',
-          email:         item.email || '',
-          adres:         item.adres || '',
-          bij_wie:       item.bij_wie || '',
-          datum:         item.datum || '',
-          adres_klant:   item.adres_klant || '',
-          status:        statusMap[rawStatus] ?? '',
-          warme_lead:    item.warme_lead === 'true' || item.warme_lead === 'v',
-          opmerkingen:   item.opmerkingen || '',
-          email_makelaar: item.email_makelaar || '',
+          telefoon:           item.telefoon || '',
+          email:              item.email || '',
+          adres:              item.adres || '',
+          bij_wie:            item.bij_wie || '',
+          datum:              item.datum || '',
+          datum_bezichtiging: item.datum_bezichtiging || '',
+          adres_klant:        item.adres_klant || '',
+          status:             statusMap[rawStatus] ?? '',
+          warme_lead:         item.warme_lead === 'true' || item.warme_lead === 'v',
+          opmerkingen:        item.opmerkingen || '',
+          email_makelaar:     item.email_makelaar || '',
         };
       });
 
@@ -665,12 +666,14 @@
           ${lead.bij_wie ? `<div class="lead-adres" style="font-size:12px;margin-top:2px">🏢 Bezichtigd bij: ${lead.bij_wie}</div>` : ''}
           <div class="lead-meta" style="margin-top:8px">
             <span class="lead-chip ${chipClass}">${chipLabel}</span>
-            ${lead.datum ? `<span class="lead-chip chip-datum">📅 ${lead.datum}</span>` : ''}
-            ${lead.adres_klant ? `<span class="lead-chip chip-datum">🏠 ${lead.adres_klant}</span>` : ''}
           </div>
-          <div style="display:flex;gap:8px;margin-top:8px;font-size:12px;color:var(--grijs-tekst)">
+          <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;color:var(--grijs-tekst);flex-wrap:wrap">
+            ${lead.datum_bezichtiging ? `<span>🏠 Bezichtiging: <strong style="color:var(--navy)">${lead.datum_bezichtiging}</strong></span>` : ''}
+            ${lead.datum ? `<span>📥 In pool: <strong style="color:var(--navy)">${lead.datum}</strong></span>` : ''}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:6px;font-size:12px;color:var(--grijs-tekst)">
             ${lead.telefoon ? `<span>📞 ${lead.telefoon}</span>` : ''}
-            ${lead.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px">✉️ ${lead.email}</span>` : ''}
+            ${lead.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">✉️ ${lead.email}</span>` : ''}
           </div>
           ${lead.opmerkingen ? `<div style="margin-top:6px;font-size:12px;color:var(--grijs-tekst);font-style:italic">💬 ${lead.opmerkingen}</div>` : ''}
           <div class="lead-acties" onclick="event.stopPropagation()">
