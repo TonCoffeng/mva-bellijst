@@ -88,6 +88,20 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify(result) };
     }
 
+    // ── 3. HAAL KOLOM-IDs OP (debug) ──────────────────────────────────
+    if (action === "get_columns") {
+      const { board_id } = data;
+      const result = await mondayFetch(`
+        query ($boardId: ID!) {
+          boards(ids: [$boardId]) {
+            name
+            columns { id title type }
+          }
+        }
+      `, { boardId: board_id });
+      return { statusCode: 200, headers, body: JSON.stringify(result) };
+    }
+
     return {
       statusCode: 400,
       headers,
