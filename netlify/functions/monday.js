@@ -149,6 +149,31 @@ exports.handler = async (event) => {
     }
 
 
+    // ── ALLE MAKELAARS (ook gevende, zonder vinkje) ───────────────────
+    if (action === "get_alle_makelaars") {
+      const result = await mondayFetch(`{
+        boards(ids: [5093235823]) {
+          items_page(limit: 50) {
+            items {
+              name
+              column_values { id text }
+            }
+          }
+        }
+      }`);
+      const items = result?.data?.boards?.[0]?.items_page?.items || [];
+      const makelaars = items
+        .map(item => ({
+          naam:  item.name,
+          email: item.column_values.find(c => c.id === "text_mm1nxwsn")?.text || "",
+          actief: item.column_values.find(c => c.id === "boolean_mm1g4fwm")?.text === "true",
+          board:  item.column_values.find(c => c.id === "text_mm1gbj3q")?.text || "",
+        }))
+        .filter(m => m.email) // alleen makelaars met een emailadres
+        .sort((a, b) => a.naam.localeCompare(b.naam));
+      return { statusCode: 200, headers, body: JSON.stringify({ makelaars }) };
+    }
+
     // ── ACTIEVE MAKELAARS OPHALEN UIT MEEDOEN LEADPOOL ────────────────
     if (action === "get_makelaars") {
       const result = await mondayFetch(`

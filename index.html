@@ -493,15 +493,15 @@
       </select>
     </div>
     <div class="rol-keuze">
-      <button class="btn-rol" onclick="login('ontvangen')">
-        <span class="rol-icon">📥</span>
-        <span class="rol-titel">Leads bellen</span>
-        <span class="rol-sub">Jouw bellijst bekijken</span>
-      </button>
       <button class="btn-rol btn-rol-geven" onclick="login('geven')">
         <span class="rol-icon">📤</span>
         <span class="rol-titel">Lead doorgeven</span>
         <span class="rol-sub">Bezichtiging naar pool</span>
+      </button>
+      <button class="btn-rol" onclick="login('ontvangen')">
+        <span class="rol-icon">📥</span>
+        <span class="rol-titel">Leads bellen</span>
+        <span class="rol-sub">Jouw bellijst bekijken</span>
       </button>
     </div>
   </div>
@@ -631,15 +631,15 @@
       const res = await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get_makelaars' })
+        body: JSON.stringify({ action: 'get_alle_makelaars' })
       });
       const json = await res.json();
       const makelaars = json?.makelaars || [];
 
       if (makelaars.length === 0) {
-        // Fallback als monday niet bereikbaar is
         select.innerHTML = `
           <option value="">— Kies jouw naam —</option>
+          <option value="toncoffeng@makelaarsvan.nl" data-naam="Ton Coffeng" data-board="5093190545">Ton Coffeng</option>
           <option value="mauritsrodermond@makelaarsvan.nl" data-naam="Maurits Rodermond" data-board="5093190545">Maurits Rodermond</option>
           <option value="matthiasmakdsi@makelaarsvan.nl" data-naam="Matthias Makdsi" data-board="5093190545">Matthias Makdsi</option>
         `;
@@ -647,16 +647,11 @@
       }
 
       select.innerHTML = '<option value="">— Kies jouw naam —</option>' +
-        makelaars.map(m => 
+        makelaars.map(m =>
           `<option value="${m.email}" data-naam="${m.naam}" data-board="5093190545">${m.naam}</option>`
         ).join('');
     } catch (err) {
-      // Fallback
-      select.innerHTML = `
-        <option value="">— Kies jouw naam —</option>
-        <option value="mauritsrodermond@makelaarsvan.nl" data-naam="Maurits Rodermond" data-board="5093190545">Maurits Rodermond</option>
-        <option value="matthiasmakdsi@makelaarsvan.nl" data-naam="Matthias Makdsi" data-board="5093190545">Matthias Makdsi</option>
-      `;
+      select.innerHTML = `<option value="">— Kies jouw naam —</option>`;
     }
   }
 
@@ -807,6 +802,9 @@
               ${b.telefoon ? `<span>📞 ${b.telefoon}</span>` : ''}
               ${b.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px">✉️ ${b.email}</span>` : ''}
             </div>
+            <div id="cloze-badge-${b.id}" style="margin-top:8px;min-height:20px">
+              <span style="font-size:11px;color:var(--grijs-tekst)">⏳ Cloze check...</span>
+            </div>
             <button
               class="btn-naar-pool ${alGedeeld ? 'gedeeld' : ''}"
               id="btn-${b.id}"
@@ -816,6 +814,34 @@
             </button>
           </div>`;
       }).join('');
+
+      // Cloze check per bezichtiging
+      items.forEach(b => {
+        if (!b.email && !b.telefoon) {
+          const badge = document.getElementById(`cloze-badge-${b.id}`);
+          if (badge) badge.innerHTML = '';
+          return;
+        }
+        fetch('/.netlify/functions/cloze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'check_bestaand',
+            data: { email: b.email, telefoon: b.telefoon, naam: b.naam }
+          })
+        }).then(r => r.json()).then(json => {
+          const badge = document.getElementById(`cloze-badge-${b.id}`);
+          if (!badge) return;
+          if (json.bestaand) {
+            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
+          } else {
+            badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`;
+          }
+        }).catch(() => {
+          const badge = document.getElementById(`cloze-badge-${b.id}`);
+          if (badge) badge.innerHTML = '';
+        });
+      });
 
     } catch (err) {
       container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--rood)">Kon bezichtigingen niet laden. Probeer opnieuw.</div>`;
