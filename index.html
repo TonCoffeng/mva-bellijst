@@ -418,8 +418,8 @@
       <label>Wie ben jij?</label>
       <select id="makelaar-select">
         <option value="">— Kies jouw naam —</option>
-        <option value="mauritsrodermond@makelaarsvan.nl" data-naam="Maurits Rodermond" data-board="5093529769">Maurits Rodermond</option>
-        <option value="matthiasmakdsi@makelaarsvan.nl" data-naam="Matthias Makdsi" data-board="5093235114">Matthias Makdsi</option>
+        <option value="mauritsrodermond@makelaarsvan.nl" data-naam="Maurits Rodermond" data-board="5093190545">Maurits Rodermond</option>
+        <option value="matthiasmakdsi@makelaarsvan.nl" data-naam="Matthias Makdsi" data-board="5093190545">Matthias Makdsi</option>
       </select>
     </div>
     <button class="btn-primary" onclick="login()">Mijn leads bekijken →</button>
@@ -551,7 +551,10 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'get_leads',
-          data: { board_id: huidigeMakelaar.boardId }
+          data: {
+            board_id: huidigeMakelaar.boardId,
+            makelaar_email: huidigeMakelaar.email,
+          }
         })
       });
 
@@ -559,18 +562,35 @@
       const items = json?.leads || [];
 
       // Parse monday items naar lead objecten
-      leadsData = items.map(item => ({
-        id: item.id,
-        naam: item.naam || item.name || '(geen naam)',
-        telefoon:   item.telefoon   || '',
-        email:      item.email      || '',
-        adres:      item.adres      || '',
-        status:     item.status     || '',
-        datum:      item.datum      || '',
-        adres_klant: item.adres_klant || '',
-        warme_lead: item.warme_lead === 'true' || item.warme_lead === 'v',
-        opmerkingen: item.opmerkingen || '',
-      }));
+      // Status mapping van monday labels naar app-statussen
+      const statusMap = {
+        'nog niet gebeld': '',
+        'niet bereikbaar': 'niet_bereikbaar',
+        'bel terug': 'bereikt_later',
+        'voicemail': 'voicemail',
+        'wellicht later': 'wellicht_later',
+        'bereikt': 'bereikt_ja',
+        'niet geïnteresseerd': 'niet_geinteresseerd',
+        'niet geinteresseerd': 'niet_geinteresseerd',
+      };
+
+      leadsData = items.map(item => {
+        const rawStatus = (item.status || '').toLowerCase();
+        return {
+          id: item.id,
+          naam: item.naam || item.name || '(geen naam)',
+          telefoon:      item.telefoon || '',
+          email:         item.email || '',
+          adres:         item.adres || '',
+          bij_wie:       item.bij_wie || '',
+          datum:         item.datum || '',
+          adres_klant:   item.adres_klant || '',
+          status:        statusMap[rawStatus] ?? '',
+          warme_lead:    item.warme_lead === 'true' || item.warme_lead === 'v',
+          opmerkingen:   item.opmerkingen || '',
+          email_makelaar: item.email_makelaar || '',
+        };
+      });
 
       renderLeads();
     } catch (err) {
@@ -640,14 +660,19 @@
 
       return `
         <div class="lead-card ${cardClass}" onclick="openModal('${lead.id}')">
-          <div class="lead-naam">${lead.naam}</div>
-          <div class="lead-adres">📍 ${lead.adres}</div>
-          <div class="lead-meta">
+          <div class="lead-naam">${lead.naam}${lead.warme_lead ? ' 🔥' : ''}</div>
+          ${lead.adres ? `<div class="lead-adres">📍 ${lead.adres}</div>` : ''}
+          ${lead.bij_wie ? `<div class="lead-adres" style="font-size:12px;margin-top:2px">🏢 Bezichtigd bij: ${lead.bij_wie}</div>` : ''}
+          <div class="lead-meta" style="margin-top:8px">
             <span class="lead-chip ${chipClass}">${chipLabel}</span>
-            ${lead.warme_lead ? `<span class="lead-chip" style="background:#fef9c3;color:#854d0e">🔥 Warm</span>` : ''}
             ${lead.datum ? `<span class="lead-chip chip-datum">📅 ${lead.datum}</span>` : ''}
             ${lead.adres_klant ? `<span class="lead-chip chip-datum">🏠 ${lead.adres_klant}</span>` : ''}
           </div>
+          <div style="display:flex;gap:8px;margin-top:8px;font-size:12px;color:var(--grijs-tekst)">
+            ${lead.telefoon ? `<span>📞 ${lead.telefoon}</span>` : ''}
+            ${lead.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px">✉️ ${lead.email}</span>` : ''}
+          </div>
+          ${lead.opmerkingen ? `<div style="margin-top:6px;font-size:12px;color:var(--grijs-tekst);font-style:italic">💬 ${lead.opmerkingen}</div>` : ''}
           <div class="lead-acties" onclick="event.stopPropagation()">
             <button class="btn-bel" onclick="bel('${lead.telefoon}', '${lead.naam}')">
               📞 Bellen

@@ -30,27 +30,28 @@ exports.handler = async (event) => {
     return res.json();
   };
 
-  // Exacte kolom-IDs van Bellijst_Matthias / Bellijst_Maurits
+  // Kolom-IDs van de centrale Leadpool (board 5093190545)
+  // Zelfde structuur als Bellijst_Matthias/Maurits
   const COL = {
-    telefoon:          "phone_mm1fzq2g",
-    email:             "email_mm1fnwvn",
-    datum_ontvangen:   "date_mm1f1fw2",
-    status:            "color_mm1f9atj",
-    warme_lead:        "boolean_mm1fnaay",
-    bezichtigd_adres:  "text_mm1frktj",
-    bij_wie:           "text_mm1fa4bf",
-    datum_bezichtiging:"date_mm1fs4t7",
-    adres_klant:       "text_mm1f7fzh",
-    opmerkingen:       "text_mm1f4g3q",
-    terugzetten:       "boolean_mm1nne68",
-    email_makelaar:    "text_mm1n99ky",
+    telefoon:           "phone_mm1fzq2g",
+    email:              "email_mm1fnwvn",
+    datum_ontvangen:    "date_mm1f1fw2",
+    status:             "color_mm1f9atj",
+    warme_lead:         "boolean_mm1fnaay",
+    bezichtigd_adres:   "text_mm1frktj",
+    bij_wie:            "text_mm1fa4bf",
+    datum_bezichtiging: "date_mm1fs4t7",
+    adres_klant:        "text_mm1f7fzh",
+    opmerkingen:        "text_mm1f4g3q",
+    terugzetten:        "boolean_mm1nne68",
+    email_makelaar:     "text_mm1n99ky",
   };
 
   const getCol = (cols, id) =>
     cols.find(c => c.id === id)?.text || "";
 
   try {
-    // ── 1. KOLOMMEN DEBUG ──────────────────────────────────────────────
+    // ── DEBUG: KOLOMMEN OPHALEN ────────────────────────────────────────
     if (action === "get_columns") {
       const result = await mondayFetch(`
         query ($boardId: ID!) {
@@ -63,12 +64,14 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify(result) };
     }
 
-    // ── 2. LEADS OPHALEN ───────────────────────────────────────────────
+    // ── LEADS OPHALEN — gefilterd op makelaar email ────────────────────
     if (action === "get_leads") {
+      const { board_id, makelaar_email } = data;
+
       const result = await mondayFetch(`
         query ($boardId: ID!) {
           boards(ids: [$boardId]) {
-            items_page(limit: 50) {
+            items_page(limit: 100) {
               items {
                 id
                 name
@@ -77,40 +80,52 @@ exports.handler = async (event) => {
             }
           }
         }
-      `, { boardId: data.board_id });
+      `, { boardId: board_id });
 
       const items = result?.data?.boards?.[0]?.items_page?.items || [];
-      const leads = items.map(item => {
-        const cols = item.column_values || [];
-        return {
-          id: item.id,
-          naam: item.name,
-          telefoon:  getCol(cols, COL.telefoon),
-          email:     getCol(cols, COL.email),
-          adres:     getCol(cols, COL.bezichtigd_adres),
-          status:    getCol(cols, COL.status),
-          datum:     getCol(cols, COL.datum_ontvangen),
-          adres_klant: getCol(cols, COL.adres_klant),
-          bij_wie:   getCol(cols, COL.bij_wie),
-          warme_lead: getCol(cols, COL.warme_lead),
-          opmerkingen: getCol(cols, COL.opmerkingen),
-        };
-      });
+
+      const leads = items
+        .map(item => {
+          const cols = item.column_values || [];
+          return {
+            id: item.id,
+            naam: item.name,
+            telefoon:      getCol(cols, COL.telefoon),
+            email:         getCol(cols, COL.email),
+            adres:         getCol(cols, COL.bezichtigd_adres),
+            bij_wie:       getCol(cols, COL.bij_wie),
+            datum:         getCol(cols, COL.datum_ontvangen),
+            datum_bezichtiging: getCol(cols, COL.datum_bezichtiging),
+            adres_klant:   getCol(cols, COL.adres_klant),
+            status:        getCol(cols, COL.status),
+            warme_lead:    getCol(cols, COL.warme_lead),
+            opmerkingen:   getCol(cols, COL.opmerkingen),
+            email_makelaar: getCol(cols, COL.email_makelaar),
+          };
+        })
+        // Filter op makelaar als meegegeven
+        .filter(lead => {
+          if (!makelaar_email) return true;
+          if (!lead.email_makelaar) return true; // toon ook leads zonder toewijzing
+          return lead.email_makelaar.toLowerCase().includes(
+            makelaar_email.split('@')[0].toLowerCase()
+          );
+        });
 
       return { statusCode: 200, headers, body: JSON.stringify({ leads }) };
     }
 
-    // ── 3. STATUS UPDATE ───────────────────────────────────────────────
+    // ── STATUS UPDATE ──────────────────────────────────────────────────
     if (action === "update_status") {
       const { item_id, board_id, status } = data;
 
       const statusLabels = {
-        bereikt_ja:           "Bereikt",
-        bereikt_later:        "Bel terug",
-        niet_bereikbaar:      "Niet bereikbaar",
-        wellicht_later:       "Wellicht later",
-        niet_geinteresseerd:  "Niet geïnteresseerd",
-        voicemail:            "Voicemail",
+        bereikt_ja:          "Bereikt",
+        bereikt_later:       "Bel terug",
+        niet_bereikbaar:     "Niet bereikbaar",
+        wellicht_later:      "Wellicht later",
+        niet_geinteresseerd: "Niet geïnteresseerd",
+        voicemail:           "Voicemail",
       };
 
       const result = await mondayFetch(`
