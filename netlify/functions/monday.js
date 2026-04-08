@@ -213,7 +213,7 @@ exports.handler = async (event) => {
         query {
           boards(ids: [5093190482]) {
             items_page(limit: 100) {
-              items { id name column_values { id title text type } }
+              items { id name column_values { id text } }
             }
           }
         }
@@ -221,29 +221,21 @@ exports.handler = async (event) => {
       const items = result?.data?.boards?.[0]?.items_page?.items || [];
       const bezichtigingen = items.map(item => {
         const cols = item.column_values || [];
-        const get = (...titles) => {
-          for (const t of titles) {
-            const col = cols.find(c =>
-              c.title?.toLowerCase().includes(t.toLowerCase()) || c.id === t
-            );
-            if (col?.text) return col.text;
-          }
-          return '';
-        };
+        const get = (id) => cols.find(c => c.id === id)?.text || '';
         return {
-          id: item.id,
-          naam: item.name,
-          adres:    get('bezichtigd adres', 'adres'),
-          makelaar: get('makelaar'),
-          datum:    get('datum'),
-          telefoon: get('telefoon', 'phone'),
-          email:    get('email'),
-          in_pool:  !!cols.find(c =>
-            (c.title?.toLowerCase().includes('leadpool') || c.title?.toLowerCase().includes('naar leadpool'))
-            && (c.text === 'true' || c.text === 'v')
-          ),
+          id:       item.id,
+          naam:     item.name,
+          adres:    get('text_mm1ff7f1'),
+          makelaar: get('text_mm1f3x0n'),
+          datum:    get('date_mm1fn58e'),
+          telefoon: get('phone_mm1fjavy'),
+          email:    get('email_mm1fm8b7'),
+          niet_naar_pool: get('boolean_mm1s4qcy') === 'true',
+          in_pool:  false, // button kolom is niet leesbaar
         };
       }).filter(b => {
+        // Filter uit wat niet naar de pool mag
+        if (b.niet_naar_pool) return false;
         if (!makelaar_naam) return true;
         return b.makelaar?.toLowerCase().includes(makelaar_naam.split(' ')[0].toLowerCase());
       });
@@ -253,18 +245,16 @@ exports.handler = async (event) => {
     // ── PUSH NAAR LEADPOOL ─────────────────────────────────────────────
     if (action === "push_naar_pool") {
       const { item_id } = data;
-      // Trigger de "Naar Leadpool" knop via column update
-      // De automatisering in monday pikt dit op
       const result = await mondayFetch(`
-        mutation ($itemId: ID!, $boardId: ID!) {
+        mutation ($itemId: ID!) {
           change_column_value(
             item_id: $itemId
-            board_id: $boardId
-            column_id: "button_mm1f76g9"
+            board_id: 5093190482
+            column_id: "button_mm1fnwa0"
             value: "{}"
           ) { id }
         }
-      `, { itemId: item_id, boardId: "5093190482" });
+      `, { itemId: item_id });
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, result }) };
     }
 
