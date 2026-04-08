@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>MVA Bellijst</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --navy: #1A2B5F;
+      --navy-light: #25346c;
+      --oranje: #E8500A;
+      --oranje-light: #ff6a20;
+      --wit: #ffffff;
+      --grijs: #f4f5f8;
+      --grijs-mid: #e2e5ed;
+      --grijs-tekst: #6b7280;
+      --groen: #16a34a;
+      --rood: #dc2626;
+      --geel: #d97706;
+      --blauw-zacht: #3b82f6;
+      --paars: #7c3aed;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: var(--grijs);
+      color: var(--navy);
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      background: var(--navy);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-logo .dot {
+      width: 32px; height: 32px;
+      background: var(--oranje);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; color: white; font-size: 14px;
+    }
+    .header-title { color: white; font-size: 17px; font-weight: 700; letter-spacing: 0.3px; }
+    .header-sub { color: rgba(255,255,255,0.6); font-size: 12px; }
+    .header-badge {
+      background: var(--oranje);
+      color: white;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    /* ── LOGIN SCHERM ── */
+    #login-screen {
+      padding: 40px 24px;
+      max-width: 420px;
+      margin: 0 auto;
+    }
+    .login-card {
+      background: white;
+      border-radius: 16px;
+      padding: 32px 24px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      margin-top: 24px;
+    }
+    .login-card h2 { font-size: 22px; margin-bottom: 8px; color: var(--navy); }
+    .login-card p { color: var(--grijs-tekst); font-size: 14px; margin-bottom: 28px; }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--navy); margin-bottom: 6px; }
+    .form-group select, .form-group input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid var(--grijs-mid);
+      border-radius: 10px;
+      font-size: 16px;
+      font-family: 'Roboto', sans-serif;
+      color: var(--navy);
+      background: white;
+      appearance: none;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group select:focus, .form-group input:focus { border-color: var(--navy); }
+    .btn-primary {
+      width: 100%;
+      padding: 16px;
+      background: var(--oranje);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      font-family: 'Roboto', sans-serif;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn-primary:active { transform: scale(0.98); background: var(--oranje-light); }
+
+    /* ── OVERZICHT SCHERM ── */
+    #overzicht-screen { padding: 16px; max-width: 600px; margin: 0 auto; }
+
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 14px 12px;
+      text-align: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .stat-number { font-size: 24px; font-weight: 700; color: var(--navy); }
+    .stat-label { font-size: 11px; color: var(--grijs-tekst); margin-top: 2px; }
+    .stat-card.oranje .stat-number { color: var(--oranje); }
+    .stat-card.groen .stat-number { color: var(--groen); }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--grijs-tekst);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 10px;
+      margin-top: 4px;
+    }
+
+    /* ── LEAD KAART ── */
+    .lead-card {
+      background: white;
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      border-left: 4px solid var(--grijs-mid);
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      position: relative;
+    }
+    .lead-card:active { transform: scale(0.99); }
+    .lead-card.urgent { border-left-color: var(--oranje); }
+    .lead-card.nieuw { border-left-color: var(--groen); }
+    .lead-card.later { border-left-color: var(--blauw-zacht); }
+    .lead-card.afgerond { border-left-color: var(--grijs-mid); opacity: 0.6; }
+
+    .lead-naam { font-size: 16px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+    .lead-adres { font-size: 13px; color: var(--grijs-tekst); margin-bottom: 10px; }
+    .lead-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .lead-chip {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+    .chip-nieuw { background: #dcfce7; color: #166534; }
+    .chip-urgent { background: #fed7aa; color: #9a3412; }
+    .chip-later { background: #dbeafe; color: #1e40af; }
+    .chip-wacht { background: #f3f4f6; color: #6b7280; }
+    .chip-datum { background: #f3f4f6; color: var(--navy); }
+
+    .lead-acties {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .btn-bel {
+      flex: 1;
+      padding: 12px;
+      background: var(--navy);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: 'Roboto', sans-serif;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-bel:active { background: var(--navy-light); }
+    .btn-status {
+      padding: 12px 14px;
+      background: var(--grijs);
+      color: var(--navy);
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: 'Roboto', sans-serif;
+      cursor: pointer;
+    }
+    .btn-status:active { background: var(--grijs-mid); }
+
+    /* ── STATUS MODAL ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 200;
+      align-items: flex-end;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-sheet {
+      background: white;
+      border-radius: 20px 20px 0 0;
+      width: 100%;
+      padding: 20px 20px 40px;
+      animation: slideUp 0.25s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .modal-handle {
+      width: 40px; height: 4px;
+      background: var(--grijs-mid);
+      border-radius: 2px;
+      margin: 0 auto 20px;
+    }
+    .modal-naam { font-size: 18px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+    .modal-adres { font-size: 13px; color: var(--grijs-tekst); margin-bottom: 20px; }
+    .modal-title { font-size: 14px; font-weight: 600; color: var(--grijs-tekst); margin-bottom: 12px; }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .status-btn {
+      padding: 14px 12px;
+      border: 2px solid var(--grijs-mid);
+      border-radius: 12px;
+      background: white;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+      font-family: 'Roboto', sans-serif;
+    }
+    .status-btn:active { transform: scale(0.97); }
+    .status-btn .status-icon { font-size: 22px; margin-bottom: 4px; }
+    .status-btn .status-label { font-size: 13px; font-weight: 500; color: var(--navy); }
+    .status-btn .status-sub { font-size: 11px; color: var(--grijs-tekst); }
+
+    .status-btn.bereikt_ja { border-color: var(--groen); }
+    .status-btn.bereikt_ja:active { background: #dcfce7; }
+    .status-btn.niet_geinteresseerd { border-color: var(--rood); }
+    .status-btn.niet_geinteresseerd:active { background: #fee2e2; }
+    .status-btn.niet_bereikbaar { border-color: var(--geel); }
+    .status-btn.niet_bereikbaar:active { background: #fef3c7; }
+    .status-btn.bereikt_later { border-color: var(--blauw-zacht); }
+    .status-btn.bereikt_later:active { background: #dbeafe; }
+    .status-btn.voicemail { border-color: var(--paars); }
+    .status-btn.voicemail:active { background: #ede9fe; }
+    .status-btn.wellicht_later { border-color: var(--grijs-tekst); }
+    .status-btn.wellicht_later:active { background: #f3f4f6; }
+
+    /* Datum picker voor "bel later" */
+    .datum-picker {
+      display: none;
+      background: var(--grijs);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+    .datum-picker.open { display: block; }
+    .datum-picker label { font-size: 13px; font-weight: 500; color: var(--navy); margin-bottom: 8px; display: block; }
+    .datum-picker input[type="datetime-local"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--grijs-mid);
+      border-radius: 8px;
+      font-size: 15px;
+      font-family: 'Roboto', sans-serif;
+      color: var(--navy);
+      background: white;
+      margin-bottom: 12px;
+    }
+
+    /* Notitie veld */
+    .notitie-veld {
+      margin-top: 12px;
+    }
+    .notitie-veld textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--grijs-mid);
+      border-radius: 10px;
+      font-size: 14px;
+      font-family: 'Roboto', sans-serif;
+      color: var(--navy);
+      resize: none;
+      height: 70px;
+      outline: none;
+    }
+    .notitie-veld textarea:focus { border-color: var(--navy); }
+
+    .btn-opslaan {
+      width: 100%;
+      padding: 16px;
+      background: var(--oranje);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      font-family: 'Roboto', sans-serif;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+    .btn-opslaan:disabled { background: var(--grijs-mid); color: var(--grijs-tekst); }
+    .btn-annuleer {
+      width: 100%;
+      padding: 12px;
+      background: none;
+      color: var(--grijs-tekst);
+      border: none;
+      font-size: 14px;
+      font-family: 'Roboto', sans-serif;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    /* ── FEEDBACK TOAST ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--navy);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-size: 14px;
+      font-weight: 500;
+      z-index: 300;
+      transition: transform 0.3s ease;
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.succes { background: var(--groen); }
+    .toast.fout { background: var(--rood); }
+
+    /* ── LEGE STAAT ── */
+    .leeg {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--grijs-tekst);
+    }
+    .leeg-icon { font-size: 48px; margin-bottom: 16px; }
+    .leeg h3 { font-size: 18px; color: var(--navy); margin-bottom: 8px; }
+
+    /* ── LOADING ── */
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--grijs-tekst);
+      font-size: 14px;
+    }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--grijs-mid);
+      border-top-color: var(--navy);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-logo">
+    <div class="dot">M</div>
+    <div>
+      <div class="header-title">MVA Bellijst</div>
+      <div class="header-sub" id="header-naam">Welkom</div>
+    </div>
+  </div>
+  <div class="header-badge" id="header-badge">0 leads</div>
+</div>
+
+<!-- LOGIN SCHERM -->
+<div id="login-screen">
+  <div class="login-card">
+    <h2>Goedemorgen 👋</h2>
+    <p>Selecteer jouw naam om jouw leads te zien.</p>
+    <div class="form-group">
+      <label>Wie ben jij?</label>
+      <select id="makelaar-select">
+        <option value="">— Kies jouw naam —</option>
+        <option value="mauritsrodermond@makelaarsvan.nl" data-naam="Maurits Rodermond" data-board="5093529769">Maurits Rodermond</option>
+        <option value="matthiasmakdsi@makelaarsvan.nl" data-naam="Matthias Makdsi" data-board="5093529769">Matthias Makdsi</option>
+      </select>
+    </div>
+    <button class="btn-primary" onclick="login()">Mijn leads bekijken →</button>
+  </div>
+</div>
+
+<!-- OVERZICHT SCHERM -->
+<div id="overzicht-screen" class="hidden">
+  <div class="stats-bar">
+    <div class="stat-card oranje">
+      <div class="stat-number" id="stat-vandaag">0</div>
+      <div class="stat-label">Vandaag</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" id="stat-totaal">0</div>
+      <div class="stat-label">Openstaand</div>
+    </div>
+    <div class="stat-card groen">
+      <div class="stat-number" id="stat-gedaan">0</div>
+      <div class="stat-label">Afgerond</div>
+    </div>
+  </div>
+
+  <div class="section-title">Jouw leads</div>
+  <div id="leads-container">
+    <div class="loading">
+      <div class="spinner"></div>
+      Leads ophalen...
+    </div>
+  </div>
+</div>
+
+<!-- STATUS MODAL -->
+<div class="modal-overlay" id="status-modal" onclick="sluitModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-naam" id="modal-naam">Naam</div>
+    <div class="modal-adres" id="modal-adres">Adres</div>
+    <div class="modal-title">Wat is het resultaat van dit gesprek?</div>
+
+    <div class="status-grid">
+      <button class="status-btn bereikt_ja" onclick="kiesStatus('bereikt_ja')">
+        <div class="status-icon">✅</div>
+        <div class="status-label">Bereikt</div>
+        <div class="status-sub">Geïnteresseerd</div>
+      </button>
+      <button class="status-btn niet_bereikbaar" onclick="kiesStatus('niet_bereikbaar')">
+        <div class="status-icon">📵</div>
+        <div class="status-label">Niet bereikbaar</div>
+        <div class="status-sub">Morgen opnieuw</div>
+      </button>
+      <button class="status-btn bereikt_later" onclick="kiesStatus('bereikt_later')">
+        <div class="status-icon">📲</div>
+        <div class="status-label">Bel later terug</div>
+        <div class="status-sub">Datum kiezen</div>
+      </button>
+      <button class="status-btn voicemail" onclick="kiesStatus('voicemail')">
+        <div class="status-icon">📬</div>
+        <div class="status-label">Voicemail</div>
+        <div class="status-sub">Ingesproken</div>
+      </button>
+      <button class="status-btn wellicht_later" onclick="kiesStatus('wellicht_later')">
+        <div class="status-icon">💤</div>
+        <div class="status-label">Wellicht later</div>
+        <div class="status-sub">Over 2 weken</div>
+      </button>
+      <button class="status-btn niet_geinteresseerd" onclick="kiesStatus('niet_geinteresseerd')">
+        <div class="status-icon">❌</div>
+        <div class="status-label">Niet geïnt.</div>
+        <div class="status-sub">Lead sluiten</div>
+      </button>
+    </div>
+
+    <!-- Datum picker (alleen bij "bel later terug") -->
+    <div class="datum-picker" id="datum-picker">
+      <label>Wanneer terugbellen?</label>
+      <input type="datetime-local" id="terugbel-datum" />
+    </div>
+
+    <!-- Notitie -->
+    <div class="notitie-veld">
+      <textarea id="notitie-input" placeholder="Notitie (optioneel)..."></textarea>
+    </div>
+
+    <button class="btn-opslaan" id="btn-opslaan" disabled onclick="slaOpEnSluit()">
+      Opslaan in Cloze →
+    </button>
+    <button class="btn-annuleer" onclick="sluitModalDirect()">Annuleren</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── STATE ───────────────────────────────────────────────────────────
+  let huidigeMakelaar = null;
+  let huidigeLead = null;
+  let gekozenStatus = null;
+  let leadsData = [];
+
+  // ── LOGIN ───────────────────────────────────────────────────────────
+  function login() {
+    const select = document.getElementById('makelaar-select');
+    const opt = select.options[select.selectedIndex];
+    if (!opt.value) { toonToast('Kies eerst jouw naam', 'fout'); return; }
+
+    huidigeMakelaar = {
+      email: opt.value,
+      naam: opt.dataset.naam,
+      boardId: opt.dataset.board,
+    };
+
+    document.getElementById('header-naam').textContent = huidigeMakelaar.naam;
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('overzicht-screen').classList.remove('hidden');
+
+    laadLeads();
+  }
+
+  // ── LEADS LADEN (via monday API) ────────────────────────────────────
+  async function laadLeads() {
+    document.getElementById('leads-container').innerHTML =
+      '<div class="loading"><div class="spinner"></div>Leads ophalen...</div>';
+
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get_leads',
+          data: { board_id: huidigeMakelaar.boardId }
+        })
+      });
+
+      const json = await res.json();
+      const items = json?.data?.boards?.[0]?.items_page?.items || [];
+
+      // Parse de monday items naar bruikbare lead objecten
+      leadsData = items.map(item => {
+        const cols = {};
+        item.column_values.forEach(c => { cols[c.id] = c.text; });
+        return {
+          id: item.id,
+          naam: item.name,
+          telefoon: cols['telefoon'] || cols['phone'] || '',
+          email: cols['email'] || '',
+          adres: cols['bezichtigd_adres'] || cols['text'] || '',
+          status: cols['status'] || '',
+          datum: cols['datum_ontvangen'] || cols['date'] || '',
+        };
+      });
+
+      renderLeads();
+    } catch (err) {
+      // Demo-data als monday niet bereikbaar is
+      leadsData = getDemoLeads();
+      renderLeads();
+    }
+  }
+
+  function getDemoLeads() {
+    return [
+      { id: '1', naam: 'Lois Hericher', telefoon: '+31627895386', email: 'loishericher00@hotmail.com', adres: 'Jan van Galenstraat 213', status: '', datum: '2025-01-09' },
+      { id: '2', naam: 'Loïs Nelissen', telefoon: '+31630128278', email: 'lois.nelissen@gmail.com', adres: 'Jan van Galenstraat 213', status: '', datum: '2025-01-16' },
+      { id: '3', naam: 'Djurre Heemskerk', telefoon: '+31640397945', email: 'djurreheemskerk@gmail.com', adres: 'Jan van Galenstraat 213', status: 'niet_bereikbaar', datum: '2025-01-09' },
+      { id: '4', naam: 'Victor Smiits', telefoon: '+31686493456', email: 'smits.v@gmail.com', adres: 'Fritz Dietrich Kahlenbergstraat 22', status: '', datum: '2025-02-03' },
+      { id: '5', naam: 'Floor Geelen', telefoon: '+31640216134', email: 'floorgeelen@hotmail.com', adres: 'Bronckhorststraat 50', status: 'bereikt_later', datum: '2025-02-06' },
+    ];
+  }
+
+  function renderLeads() {
+    const container = document.getElementById('leads-container');
+    const openstaand = leadsData.filter(l => !['bereikt_ja','niet_geinteresseerd'].includes(l.status));
+    const afgerond = leadsData.filter(l => ['bereikt_ja','niet_geinteresseerd'].includes(l.status));
+
+    document.getElementById('stat-totaal').textContent = openstaand.length;
+    document.getElementById('stat-vandaag').textContent = openstaand.filter(l => !l.status).length;
+    document.getElementById('stat-gedaan').textContent = afgerond.length;
+    document.getElementById('header-badge').textContent = openstaand.length + ' leads';
+
+    if (leadsData.length === 0) {
+      container.innerHTML = `<div class="leeg">
+        <div class="leeg-icon">🎉</div>
+        <h3>Alles afgehandeld!</h3>
+        <p>Je hebt geen openstaande leads meer.</p>
+      </div>`;
+      return;
+    }
+
+    container.innerHTML = leadsData.map(lead => {
+      const chipClass = {
+        '': 'chip-nieuw',
+        'niet_bereikbaar': 'chip-urgent',
+        'bereikt_later': 'chip-later',
+        'voicemail': 'chip-wacht',
+        'wellicht_later': 'chip-wacht',
+        'bereikt_ja': 'chip-nieuw',
+        'niet_geinteresseerd': 'chip-wacht',
+      }[lead.status] || 'chip-nieuw';
+
+      const chipLabel = {
+        '': 'Nieuw',
+        'niet_bereikbaar': 'Niet bereikbaar',
+        'bereikt_later': 'Bel terug',
+        'voicemail': 'Voicemail',
+        'wellicht_later': 'Wellicht later',
+        'bereikt_ja': '✅ Bereikt',
+        'niet_geinteresseerd': '❌ Afgerond',
+      }[lead.status] || 'Nieuw';
+
+      const cardClass = {
+        '': 'nieuw',
+        'niet_bereikbaar': 'urgent',
+        'bereikt_later': 'later',
+        'bereikt_ja': 'afgerond',
+        'niet_geinteresseerd': 'afgerond',
+      }[lead.status] || '';
+
+      return `
+        <div class="lead-card ${cardClass}" onclick="openModal('${lead.id}')">
+          <div class="lead-naam">${lead.naam}</div>
+          <div class="lead-adres">📍 ${lead.adres}</div>
+          <div class="lead-meta">
+            <span class="lead-chip ${chipClass}">${chipLabel}</span>
+            ${lead.datum ? `<span class="lead-chip chip-datum">📅 ${lead.datum}</span>` : ''}
+          </div>
+          <div class="lead-acties" onclick="event.stopPropagation()">
+            <button class="btn-bel" onclick="bel('${lead.telefoon}', '${lead.naam}')">
+              📞 Bellen
+            </button>
+            <button class="btn-status" onclick="openModal('${lead.id}')">
+              Status →
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // ── BELLEN ──────────────────────────────────────────────────────────
+  function bel(telefoon, naam) {
+    if (!telefoon) { toonToast('Geen telefoonnummer bekend', 'fout'); return; }
+    window.location.href = `tel:${telefoon}`;
+  }
+
+  // ── MODAL ───────────────────────────────────────────────────────────
+  function openModal(leadId) {
+    huidigeLead = leadsData.find(l => l.id === leadId);
+    if (!huidigeLead) return;
+
+    document.getElementById('modal-naam').textContent = huidigeLead.naam;
+    document.getElementById('modal-adres').textContent = '📍 ' + huidigeLead.adres;
+    document.getElementById('notitie-input').value = '';
+    document.getElementById('datum-picker').classList.remove('open');
+    document.getElementById('btn-opslaan').disabled = true;
+    gekozenStatus = null;
+
+    // Reset datum naar morgen
+    const morgen = new Date(Date.now() + 86400000);
+    morgen.setHours(9, 0, 0, 0);
+    document.getElementById('terugbel-datum').value = morgen.toISOString().slice(0,16);
+
+    document.getElementById('status-modal').classList.add('open');
+  }
+
+  function sluitModal(event) {
+    if (event.target === document.getElementById('status-modal')) sluitModalDirect();
+  }
+
+  function sluitModalDirect() {
+    document.getElementById('status-modal').classList.remove('open');
+    gekozenStatus = null;
+    huidigeLead = null;
+  }
+
+  function kiesStatus(status) {
+    gekozenStatus = status;
+
+    // Highlight geselecteerde knop
+    document.querySelectorAll('.status-btn').forEach(b => b.style.opacity = '0.5');
+    document.querySelector(`.status-btn.${status}`).style.opacity = '1';
+
+    // Datum picker tonen bij "bel later"
+    const picker = document.getElementById('datum-picker');
+    picker.classList.toggle('open', status === 'bereikt_later');
+
+    document.getElementById('btn-opslaan').disabled = false;
+  }
+
+  // ── OPSLAAN IN CLOZE ────────────────────────────────────────────────
+  async function slaOpEnSluit() {
+    if (!gekozenStatus || !huidigeLead) return;
+
+    const btn = document.getElementById('btn-opslaan');
+    btn.disabled = true;
+    btn.textContent = 'Opslaan...';
+
+    const notitie = document.getElementById('notitie-input').value;
+    const terugbelDatum = document.getElementById('terugbel-datum').value;
+
+    try {
+      // 1. Persoon aanmaken/updaten in Cloze
+      await fetch('/.netlify/functions/cloze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'upsert_person',
+          data: {
+            naam: huidigeLead.naam,
+            email: huidigeLead.email,
+            telefoon: huidigeLead.telefoon,
+            adres: huidigeLead.adres,
+            makelaar_email: huidigeMakelaar.email,
+          }
+        })
+      });
+
+      // 2. Belpoging loggen
+      await fetch('/.netlify/functions/cloze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'log_call',
+          data: {
+            naam: huidigeLead.naam,
+            telefoon: huidigeLead.telefoon,
+            adres: huidigeLead.adres,
+            outcome: gekozenStatus,
+            notitie,
+            makelaar_email: huidigeMakelaar.email,
+          }
+        })
+      });
+
+      // 3. Follow-up todo aanmaken indien nodig
+      if (['niet_bereikbaar', 'voicemail', 'bereikt_later', 'wellicht_later'].includes(gekozenStatus)) {
+        let followUpDatum;
+        if (gekozenStatus === 'bereikt_later') {
+          followUpDatum = new Date(terugbelDatum).toISOString();
+        } else if (gekozenStatus === 'wellicht_later') {
+          followUpDatum = new Date(Date.now() + 14 * 86400000).toISOString();
+        } else {
+          followUpDatum = new Date(Date.now() + 86400000).toISOString();
+        }
+
+        await fetch('/.netlify/functions/cloze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'create_todo',
+            data: {
+              naam: huidigeLead.naam,
+              telefoon: huidigeLead.telefoon,
+              datum: followUpDatum,
+              omschrijving: `Nabellen: ${huidigeLead.naam} | ${huidigeLead.adres}`,
+              makelaar_email: huidigeMakelaar.email,
+            }
+          })
+        });
+      }
+
+      // 4. Status updaten in monday
+      await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_status',
+          data: {
+            item_id: huidigeLead.id,
+            board_id: huidigeMakelaar.boardId,
+            status: gekozenStatus,
+          }
+        })
+      });
+
+      // 5. Lokaal updaten
+      const lead = leadsData.find(l => l.id === huidigeLead.id);
+      if (lead) lead.status = gekozenStatus;
+
+      sluitModalDirect();
+      renderLeads();
+      toonToast('✅ Opgeslagen in Cloze', 'succes');
+
+    } catch (err) {
+      toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
+      btn.disabled = false;
+      btn.textContent = 'Opslaan in Cloze →';
+    }
+  }
+
+  // ── TOAST ───────────────────────────────────────────────────────────
+  function toonToast(bericht, type = '') {
+    const toast = document.getElementById('toast');
+    toast.textContent = bericht;
+    toast.className = 'toast show ' + type;
+    setTimeout(() => { toast.className = 'toast'; }, 3000);
+  }
+</script>
+</body>
+</html>
