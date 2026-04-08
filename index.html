@@ -393,6 +393,23 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .hidden { display: none !important; }
+
+    /* ── CLOZE BADGE ── */
+    .cloze-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .cloze-badge.bekend {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+    .cloze-badge.nieuw {
+      background: #dcfce7;
+      color: #15803d;
+    }
   </style>
 </head>
 <body>
@@ -631,6 +648,10 @@
       });
 
       renderLeads();
+
+      // Async Cloze check per lead — badge verschijnt zodra resultaat er is
+      checkClozeBestaand();
+
     } catch (err) {
       // Demo-data als monday niet bereikbaar is
       leadsData = getDemoLeads();
@@ -646,6 +667,36 @@
       { id: '4', naam: 'Victor Smiits', telefoon: '+31686493456', email: 'smits.v@gmail.com', adres: 'Fritz Dietrich Kahlenbergstraat 22', status: '', datum: '2025-02-03' },
       { id: '5', naam: 'Floor Geelen', telefoon: '+31640216134', email: 'floorgeelen@hotmail.com', adres: 'Bronckhorststraat 50', status: 'bereikt_later', datum: '2025-02-06' },
     ];
+  }
+
+  // ── CLOZE CHECK — async badge per lead ──────────────────────────────
+  async function checkClozeBestaand() {
+    for (const lead of leadsData) {
+      if (!lead.email && !lead.telefoon) continue;
+      try {
+        const res = await fetch('/.netlify/functions/cloze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'check_bestaand',
+            data: { email: lead.email, telefoon: lead.telefoon, naam: lead.naam }
+          })
+        });
+        const json = await res.json();
+        lead.cloze_bestaand = json.bestaand;
+        lead.cloze_stage = json.stage;
+
+        // Update badge in DOM zonder volledige re-render
+        const badge = document.getElementById(`cloze-badge-${lead.id}`);
+        if (badge) {
+          if (json.bestaand) {
+            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
+          } else {
+            badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`;
+          }
+        }
+      } catch (e) { /* stille fout — badge blijft leeg */ }
+    }
   }
 
   function renderLeads() {
@@ -704,15 +755,22 @@
           <div class="lead-meta" style="margin-top:8px">
             <span class="lead-chip ${chipClass}">${chipLabel}</span>
           </div>
-          <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;color:var(--grijs-tekst);flex-wrap:wrap">
-            ${lead.datum_bezichtiging ? `<span>🏠 Bezichtiging: <strong style="color:var(--navy)">${lead.datum_bezichtiging}</strong></span>` : ''}
-            ${lead.datum ? `<span>📥 In pool: <strong style="color:var(--navy)">${lead.datum}</strong></span>` : ''}
+          <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;flex-wrap:wrap">
+            ${lead.datum_bezichtiging ? `<span style="color:var(--navy);font-weight:500">🏠 Bezichtiging: <strong>${lead.datum_bezichtiging}</strong></span>` : ''}
+            ${lead.datum ? `<span style="color:var(--grijs-tekst)">📥 In pool: <strong>${lead.datum}</strong></span>` : ''}
           </div>
           <div style="display:flex;gap:8px;margin-top:6px;font-size:12px;color:var(--grijs-tekst)">
             ${lead.telefoon ? `<span>📞 ${lead.telefoon}</span>` : ''}
             ${lead.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">✉️ ${lead.email}</span>` : ''}
           </div>
           ${lead.opmerkingen ? `<div style="margin-top:6px;font-size:12px;color:var(--grijs-tekst);font-style:italic">💬 ${lead.opmerkingen}</div>` : ''}
+          <div id="cloze-badge-${lead.id}" style="margin-top:8px;min-height:22px">
+            ${lead.cloze_bestaand === true
+              ? `<span class="cloze-badge bekend">📁 Bekend in Cloze${lead.cloze_stage ? ' · ' + lead.cloze_stage : ''}</span>`
+              : lead.cloze_bestaand === false
+              ? `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`
+              : `<span style="font-size:11px;color:var(--grijs-tekst)">⏳ Cloze check...</span>`}
+          </div>
           <div class="lead-acties" onclick="event.stopPropagation()">
             <button class="btn-bel" onclick="bel('${lead.telefoon}', '${lead.naam}')">
               📞 Bellen

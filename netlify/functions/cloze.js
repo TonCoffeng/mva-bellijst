@@ -148,6 +148,38 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify(result) };
     }
 
+    // ── CHECK OF PERSOON AL IN CLOZE STAAT ────────────────────────────
+    if (action === "check_bestaand") {
+      const { email, telefoon, naam } = data;
+
+      // Zoek op email eerst, dan telefoon, dan naam
+      const queries = [email, telefoon, naam].filter(Boolean);
+      let gevonden = null;
+
+      for (const query of queries) {
+        const res = await fetch(
+          `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(query)}&pagesize=1`
+        );
+        const json = await res.json();
+        if (json?.people?.length > 0) {
+          gevonden = json.people[0];
+          break;
+        }
+      }
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          bestaand: !!gevonden,
+          naam: gevonden?.name || null,
+          stage: gevonden?.stage || null,
+          // Hoeveel interacties er al zijn (geeft inschatting van relatiediepte)
+          interacties: gevonden?.engagement?.score || null,
+        }),
+      };
+    }
+
     return {
       statusCode: 400,
       headers,
