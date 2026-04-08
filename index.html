@@ -862,13 +862,36 @@
         })
       });
 
-      // 5. Lokaal updaten
+      // 5. Bedank-mail naar gevende makelaar bij bereikt_ja
+      if (gekozenStatus === 'bereikt_ja' && huidigeLead.bij_wie) {
+        fetch('/.netlify/functions/mail', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'bedank_mail',
+            data: {
+              ontvangende_makelaar: huidigeMakelaar.naam,
+              ontvangende_email:    huidigeMakelaar.email,
+              gevende_makelaar:     huidigeLead.bij_wie,
+              lead_naam:            huidigeLead.naam,
+              lead_adres:           huidigeLead.adres,
+              notitie:              notitie || '',
+            }
+          })
+        }); // fire-and-forget, niet awaiten zodat UI niet wacht
+      }
+
+      // 6. Lokaal updaten
       const lead = leadsData.find(l => l.id === huidigeLead.id);
       if (lead) lead.status = gekozenStatus;
 
       sluitModalDirect();
       renderLeads();
-      toonToast('✅ Opgeslagen in Cloze', 'succes');
+
+      const bericht = gekozenStatus === 'bereikt_ja' && huidigeLead.bij_wie
+        ? `✅ Opgeslagen — bedankmail verstuurd naar ${huidigeLead.bij_wie}`
+        : '✅ Opgeslagen in Cloze';
+      toonToast(bericht, 'succes');
 
     } catch (err) {
       toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
