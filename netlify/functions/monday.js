@@ -242,6 +242,7 @@ exports.handler = async (event) => {
           telefoon: get('phone_mm1fjavy'),
           email:    get('email_mm1fm8b7'),
           niet_naar_pool: get('boolean_mm1s4qcy') === 'true',
+          feedback: get('text_mm1fy05p'), // Adres klant kolom hergebruiken voor feedback
           in_pool:  false,
         };
       }).filter(b => {
@@ -266,6 +267,25 @@ exports.handler = async (event) => {
         }
       `, { itemId: item_id });
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, result }) };
+    }
+
+    // ── FEEDBACK OPSLAAN IN BEZICHTIGINGEN BORD ───────────────────────
+    if (action === "sla_feedback_op") {
+      const { item_id, feedback_tekst } = data;
+      const result = await mondayFetch(`
+        mutation ($itemId: ID!, $value: JSON!) {
+          change_column_value(
+            item_id: $itemId
+            board_id: 5093190482
+            column_id: "text_mm1fy05p"
+            value: $value
+          ) { id }
+        }
+      `, {
+        itemId: item_id,
+        value: JSON.stringify(feedback_tekst),
+      });
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
     }
 
     return {

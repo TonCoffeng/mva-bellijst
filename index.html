@@ -449,6 +449,50 @@
 
     .hidden { display: none !important; }
 
+    /* ── FEEDBACK KNOPPEN ── */
+    .feedback-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .btn-feedback {
+      padding: 10px 8px;
+      background: #f4f5f8;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--navy);
+      cursor: pointer;
+      text-align: left;
+      transition: all .15s;
+    }
+    .btn-feedback:hover { background: #e8eaf6; }
+    .btn-feedback.actief {
+      background: #fff3e0;
+      border-color: var(--oranje);
+      color: var(--oranje);
+      font-weight: 700;
+    }
+    .btn-feedback-opslaan {
+      width: 100%;
+      padding: 11px;
+      background: var(--navy);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 10px;
+      transition: background .2s;
+    }
+    .btn-feedback-opslaan:hover { background: #1e3a8a; }
+    .btn-feedback-opslaan:disabled { background: var(--grijs-mid); color: var(--grijs-tekst); cursor: default; }
+    .bez-open { border-left-color: var(--oranje) !important; }
+    .bez-gedaan { border-left-color: var(--groen) !important; }
+
     /* ── CLOZE BADGE ── */
     .cloze-badge {
       display: inline-block;
@@ -516,7 +560,7 @@
     </div>
     <div class="stat-card">
       <div class="stat-number" id="stat-geven-nieuw">0</div>
-      <div class="stat-label">Nog niet gedeeld</div>
+      <div class="stat-label">Open feedback</div>
     </div>
     <div class="stat-card groen">
       <div class="stat-number" id="stat-geven-gedeeld">0</div>
@@ -758,7 +802,94 @@
     ];
   }
 
-  // ── BEZICHTIGINGEN LADEN (gevende makelaar) ─────────────────────────
+  // ── FEEDBACK TOGGLE ──────────────────────────────────────────────────
+  function toggleFeedback(bezId, key, btn) {
+    btn.classList.toggle('actief');
+
+    // Tel actieve knoppen
+    const grid = document.getElementById(`fg-${bezId}`);
+    const actief = grid.querySelectorAll('.btn-feedback.actief').length;
+    const opslaanBtn = document.getElementById(`fbo-${bezId}`);
+    opslaanBtn.disabled = actief === 0;
+  }
+
+  // ── FEEDBACK OPSLAAN ─────────────────────────────────────────────────
+  async function slaFeedbackOp(bezId, naam, adres, email, telefoon) {
+    const grid = document.getElementById(`fg-${bezId}`);
+    const actief = Array.from(grid.querySelectorAll('.btn-feedback.actief'))
+      .map(b => b.id.replace(`fb-${bezId}-`, ''));
+
+    if (actief.length === 0) return;
+
+    const opslaanBtn = document.getElementById(`fbo-${bezId}`);
+    opslaanBtn.disabled = true;
+    opslaanBtn.textContent = 'Opslaan...';
+
+    const feedbackLabels = {
+      serieus:    '🔥 Serieuze koper',
+      verkoop:    '💰 Verkoopprospect',
+      aankoop:    '🏠 Aankoopprospect',
+      makelaar:   '✋ Heeft makelaar',
+      geen_beeld: '💭 Geen beeld',
+      noshow:     '🚫 No-show',
+    };
+    const feedbackTekst = actief.map(k => feedbackLabels[k]).join(', ');
+
+    try {
+      // 1. Opslaan in monday als opmerkingen-update
+      await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'sla_feedback_op',
+          data: { item_id: bezId, feedback: actief.join(','), feedback_tekst: feedbackTekst }
+        })
+      });
+
+      // 2. Opslaan in Cloze als notitie
+      if (email || telefoon) {
+        await fetch('/.netlify/functions/cloze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'log_call',
+            data: {
+              naam, telefoon, adres,
+              outcome: 'bereikt_ja',
+              notitie: `Feedback bezichtiging: ${feedbackTekst}`,
+              makelaar_email: huidigeMakelaar.email,
+            }
+          })
+        });
+      }
+
+      // UI updaten
+      opslaanBtn.textContent = '✅ Opgeslagen!';
+      const card = document.getElementById(`bez-${bezId}`);
+      card.classList.remove('bez-open');
+      card.classList.add('bez-gedaan');
+
+      // Open → Klaar badge
+      const badge = card.querySelector('[style*="Open"]') || card.querySelector('span');
+      card.querySelectorAll('span').forEach(s => {
+        if (s.textContent.includes('● Open')) {
+          s.style.background = '#e8f5e9';
+          s.style.color = '#2e7d32';
+          s.textContent = '✓ Klaar';
+        }
+      });
+
+      // Stats bijwerken
+      const open = document.querySelectorAll('.bez-open').length;
+      document.getElementById('stat-geven-nieuw').textContent = open;
+
+      toonToast(`✅ Feedback opgeslagen voor ${naam}`, 'succes');
+    } catch (err) {
+      opslaanBtn.disabled = false;
+      opslaanBtn.textContent = '💾 Feedback opslaan';
+      toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
+    }
+  }
   async function laadBezichtigingen() {
     const container = document.getElementById('geven-container');
     container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--grijs-tekst)"><div class="spinner"></div>Bezichtigingen laden...</div>';
@@ -777,8 +908,9 @@
 
       const totaal = items.length;
       const gedeeld = items.filter(b => b.in_pool).length;
+      const openFeedback = items.filter(b => !b.feedback).length;
       document.getElementById('stat-geven-totaal').textContent = totaal;
-      document.getElementById('stat-geven-nieuw').textContent = totaal - gedeeld;
+      document.getElementById('stat-geven-nieuw').textContent = openFeedback;
       document.getElementById('stat-geven-gedeeld').textContent = gedeeld;
       document.getElementById('header-badge').textContent = totaal + ' bezichtigingen';
 
@@ -793,18 +925,56 @@
 
       container.innerHTML = items.map(b => {
         const alGedeeld = b.in_pool;
+        const feedbackOpties = [
+          { key: 'serieus',    emoji: '🔥', label: 'Serieuze koper' },
+          { key: 'verkoop',    emoji: '💰', label: 'Verkoopprospect' },
+          { key: 'aankoop',   emoji: '🏠', label: 'Aankoopprospect' },
+          { key: 'makelaar',  emoji: '✋', label: 'Heeft makelaar' },
+          { key: 'geen_beeld',emoji: '💭', label: 'Geen beeld' },
+          { key: 'noshow',    emoji: '🚫', label: 'No-show' },
+        ];
+        const huidigeFeedback = b.feedback ? b.feedback.split(',') : [];
         return `
-          <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''}" id="bez-${b.id}">
-            <div class="bez-naam">${b.naam}</div>
-            <div class="bez-adres">📍 ${b.adres || '—'}</div>
-            <div class="bez-meta">
+          <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''} ${huidigeFeedback.length === 0 ? 'bez-open' : 'bez-gedaan'}" id="bez-${b.id}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div>
+                <div class="bez-naam">${b.naam}</div>
+                <div class="bez-adres">📍 ${b.adres || '—'}</div>
+              </div>
+              ${huidigeFeedback.length === 0
+                ? `<span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap">● Open</span>`
+                : `<span style="background:#e8f5e9;color:#2e7d32;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap">✓ Klaar</span>`}
+            </div>
+            <div class="bez-meta" style="margin-top:8px">
               ${b.datum ? `<span>📅 <strong>${b.datum}</strong>${b.tijdstip ? ' om ' + b.tijdstip : ''}</span>` : ''}
               ${b.telefoon ? `<span>📞 ${b.telefoon}</span>` : ''}
               ${b.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px">✉️ ${b.email}</span>` : ''}
             </div>
-            <div id="cloze-badge-${b.id}" style="margin-top:8px;min-height:20px">
+            <div id="cloze-badge-${b.id}" style="margin-top:6px;min-height:20px">
               <span style="font-size:11px;color:var(--grijs-tekst)">⏳ Cloze check...</span>
             </div>
+
+            <!-- FEEDBACK KNOPPEN -->
+            <div style="margin-top:12px">
+              <div style="font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em;margin-bottom:6px">FEEDBACK (meerdere mogelijk)</div>
+              <div class="feedback-grid" id="fg-${b.id}">
+                ${feedbackOpties.map(f => `
+                  <button
+                    class="btn-feedback ${huidigeFeedback.includes(f.key) ? 'actief' : ''}"
+                    id="fb-${b.id}-${f.key}"
+                    onclick="toggleFeedback('${b.id}', '${f.key}', this)">
+                    ${f.emoji} ${f.label}
+                  </button>`).join('')}
+              </div>
+              <button
+                class="btn-feedback-opslaan"
+                id="fbo-${b.id}"
+                onclick="slaFeedbackOp('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}', '${b.email || ''}', '${b.telefoon || ''}')"
+                ${huidigeFeedback.length === 0 ? 'disabled' : ''}>
+                💾 Feedback opslaan
+              </button>
+            </div>
+
             <button
               class="btn-naar-pool ${alGedeeld ? 'gedeeld' : ''}"
               id="btn-${b.id}"
