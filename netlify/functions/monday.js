@@ -213,7 +213,7 @@ exports.handler = async (event) => {
         query {
           boards(ids: [5093190482]) {
             items_page(limit: 100) {
-              items { id name column_values { id text } }
+              items { id name column_values { id text value } }
             }
           }
         }
@@ -222,19 +222,29 @@ exports.handler = async (event) => {
       const bezichtigingen = items.map(item => {
         const cols = item.column_values || [];
         const get = (id) => cols.find(c => c.id === id)?.text || '';
+        const getVal = (id) => {
+          const raw = cols.find(c => c.id === id)?.value;
+          try { return raw ? JSON.parse(raw) : null; } catch { return null; }
+        };
+
+        // Datum + tijdstip uit value JSON
+        const datumVal = getVal('date_mm1fn58e');
+        const datum = datumVal?.date || get('date_mm1fn58e');
+        const tijdstip = datumVal?.time ? datumVal.time.substring(0, 5) : null;
+
         return {
           id:       item.id,
           naam:     item.name,
           adres:    get('text_mm1ff7f1'),
           makelaar: get('text_mm1f3x0n'),
-          datum:    get('date_mm1fn58e'),
+          datum,
+          tijdstip,
           telefoon: get('phone_mm1fjavy'),
           email:    get('email_mm1fm8b7'),
           niet_naar_pool: get('boolean_mm1s4qcy') === 'true',
-          in_pool:  false, // button kolom is niet leesbaar
+          in_pool:  false,
         };
       }).filter(b => {
-        // Filter uit wat niet naar de pool mag
         if (b.niet_naar_pool) return false;
         if (!makelaar_naam) return true;
         return b.makelaar?.toLowerCase().includes(makelaar_naam.split(' ')[0].toLowerCase());

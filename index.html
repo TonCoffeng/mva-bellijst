@@ -798,7 +798,7 @@
             <div class="bez-naam">${b.naam}</div>
             <div class="bez-adres">📍 ${b.adres || '—'}</div>
             <div class="bez-meta">
-              ${b.datum ? `<span>📅 Bezichtiging: <strong>${b.datum}</strong></span>` : ''}
+              ${b.datum ? `<span>📅 <strong>${b.datum}</strong>${b.tijdstip ? ' om ' + b.tijdstip : ''}</span>` : ''}
               ${b.telefoon ? `<span>📞 ${b.telefoon}</span>` : ''}
               ${b.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px">✉️ ${b.email}</span>` : ''}
             </div>
