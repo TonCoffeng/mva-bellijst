@@ -1390,22 +1390,50 @@
   }
 
   // ── SERVICE WORKER + PUSH ────────────────────────────────────────────
+  const VAPID_PUBLIC_KEY = 'BPnjL9NWOY5abuWusCqEez8765vTG8jNn1V5rtEoll6MqiNznTzUDKNHd1pSbDYhYTpg9sWISVZnZ2Q3uO7-TMU';
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+
   async function registreerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
       const reg = await navigator.serviceWorker.register('/sw.js');
       console.log('SW geregistreerd');
 
-      // Vraag push permissie aan als makelaar is ingelogd
-      if (huidigeMakelaar && 'Notification' in window) {
-        const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-          console.log('Push permissie verleend');
-          toonToast('✅ Meldingen ingeschakeld!', 'succes');
-        }
-      }
+      if (!huidigeMakelaar || !('Notification' in window)) return;
+
+      // Vraag push permissie
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') return;
+
+      // Registreer subscription bij de server
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+
+      // Stuur subscription naar Netlify function voor opslag
+      await fetch('/.netlify/functions/push-subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscription,
+          makelaar_email: huidigeMakelaar.email,
+          makelaar_naam: huidigeMakelaar.naam,
+        })
+      });
+
+      console.log('Push subscription opgeslagen voor', huidigeMakelaar.naam);
+      toonToast('🔔 Push-meldingen ingeschakeld!', 'succes');
     } catch (err) {
-      console.log('SW registratie mislukt:', err);
+      console.log('SW/Push registratie mislukt:', err);
     }
   }
 
