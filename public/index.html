@@ -834,6 +834,8 @@
     // Toon het grid en de opslaan knop weer
     document.getElementById(`fg-${bezId}`).style.display = 'grid';
     document.getElementById(`fbo-${bezId}`).style.display = 'block';
+    const opmEl = document.getElementById(`opmerking-${bezId}`);
+    if (opmEl) opmEl.style.display = 'block';
   }
 
   // ── FEEDBACK TOGGLE ──────────────────────────────────────────────────
@@ -855,6 +857,9 @@
 
     if (actief.length === 0) return;
 
+    const opmerkingEl = document.getElementById(`opmerking-${bezId}`);
+    const opmerking = opmerkingEl?.value?.trim() || '';
+
     const opslaanBtn = document.getElementById(`fbo-${bezId}`);
     opslaanBtn.disabled = true;
     opslaanBtn.textContent = 'Opslaan...';
@@ -867,7 +872,7 @@
       geen_beeld: '💭 Geen beeld',
       noshow:     '🚫 No-show',
     };
-    const feedbackTekst = actief.map(k => feedbackLabels[k]).join(', ');
+    const feedbackTekst = actief.map(k => feedbackLabels[k]).join(', ') + (opmerking ? ` — ${opmerking}` : '');
 
     try {
       // 1. Opslaan in monday als opmerkingen-update
@@ -899,6 +904,7 @@
 
       // UI updaten
       opslaanBtn.textContent = '✅ Opgeslagen!';
+      if (opmerkingEl) opmerkingEl.style.display = 'none';
       const card = document.getElementById(`bez-${bezId}`);
       card.classList.remove('bez-open');
       card.classList.add('bez-gedaan');
@@ -1021,6 +1027,11 @@
                     ${f.emoji} ${f.label}
                   </button>`).join('')}
               </div>
+              <textarea
+                id="opmerking-${b.id}"
+                placeholder="Opmerking (optioneel)..."
+                style="${heeftFeedback ? 'display:none' : ''};width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--grijs-mid);border-radius:10px;font-size:13px;font-family:inherit;color:var(--navy);resize:none;height:60px;margin-bottom:8px;background:var(--wit)"
+                rows="2"></textarea>
               <button
                 class="btn-feedback-opslaan ${heeftFeedback ? 'verborgen' : ''}"
                 id="fbo-${b.id}"
