@@ -529,7 +529,10 @@
       <div class="header-sub" id="header-naam">Welkom</div>
     </div>
   </div>
-  <div class="header-badge" id="header-badge">0 leads</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <button id="btn-terug" class="hidden" onclick="gaNaarLogin()" style="background:none;border:1px solid rgba(255,255,255,0.35);color:white;padding:5px 14px;border-radius:20px;font-size:13px;cursor:pointer;font-family:inherit">← Terug</button>
+    <div class="header-badge" id="header-badge">0 leads</div>
+  </div>
 </div>
 
 <!-- LOGIN SCHERM -->
@@ -723,6 +726,7 @@
 
     document.getElementById('header-naam').textContent = huidigeMakelaar.naam;
     document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('btn-terug').classList.remove('hidden');
 
     // Registreer service worker en vraag push permissie
     registreerServiceWorker();
@@ -810,6 +814,19 @@
       { id: '4', naam: 'Victor Smiits', telefoon: '+31686493456', email: 'smits.v@gmail.com', adres: 'Fritz Dietrich Kahlenbergstraat 22', status: '', datum: '2025-02-03' },
       { id: '5', naam: 'Floor Geelen', telefoon: '+31640216134', email: 'floorgeelen@hotmail.com', adres: 'Bronckhorststraat 50', status: 'bereikt_later', datum: '2025-02-06' },
     ];
+  }
+
+  // ── TERUG NAAR LOGIN ─────────────────────────────────────────────────
+  function gaNaarLogin() {
+    huidigeMakelaar = null;
+    leadsData = [];
+    document.getElementById('geven-screen').classList.add('hidden');
+    document.getElementById('overzicht-screen').classList.add('hidden');
+    document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('btn-terug').classList.add('hidden');
+    document.getElementById('header-naam').textContent = 'Welkom';
+    document.getElementById('header-badge').textContent = '0 leads';
+    document.getElementById('makelaar-select').value = '';
   }
 
   // ── FEEDBACK BEWERKEN ────────────────────────────────────────────────
@@ -1014,13 +1031,24 @@
               </button>
             </div>
 
-            <button
-              class="btn-naar-pool ${alGedeeld ? 'gedeeld' : ''}"
-              id="btn-${b.id}"
-              onclick="geefNaarPool('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
-              ${alGedeeld ? 'disabled' : ''}>
-              ${alGedeeld ? '✅ Al in de pool' : '📤 Geef door aan pool'}
-            </button>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button
+                class="btn-naar-pool ${alGedeeld ? 'gedeeld' : ''}"
+                id="btn-${b.id}"
+                onclick="geefNaarPool('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
+                ${alGedeeld ? 'disabled' : ''}
+                style="flex:1">
+                ${alGedeeld ? '✅ Al in de pool' : '📤 Geef door aan pool'}
+              </button>
+              ${!alGedeeld ? `
+              <button
+                class="btn-zichzelf"
+                id="btn-zelf-${b.id}"
+                onclick="geefAanZichzelf('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
+                style="flex:0 0 auto;padding:12px 14px;background:var(--navy);color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
+                👤 Zelf bellen
+              </button>` : ''}
+            </div>
           </div>`;
       }).join('');
 
@@ -1058,7 +1086,44 @@
   }
 
   // ── LEAD NAAR POOL STUREN ────────────────────────────────────────────
-  async function geefNaarPool(itemId, naam, adres) {
+  // ── ZELF BELLEN — lead direct aan zichzelf toewijzen ─────────────────
+  async function geefAanZichzelf(itemId, naam, adres) {
+    const btn = document.getElementById(`btn-zelf-${itemId}`);
+    const poolBtn = document.getElementById(`btn-${itemId}`);
+    btn.disabled = true;
+    btn.textContent = 'Bezig...';
+
+    try {
+      // Push naar pool maar met board_afkomstig = eigen bellijst
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'push_naar_pool',
+          data: {
+            item_id: itemId,
+            makelaar_naam: huidigeMakelaar.naam,
+            board_afkomstig: `Bellijst_${huidigeMakelaar.naam.split(' ')[0]}`,
+          }
+        })
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+
+      btn.textContent = '✅ Staat bij jou!';
+      btn.style.background = '#2e7d32';
+      if (poolBtn) { poolBtn.disabled = true; poolBtn.textContent = '✅ Al toegewezen'; poolBtn.classList.add('gedeeld'); }
+      document.getElementById(`bez-${itemId}`).classList.add('al-gedeeld');
+
+      toonToast(`✅ ${naam} staat op jouw bellijst!`, 'succes');
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = '👤 Zelf bellen';
+      toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
+    }
+  }
+
+  // ── NAAR POOL ────────────────────────────────────────────────────────
     const btn = document.getElementById(`btn-${itemId}`);
     btn.disabled = true;
     btn.textContent = 'Bezig...';

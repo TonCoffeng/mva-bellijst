@@ -98,19 +98,19 @@ exports.handler = async (event) => {
           board_afkomstig:    cols.find(c => c.id === 'text_mm1mpcr0')?.text || boardAfkomstig,
         };
       }).filter(lead => {
-        // Filter op makelaar
+        // Filter op makelaar — alleen leads die expliciet zijn toegewezen
         if (!makelaar_naam) return true;
         const board = lead.board_afkomstig.toLowerCase();
         const email = lead.email_makelaar.toLowerCase();
         const naam = makelaar_naam.toLowerCase();
+        const voornaam = naam.split(' ')[0];
 
         // Match op board naam (Bellijst_Maurits / Bellijst_Matthias)
-        if (board && board.includes(naam.split(' ')[0])) return true;
+        if (board && board.includes(voornaam)) return true;
         // Match op email
-        if (email && email.includes(naam.split(' ')[0])) return true;
-        // Als beide leeg zijn: toon wel (niet-toegewezen leads)
-        if (!board && !email) return true;
+        if (email && email.includes(voornaam)) return true;
 
+        // Leads zonder toewijzing NIET tonen — die horen bij niemand
         return false;
       });
 
