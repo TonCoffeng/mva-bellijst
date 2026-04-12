@@ -885,21 +885,26 @@
         })
       });
 
-      // 2. Opslaan in Cloze als notitie
+      // 2. Verwerk lead in Cloze — aanmaken/updaten + stage + notitie
       if (email || telefoon) {
-        await fetch('/.netlify/functions/cloze', {
+        fetch('/.netlify/functions/cloze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            action: 'log_call',
+            action: 'verwerk_lead',
             data: {
-              naam, telefoon, adres,
-              outcome: 'bereikt_ja',
-              notitie: `Feedback bezichtiging: ${feedbackTekst}`,
+              naam,
+              adres,
+              email,
+              telefoon,
               makelaar_email: huidigeMakelaar.email,
+              feedback: actief,
+              opmerking,
             }
           })
-        });
+        }).then(r => r.json()).then(r => {
+          console.log('Cloze verwerk_lead:', r.stage_ingesteld);
+        }).catch(e => console.warn('Cloze error:', e));
       }
 
       // UI updaten

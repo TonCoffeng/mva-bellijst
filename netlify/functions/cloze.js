@@ -1,5 +1,6 @@
 exports.handler = async (event) => {
   const CLOZE_API_KEY = process.env.CLOZE_API_KEY;
+  const CLOZE_USER    = 'toncoffeng@makelaarsvan.nl';
 
   const headers = {
     "Access-Control-Allow-Origin": "*",
@@ -13,8 +14,82 @@ exports.handler = async (event) => {
 
   const { action, data } = JSON.parse(event.body || "{}");
 
+  // Helper: Cloze API call
+  const cloze = async (endpoint, body = null, method = 'POST') => {
+    const url = `https://api.cloze.com/v1/${endpoint}?api_key=${CLOZE_API_KEY}&user_email=${CLOZE_USER}`;
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(url, opts);
+    return res.json();
+  };
+
+  // Stage mapping op basis van feedback knoppen
+  const feedbackNaarStage = (feedback = []) => {
+    if (feedback.includes('serieus'))    return 'lead';
+    if (feedback.includes('verkoop'))    return 'lead';
+    if (feedback.includes('aankoop'))    return 'lead';
+    if (feedback.includes('makelaar'))   return 'out';
+    if (feedback.includes('noshow'))     return 'out';
+    return null; // geen beeld → stage niet wijzigen
+  };
+
+  const feedbackNaarLabel = {
+    serieus:    '🔥 Serieuze koper',
+    verkoop:    '💰 Verkoopprospect',
+    aankoop:    '🏠 Aankoopprospect',
+    makelaar:   '✋ Heeft aankoopmakelaar',
+    geen_beeld: '💭 Geen beeld',
+    noshow:     '🚫 No-show',
+  };
+
   try {
-    // ── 1. ZOEK OF MAAK PERSOON AAN IN CLOZE ──────────────────────────
+
+    // ── VERWERK LEAD — alles in één ───────────────────────────────────────
+    // Aanroepen na feedback opslaan: maakt contact aan (of update),
+    // stelt stage in en voegt notitie toe
+    if (action === 'verwerk_lead') {
+      const { naam, email, telefoon, adres, makelaar_email, feedback, opmerking } = data;
+      const feedbackKeys = Array.isArray(feedback) ? feedback : (feedback || '').split(',').filter(Boolean);
+      const feedbackTekst = feedbackKeys.map(k => feedbackNaarLabel[k] || k).join(', ');
+      const stage = feedbackNaarStage(feedbackKeys);
+      const notitie = `Bezichtiging ${adres} — ${feedbackTekst}${opmerking ? ` — ${opmerking}` : ''}`;
+
+      // 1. Contact aanmaken of updaten (Cloze merget automatisch op email/telefoon)
+      const personBody = {
+        name: naam,
+        ...(email    && { emails: [{ value: email }] }),
+        ...(telefoon && { phones: [{ value: telefoon, type: 'mobile' }] }),
+        ...(stage    && { stage }),
+        assignedTo: makelaar_email,
+        atAGlanceNotes: notitie,
+      };
+      const personResult = await cloze('people/create', personBody);
+
+      // 2. Notitie toevoegen als activiteit
+      const noteBody = {
+        date: new Date().toISOString(),
+        style: 'note',
+        account: makelaar_email,
+        subject: `Bezichtiging ${adres}`,
+        body: notitie,
+        recipients: [
+          ...(email    ? [{ value: email,    name: naam }] : []),
+          ...(telefoon ? [{ value: telefoon, name: naam }] : []),
+        ],
+      };
+      const noteResult = await cloze('timeline/communication/create', noteBody);
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          ok: true,
+          person: personResult,
+          note: noteResult,
+          stage_ingesteld: stage || 'niet gewijzigd',
+        }),
+      };
+    }
     if (action === "upsert_person") {
       const { naam, email, telefoon, adres, makelaar_email } = data;
 
