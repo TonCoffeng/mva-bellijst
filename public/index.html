@@ -1124,6 +1124,7 @@
   }
 
   // ── NAAR POOL ────────────────────────────────────────────────────────
+  async function geefNaarPool(itemId, naam, adres) {
     const btn = document.getElementById(`btn-${itemId}`);
     btn.disabled = true;
     btn.textContent = 'Bezig...';
