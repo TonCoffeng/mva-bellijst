@@ -1064,6 +1064,13 @@
                 style="flex:0 0 auto;padding:12px 14px;background:var(--navy);color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
                 👤 Zelf bellen
               </button>` : ''}
+              <button
+                class="btn-afgehandeld"
+                id="btn-afgehandeld-${b.id}"
+                onclick="markeerAfgehandeld('${b.id}', '${b.naam.replace(/'/g, "\'")}', '${b.adres?.replace(/'/g, "\'") || ''}')"
+                style="flex:0 0 auto;padding:12px 14px;background:#2E7D32;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
+                ✅ Afgehandeld
+              </button>
             </div>
           </div>`;
       }).join('');
@@ -1175,6 +1182,79 @@
       toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
     }
   }
+  // == AFGEHANDELD (niet doorsturen) ====================================
+  async function markeerAfgehandeld(itemId, naam, adres) {
+    // Stap 1: stage kiezen via simpele prompt
+    const stageKeuze = prompt(
+      `Lead "${naam}" afhandelen voor Cloze.\n\n` +
+      `Kies status:\n` +
+      `  1 = Lead (potentiële klant)\n` +
+      `  2 = Out (geen vervolg)\n` +
+      `  3 = Status niet wijzigen\n\n` +
+      `Typ 1, 2 of 3:`,
+      '3'
+    );
+    if (stageKeuze === null) return; // geannuleerd
+    let stage_override;
+    if (stageKeuze.trim() === '1') stage_override = 'lead';
+    else if (stageKeuze.trim() === '2') stage_override = 'out';
+    else if (stageKeuze.trim() === '3') stage_override = null;
+    else { toonToast('Ongeldige keuze. Kies 1, 2 of 3.', 'fout'); return; }
+
+    // Stap 2: opmerking (optioneel)
+    const opmerking = prompt(`Opmerking meegeven aan Cloze (optioneel):`, '') || '';
+
+    // Vind de lead-data
+    const lead = leadsData.find(l => String(l.id) === String(itemId));
+    if (!lead) { toonToast('Lead niet gevonden.', 'fout'); return; }
+
+    const btn = document.getElementById(`btn-afgehandeld-${itemId}`);
+    if (btn) { btn.disabled = true; btn.textContent = 'Bezig...'; }
+
+    try {
+      // 1. Cloze bijwerken met stage_override + opmerking
+      await fetch('/.netlify/functions/cloze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'verwerk_lead',
+          data: {
+            naam: lead.naam,
+            email: lead.email,
+            telefoon: lead.telefoon,
+            adres: lead.adres,
+            makelaar_email: huidigeMakelaar?.email || '',
+            feedback: [],
+            opmerking: opmerking,
+            stage_override: stage_override
+          }
+        })
+      });
+
+      // 2. Monday: status op "afgehandeld" (niet naar pool)
+      await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_status',
+          data: {
+            item_id: itemId,
+            board_id: huidigeMakelaar?.boardId,
+            status: 'afgehandeld'
+          }
+        })
+      });
+
+      toonToast(`✅ ${naam} afgehandeld${stage_override ? ' (Cloze: ' + stage_override + ')' : ''}`, 'succes');
+      // Verwijder de kaart uit de UI
+      const card = document.getElementById(`bez-${itemId}`);
+      if (card) card.remove();
+    } catch (err) {
+      if (btn) { btn.disabled = false; btn.textContent = '✅ Afgehandeld'; }
+      toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
+    }
+  }
+
   async function checkClozeBestaand() {
     for (const lead of leadsData) {
       if (!lead.email && !lead.telefoon) continue;
