@@ -48,10 +48,10 @@ exports.handler = async (event) => {
     // Aanroepen na feedback opslaan: maakt contact aan (of update),
     // stelt stage in en voegt notitie toe
     if (action === 'verwerk_lead') {
-      const { naam, email, telefoon, adres, makelaar_email, feedback, opmerking } = data;
+      const { naam, email, telefoon, adres, makelaar_email, feedback, opmerking, stage_override } = data;
       const feedbackKeys = Array.isArray(feedback) ? feedback : (feedback || '').split(',').filter(Boolean);
       const feedbackTekst = feedbackKeys.map(k => feedbackNaarLabel[k] || k).join(', ');
-      const stage = feedbackNaarStage(feedbackKeys);
+      const stage = stage_override !== undefined ? (stage_override || null) : feedbackNaarStage(feedbackKeys);
       const notitie = `Bezichtiging ${adres} — ${feedbackTekst}${opmerking ? ` — ${opmerking}` : ''}`;
 
       // 1. Contact aanmaken of updaten (Cloze merget automatisch op email/telefoon)
