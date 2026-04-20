@@ -577,10 +577,35 @@
       <div class="stat-label">Naar pool</div>
     </div>
   </div>
-  <div style="padding:0 16px 8px;font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em">
-    JOUW BEZICHTIGINGEN
+  <div style="padding:0 16px 8px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+    <div style="font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em">
+      JOUW BEZICHTIGINGEN
+    </div>
+    <button id="btn-selectiemodus" onclick="toggleSelectiemodus()"
+      style="background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;color:var(--grijs-tekst);cursor:pointer">
+      &#9744; Selectie
+    </button>
+  </div>
+  <div style="padding:0 16px 10px">
+    <div style="position:relative">
+      <input id="filter-adres" type="search" autocomplete="off" placeholder="Zoek op pandadres, naam of datum..."
+        oninput="filterBezichtigingen()"
+        style="width:100%;padding:10px 36px 10px 14px;border:1px solid var(--grijs-mid);border-radius:10px;font-size:13px;font-family:inherit;color:var(--navy);background:var(--wit);box-sizing:border-box" />
+      <button id="filter-wissen" onclick="wisFilter()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;cursor:pointer;color:var(--grijs-tekst);padding:4px 8px">&#10005;</button>
+    </div>
+    <div id="filter-teller" style="display:none;font-size:11px;color:var(--grijs-tekst);margin-top:6px;padding-left:4px"></div>
   </div>
   <div id="geven-container"></div>
+  <div id="bulk-actiebalk" style="display:none;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--navy);color:white;padding:12px 18px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.25);z-index:90;gap:14px;align-items:center;min-width:280px;max-width:92vw">
+    <div style="flex:1">
+      <div style="font-size:11px;opacity:0.8;letter-spacing:.05em">GESELECTEERD</div>
+      <div id="bulk-count" style="font-size:18px;font-weight:700">0 bezichtigingen</div>
+    </div>
+    <button onclick="openBulkModal()" id="btn-bulk-start" disabled
+      style="background:var(--oranje);color:white;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">
+      Doorzetten
+    </button>
+  </div>
 </div>
 
 <!-- OVERZICHT SCHERM -->
@@ -985,9 +1010,14 @@
         const feedbackMap = Object.fromEntries(feedbackOpties.map(f => [f.key, f.emoji + ' ' + f.label]));
 
         return `
-          <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''} ${heeftFeedback ? 'bez-gedaan' : 'bez-open'}" id="bez-${b.id}">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start">
-              <div>
+          <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''} ${heeftFeedback ? 'bez-gedaan' : 'bez-open'}" id="bez-${b.id}" data-adres="${(b.adres||'').toLowerCase().replace(/"/g,'&quot;')}" data-naam="${b.naam.toLowerCase().replace(/"/g,'&quot;')}" data-datum="${(b.datum||'').toLowerCase()}" data-inpool="${alGedeeld?'1':'0'}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+              <label class="bulk-checkbox-wrap" style="display:none;padding-top:2px;cursor:pointer">
+                <input type="checkbox" class="bulk-checkbox" data-bez-id="${b.id}" ${alGedeeld?'disabled':''}
+                  onchange="updateBulkTeller()"
+                  style="width:20px;height:20px;cursor:pointer;accent-color:var(--oranje)" />
+              </label>
+              <div style="flex:1;min-width:0">
                 <div class="bez-naam">${b.naam}</div>
                 <div class="bez-adres">📍 ${b.adres || '—'}</div>
               </div>
@@ -1104,8 +1134,192 @@
       });
 
     } catch (err) {
-      container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--rood)">Kon bezichtigingen niet laden. Probeer opnieuw.</div>`;
+      container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--rood)">Kon bezichtigingen niet laden. Probeer opnieuw.</div>';
     }
+
+    if (selectieModusActief) {
+      selectieModusActief = false;
+      updateSelectieModusUI();
+    }
+    const filterInput = document.getElementById('filter-adres');
+    if (filterInput && filterInput.value) filterBezichtigingen();
+  }
+
+  function filterBezichtigingen() {
+    const input = document.getElementById('filter-adres');
+    const term = (input.value || '').trim().toLowerCase();
+    const wisBtn = document.getElementById('filter-wissen');
+    const teller = document.getElementById('filter-teller');
+    wisBtn.style.display = term ? 'block' : 'none';
+    const cards = document.querySelectorAll('#geven-container .bez-card');
+    let zichtbaar = 0;
+    cards.forEach(card => {
+      if (!term) { card.style.display = ''; zichtbaar++; return; }
+      const adres = card.dataset.adres || '';
+      const naam  = card.dataset.naam || '';
+      const datum = card.dataset.datum || '';
+      const match = adres.includes(term) || naam.includes(term) || datum.includes(term);
+      card.style.display = match ? '' : 'none';
+      if (match) zichtbaar++;
+    });
+    if (term) {
+      teller.style.display = 'block';
+      teller.textContent = zichtbaar + ' van ' + cards.length + ' bezichtigingen zichtbaar';
+    } else { teller.style.display = 'none'; }
+    updateBulkTeller();
+  }
+
+  function wisFilter() {
+    const input = document.getElementById('filter-adres');
+    input.value = '';
+    filterBezichtigingen();
+    input.focus();
+  }
+
+  let selectieModusActief = false;
+  function toggleSelectiemodus() {
+    selectieModusActief = !selectieModusActief;
+    updateSelectieModusUI();
+  }
+  function updateSelectieModusUI() {
+    const btn = document.getElementById('btn-selectiemodus');
+    const balk = document.getElementById('bulk-actiebalk');
+    const wraps = document.querySelectorAll('.bulk-checkbox-wrap');
+    wraps.forEach(w => { w.style.display = selectieModusActief ? 'flex' : 'none'; });
+    if (selectieModusActief) {
+      btn.textContent = '\u2715 Selectie stop';
+      btn.style.background = 'var(--oranje)';
+      btn.style.color = 'white';
+      btn.style.borderColor = 'var(--oranje)';
+      balk.style.display = 'flex';
+    } else {
+      btn.textContent = '\u2610 Selectie';
+      btn.style.background = 'none';
+      btn.style.color = 'var(--grijs-tekst)';
+      btn.style.borderColor = 'var(--grijs-mid)';
+      balk.style.display = 'none';
+      document.querySelectorAll('.bulk-checkbox').forEach(cb => { cb.checked = false; });
+    }
+    updateBulkTeller();
+  }
+
+  function updateBulkTeller() {
+    const geselecteerd = document.querySelectorAll('.bulk-checkbox:checked').length;
+    const countEl = document.getElementById('bulk-count');
+    const btnStart = document.getElementById('btn-bulk-start');
+    if (countEl) countEl.textContent = geselecteerd + ' bezichtiging' + (geselecteerd===1?'':'en');
+    if (btnStart) btnStart.disabled = geselecteerd === 0;
+  }
+
+  function openBulkModal() {
+    const ids = Array.from(document.querySelectorAll('.bulk-checkbox:checked')).map(cb => cb.dataset.bezId);
+    if (ids.length === 0) return;
+    const items = ids.map(id => {
+      const card = document.getElementById('bez-' + id);
+      return {
+        id: id,
+        naam: card.querySelector('.bez-naam') ? card.querySelector('.bez-naam').textContent : '',
+        adres: card.querySelector('.bez-adres') ? card.querySelector('.bez-adres').textContent.replace(/^[^\w]*/, '').trim() : ''
+      };
+    });
+    const opts = [
+      { k:'serieus',    e:'\uD83D\uDD25', l:'Serieuze koper' },
+      { k:'verkoop',    e:'\uD83D\uDCB0', l:'Verkoopprospect' },
+      { k:'aankoop',    e:'\uD83C\uDFE0', l:'Aankoopprospect' },
+      { k:'makelaar',   e:'\u270B',       l:'Heeft makelaar' },
+      { k:'geen_beeld', e:'\uD83D\uDCAD', l:'Geen beeld' },
+      { k:'noshow',     e:'\uD83D\uDEAB', l:'No-show' }
+    ];
+    const kaartHtml = items.map(function(it){
+      const opties = opts.map(function(f){
+        return '<button type="button" class="btn-feedback bulk-fb-btn" data-fb-key="'+f.k+'" onclick="bulkToggleFeedback(this)">'+f.e+' '+f.l+'</button>';
+      }).join('');
+      return '<div class="bulk-kaart" data-bulk-id="'+it.id+'" style="background:white;border:1px solid var(--grijs-mid);border-radius:12px;padding:14px;margin-bottom:12px">'+
+        '<div style="font-weight:700;color:var(--navy);font-size:15px;margin-bottom:2px">'+it.naam+'</div>'+
+        '<div style="font-size:12px;color:var(--grijs-tekst);margin-bottom:10px">'+it.adres+'</div>'+
+        '<div class="feedback-grid" style="margin-bottom:8px">'+opties+'</div>'+
+        '<textarea class="bulk-opmerking" placeholder="Opmerking (optioneel)..." rows="2" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--grijs-mid);border-radius:8px;font-size:12px;font-family:inherit;color:var(--navy);resize:none"></textarea>'+
+        '<div class="bulk-status" style="font-size:11px;color:var(--grijs-tekst);margin-top:6px;min-height:14px"></div>'+
+      '</div>';
+    }).join('');
+    const modal = document.createElement('div');
+    modal.id = 'bulk-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:flex-end;justify-content:center';
+    modal.innerHTML = '<div style="background:var(--grijs);width:100%;max-width:600px;max-height:92vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column">'+
+      '<div style="padding:16px 20px;background:var(--navy);color:white;border-radius:18px 18px 0 0;display:flex;justify-content:space-between;align-items:center">'+
+        '<div><div style="font-size:11px;opacity:0.8;letter-spacing:.05em">BULK DOORZETTEN</div>'+
+        '<div style="font-size:16px;font-weight:700">'+items.length+' bezichtiging'+(items.length===1?'':'en')+'</div></div>'+
+        '<button onclick="sluitBulkModal()" style="background:none;border:none;color:white;font-size:22px;cursor:pointer;padding:4px 8px">\u2715</button>'+
+      '</div>'+
+      '<div style="padding:14px 16px 6px;font-size:11px;color:var(--grijs-tekst);line-height:1.4">Kies per bezichtiging de feedback. Leeg laten = overslaan. Druk \u00E9\u00E9n keer op Verstuur alles.</div>'+
+      '<div style="flex:1;overflow-y:auto;padding:6px 16px">'+kaartHtml+'</div>'+
+      '<div style="padding:14px 16px 20px;background:white;border-top:1px solid var(--grijs-mid);display:flex;gap:10px">'+
+        '<button onclick="sluitBulkModal()" style="flex:0 0 auto;background:none;border:1px solid var(--grijs-mid);color:var(--grijs-tekst);border-radius:10px;padding:12px 18px;font-size:13px;font-weight:600;cursor:pointer">Annuleer</button>'+
+        '<button id="bulk-verstuur-btn" onclick="bulkVerstuurAlles()" style="flex:1;background:var(--oranje);color:white;border:none;border-radius:10px;padding:12px 16px;font-size:14px;font-weight:700;cursor:pointer">Verstuur alles ('+items.length+')</button>'+
+      '</div>'+
+    '</div>';
+    document.body.appendChild(modal);
+  }
+
+  function sluitBulkModal() {
+    const m = document.getElementById('bulk-modal');
+    if (m) m.remove();
+  }
+
+  function bulkToggleFeedback(btn) {
+    btn.classList.toggle('actief');
+  }
+
+  async function bulkVerstuurAlles() {
+    const modal = document.getElementById('bulk-modal');
+    if (!modal) return;
+    const kaarten = modal.querySelectorAll('.bulk-kaart');
+    const verstuurBtn = document.getElementById('bulk-verstuur-btn');
+    const taken = [];
+    kaarten.forEach(function(k){
+      const id = k.dataset.bulkId;
+      const actief = Array.from(k.querySelectorAll('.bulk-fb-btn.actief')).map(function(b){return b.dataset.fbKey;});
+      const opmerking = k.querySelector('.bulk-opmerking').value.trim();
+      if (actief.length > 0) taken.push({ id: id, feedback: actief, opmerking: opmerking, kaart: k });
+    });
+    if (taken.length === 0) { toonToast('Kies minimaal bij \u00E9\u00E9n bezichtiging feedback, of annuleer.', 'fout'); return; }
+    verstuurBtn.disabled = true;
+    verstuurBtn.textContent = 'Bezig... (0/' + taken.length + ')';
+    const labels = { serieus:'\uD83D\uDD25 Serieuze koper', verkoop:'\uD83D\uDCB0 Verkoopprospect', aankoop:'\uD83C\uDFE0 Aankoopprospect', makelaar:'\u270B Heeft makelaar', geen_beeld:'\uD83D\uDCAD Geen beeld', noshow:'\uD83D\uDEAB No-show' };
+    let gelukt = 0, mislukt = 0;
+    for (let i = 0; i < taken.length; i++) {
+      const t = taken[i];
+      const statusEl = t.kaart.querySelector('.bulk-status');
+      statusEl.textContent = 'Versturen...';
+      statusEl.style.color = 'var(--grijs-tekst)';
+      const feedbackTekst = t.feedback.map(function(k){return labels[k];}).join(', ') + (t.opmerking ? ' \u2014 \u2014 ' + t.opmerking : '');
+      try {
+        await fetch('/.netlify/functions/monday', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'sla_feedback_op', data: { item_id: t.id, feedback: t.feedback.join(','), feedback_tekst: feedbackTekst } })
+        });
+        const poolRes = await fetch('/.netlify/functions/monday', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'push_naar_pool', data: { item_id: t.id, makelaar_naam: huidigeMakelaar.naam } })
+        });
+        const poolJson = await poolRes.json();
+        if (poolJson.error) throw new Error(poolJson.error);
+        statusEl.textContent = '\u2705 Verstuurd';
+        statusEl.style.color = 'var(--groen)';
+        gelukt++;
+      } catch (err) {
+        statusEl.textContent = '\u274C Mislukt';
+        statusEl.style.color = 'var(--rood)';
+        mislukt++;
+      }
+      verstuurBtn.textContent = 'Bezig... (' + (i+1) + '/' + taken.length + ')';
+    }
+    verstuurBtn.textContent = mislukt === 0 ? ('\u2705 ' + gelukt + ' verstuurd') : ('\u26A0 ' + gelukt + ' ok \u00B7 ' + mislukt + ' fout');
+    verstuurBtn.style.background = mislukt === 0 ? 'var(--groen)' : 'var(--geel)';
+    toonToast(mislukt === 0 ? ('\u2705 ' + gelukt + ' bezichtigingen doorgezet') : (gelukt + ' ok, ' + mislukt + ' fout'), mislukt === 0 ? 'succes' : 'fout');
+    setTimeout(function(){ sluitBulkModal(); laadBezichtigingen(); }, 1500);
   }
 
   // ── LEAD NAAR POOL STUREN ────────────────────────────────────────────
