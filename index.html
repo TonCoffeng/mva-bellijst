@@ -955,7 +955,8 @@
         })
       });
       const json = await res.json();
-      const items = json?.bezichtigingen || [];// Nieuwste bezichtigingen eerst (Rogier's wens)
+      const items = json?.bezichtigingen || [];
+        // Nieuwste bezichtigingen eerst (Rogier's wens)
         items.sort((a, b) => (b.datum || '').localeCompare(a.datum || ''));
 
       const totaal = items.length;
