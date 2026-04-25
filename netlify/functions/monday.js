@@ -49,7 +49,7 @@ exports.handler = async (event) => {
 
     // ── LEADS OPHALEN ─────────────────────────────────────────────────
     if (action === "get_leads") {
-      const { board_id, makelaar_naam } = data;
+      const { board_id, makelaar_naam, makelaar_email } = data;
 
       const result = await mondayFetch(`
         query ($boardId: ID!) {
@@ -67,19 +67,23 @@ exports.handler = async (event) => {
 
       const items = result?.data?.boards?.[0]?.items_page?.items || [];
 
-      // Haal alle kolom-waarden op als één platte map
       const leads = items.map(item => {
         const cols = item.column_values || [];
-        const colMap = {};
-        cols.forEach(c => { colMap[c.id] = c.text || ''; });
 
-        // Zoek "board afkomstig" kolom (bevat Bellijst_Maurits / Bellijst_Matthias)
-        const boardAfkomstig = cols.find(c =>
-          c.text && (c.text.includes('Bellijst') || c.text.includes('bellijst'))
-        )?.text || '';
-
-        // email_makelaar als fallback
+        // Bestaande velden
         const emailMakelaar = cols.find(c => c.id === 'text_mm1n99ky')?.text || '';
+        const boardAfkomstig = cols.find(c => c.id === 'text_mm1mpcr0')?.text || '';
+
+        // NIEUWE velden van leadpool round-robin
+        const toegewezenAan = cols.find(c => c.id === 'text_mm2rfv9v')?.text || '';
+        const emailToegewezen = cols.find(c => c.id === 'text_mm2r2f05')?.text || '';
+        const toegewezenOp = cols.find(c => c.id === 'date_mm2rm4mg')?.text || '';
+        const leadStatus = cols.find(c => c.id === 'color_mm2rne17')?.text || '';
+        const afspraakOp = cols.find(c => c.id === 'date_mm2r1yem')?.text || '';
+        const dealOp = cols.find(c => c.id === 'date_mm2r29y4')?.text || '';
+
+        // Bron bepalen: leadpool als toegewezen, anders eigen
+        const bron = toegewezenAan ? 'leadpool' : 'eigen';
 
         return {
           id: item.id,
@@ -95,28 +99,42 @@ exports.handler = async (event) => {
           warme_lead:         cols.find(c => c.id === 'boolean_mm1fnaay')?.text || '',
           opmerkingen:        cols.find(c => c.id === 'text_mm1f4g3q')?.text || '',
           email_makelaar:     emailMakelaar,
-          board_afkomstig:    cols.find(c => c.id === 'text_mm1mpcr0')?.text || boardAfkomstig,
+          board_afkomstig:    boardAfkomstig,
+          // NIEUW: leadpool velden
+          toegewezen_aan:     toegewezenAan,
+          email_toegewezen:   emailToegewezen,
+          toegewezen_op:      toegewezenOp,
+          lead_status:        leadStatus,
+          afspraak_op:        afspraakOp,
+          deal_op:            dealOp,
+          bron:               bron,
         };
       }).filter(lead => {
-        // Filter op makelaar — alleen leads die expliciet zijn toegewezen
-        if (!makelaar_naam) return true;
-        const board = lead.board_afkomstig.toLowerCase();
-        const email = lead.email_makelaar.toLowerCase();
-        const naam = makelaar_naam.toLowerCase();
+        // Sluit afgehandelde leadpool-leads uit (Lost en Deal verdwijnen uit de lijst)
+        if (lead.lead_status === 'Lost' || lead.lead_status === 'Deal') return false;
+
+        // Geen filter = alle leads
+        if (!makelaar_naam && !makelaar_email) return true;
+
+        const naam = (makelaar_naam || '').toLowerCase();
         const voornaam = naam.split(' ')[0];
+        const email = (makelaar_email || '').toLowerCase();
 
-        // Match op board naam (Bellijst_Maurits / Bellijst_Matthias)
+        // Match op leadpool toewijzing (NIEUW)
+        if (email && lead.email_toegewezen.toLowerCase() === email) return true;
+        if (voornaam && lead.toegewezen_aan.toLowerCase().includes(voornaam)) return true;
+
+        // Match op eigen bellijst (BESTAAND)
+        const board = lead.board_afkomstig.toLowerCase();
+        const emailM = lead.email_makelaar.toLowerCase();
         if (board && board.includes(voornaam)) return true;
-        // Match op email
-        if (email && email.includes(voornaam)) return true;
+        if (emailM && emailM.includes(voornaam)) return true;
 
-        // Leads zonder toewijzing NIET tonen — die horen bij niemand
         return false;
       });
 
       return { statusCode: 200, headers, body: JSON.stringify({ leads }) };
     }
-
     // ── STATUS UPDATE ──────────────────────────────────────────────────
     if (action === "update_status") {
       const { item_id, board_id, status } = data;
