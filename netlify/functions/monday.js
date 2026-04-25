@@ -135,7 +135,87 @@ exports.handler = async (event) => {
 
       return { statusCode: 200, headers, body: JSON.stringify({ leads }) };
     }
-    // ── STATUS UPDATE ──────────────────────────────────────────────────
+    // ── LEADPOOL STATUS UPDATE (voor ontvangende makelaar) ──────────────
+    if (action === "update_lead_status") {
+      const { item_id, lead_status } = data;
+      if (!item_id || !lead_status) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: "item_id en lead_status verplicht" }) };
+      }
+
+      const vandaag = new Date().toISOString().split('T')[0];
+      const columnValues = {
+        color_mm2rne17: { label: lead_status },   // Lead status
+      };
+
+      // Bij Afspraak: vul ook 'Afspraak op d.d.'
+      if (lead_status === 'Afspraak') {
+        columnValues.date_mm2r1yem = { date: vandaag };
+      }
+      // Bij Deal: vul ook 'Deal op datum' (komt later via fase 3, maar alvast)
+      if (lead_status === 'Deal') {
+        columnValues.date_mm2r29y4 = { date: vandaag };
+      }
+
+      // Bij Niet bereikt: belpogingen +1
+      // (Niet bereikt = blijft op Toegewezen, alleen counter omhoog)
+      if (lead_status === 'NietBereikt') {
+        // Lees eerst huidige waarde
+        const huidigRes = await mondayFetch(`
+          query ($itemId: ID!) {
+            items(ids: [$itemId]) {
+              column_values(ids: ["numeric_mm2rxahc"]) { text }
+            }
+          }
+        `, { itemId: item_id });
+        const huidigText = huidigRes?.data?.items?.[0]?.column_values?.[0]?.text || '0';
+        const huidig = parseInt(huidigText) || 0;
+
+        // Status blijft Toegewezen, alleen belpogingen omhoog
+        const nieuweTeller = huidig + 1;
+        await mondayFetch(`
+          mutation ($itemId: ID!, $columnValues: JSON!) {
+            change_multiple_column_values(
+              item_id: $itemId
+              board_id: 5093190545
+              column_values: $columnValues
+            ) { id }
+          }
+        `, {
+          itemId: item_id,
+          columnValues: JSON.stringify({
+            numeric_mm2rxahc: String(nieuweTeller),
+            // status NIET wijzigen — blijft Toegewezen
+          }),
+        });
+
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ ok: true, belpogingen: nieuweTeller, lead_status: 'Toegewezen' }),
+        };
+      }
+
+      // Anders: status updaten + eventueel afspraakdatum
+      await mondayFetch(`
+        mutation ($itemId: ID!, $columnValues: JSON!) {
+          change_multiple_column_values(
+            item_id: $itemId
+            board_id: 5093190545
+            column_values: $columnValues
+          ) { id }
+        }
+      `, {
+        itemId: item_id,
+        columnValues: JSON.stringify(columnValues),
+      });
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ ok: true, lead_status }),
+      };
+    }
+      // ── STATUS UPDATE ──────────────────────────────────────────────────
     if (action === "update_status") {
       const { item_id, board_id, status } = data;
 
