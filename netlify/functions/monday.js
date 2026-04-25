@@ -242,11 +242,13 @@ exports.handler = async (event) => {
           telefoon: get('phone_mm1fjavy'),
           email:    get('email_mm1fm8b7'),
           niet_naar_pool: get('boolean_mm1s4qcy') === 'true',
+          doorgegeven:    get('boolean_mm2q35j3') === 'true',
           feedback: get('text_mm1fy05p'), // Adres klant kolom hergebruiken voor feedback
           in_pool:  false,
         };
       }).filter(b => {
         if (b.niet_naar_pool) return false;
+        if (b.doorgegeven) return false;
         if (!makelaar_naam) return true;
         return b.makelaar?.toLowerCase().includes(makelaar_naam.split(' ')[0].toLowerCase());
       });
@@ -256,6 +258,7 @@ exports.handler = async (event) => {
     // ── PUSH NAAR LEADPOOL ─────────────────────────────────────────────
     if (action === "push_naar_pool") {
       const { item_id } = data;
+      // Stap 1: trigger de button om lead naar Leadpool bord te sturen
       const result = await mondayFetch(`
         mutation ($itemId: ID!) {
           change_column_value(
@@ -263,6 +266,17 @@ exports.handler = async (event) => {
             board_id: 5093190482
             column_id: "button_mm1fnwa0"
             value: "{}"
+          ) { id }
+        }
+      `, { itemId: item_id });
+      // Stap 2: markeer als doorgegeven zodat hij uit de lijst van gevende makelaar verdwijnt
+      await mondayFetch(`
+        mutation ($itemId: ID!) {
+          change_column_value(
+            item_id: $itemId
+            board_id: 5093190482
+            column_id: "boolean_mm2q35j3"
+            value: "{\"checked\":\"true\"}"
           ) { id }
         }
       `, { itemId: item_id });
