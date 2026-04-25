@@ -81,6 +81,7 @@ exports.handler = async (event) => {
         const leadStatus = cols.find(c => c.id === 'color_mm2rne17')?.text || '';
         const afspraakOp = cols.find(c => c.id === 'date_mm2r1yem')?.text || '';
         const dealOp = cols.find(c => c.id === 'date_mm2r29y4')?.text || '';
+        const belpogingen = cols.find(c => c.id === 'numeric_mm2rxahc')?.text || '0';
 
         // Bron bepalen: leadpool als toegewezen, anders eigen
         const bron = toegewezenAan ? 'leadpool' : 'eigen';
@@ -108,6 +109,7 @@ exports.handler = async (event) => {
           afspraak_op:        afspraakOp,
           deal_op:            dealOp,
           bron:               bron,
+          belpogingen:        parseInt(belpogingen) || 0,
         };
       }).filter(lead => {
         // Sluit afgehandelde leadpool-leads uit (Lost en Deal verdwijnen uit de lijst)
