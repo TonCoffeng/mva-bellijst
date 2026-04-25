@@ -955,7 +955,8 @@
         })
       });
       const json = await res.json();
-      const items = json?.bezichtigingen || [];
+      const items = json?.bezichtigingen || [];// Nieuwste bezichtigingen eerst (Rogier's wens)
+        items.sort((a, b) => (b.datum || '').localeCompare(a.datum || ''));
 
       const totaal = items.length;
       const gedeeld = items.filter(b => b.in_pool).length;
@@ -975,7 +976,7 @@
       }
 
       container.innerHTML = items.map(b => {
-        const alGedeeld = b.in_pool;
+        const alGedeeld = b.in_pool
         const feedbackOpties = [
           { key: 'serieus',    emoji: '🔥', label: 'Serieuze koper' },
           { key: 'verkoop',    emoji: '💰', label: 'Verkoopprospect' },
