@@ -256,7 +256,93 @@ exports.handler = async (event) => {
     }
 
     // ── PUSH NAAR LEADPOOL ─────────────────────────────────────────────
-    if (action === "push_naar_pool") {
+    // ── ROUND-ROBIN: WIJS LEAD TOE AAN AANGEVINKTE MAKELAAR ─────────────
+    if (action === "assign_makelaar") {
+      const { item_id } = data;
+      if (!item_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: "item_id ontbreekt" }) };
+      }
+
+      // 1. Haal aangevinkte makelaars op uit Meedoen Leadpool
+      const mResult = await mondayFetch(`
+        query {
+          boards(ids: [5093235823]) {
+            items_page(limit: 50) {
+              items { name column_values { id text } }
+            }
+          }
+        }
+      `);
+      const items = mResult?.data?.boards?.[0]?.items_page?.items || [];
+      const makelaars = items
+        .map(item => ({
+          naam: item.name,
+          email: item.column_values.find(c => c.id === 'text_mm1nxwsn')?.text || '',
+          meedoen: item.column_values.find(c => c.id === 'boolean_mm1g4fwm')?.text || '',
+          vakantie: item.column_values.find(c => c.id === 'timerange_mm1gj38w')?.text || '',
+        }))
+        .filter(m => (m.meedoen === 'true' || m.meedoen === 'v') && m.email);
+
+      if (makelaars.length === 0) {
+        return { statusCode: 200, headers, body: JSON.stringify({ ok: false, reden: "Geen aangevinkte makelaars" }) };
+      }
+
+      // 2. Lees teller uit Make data-store
+      const MAKE_API = process.env.MAKE_API_TOKEN;
+      const DS_ID = 117681; // Leadpool RR teller
+      const tellerRes = await fetch(`https://eu1.make.com/api/v2/data-stores/${DS_ID}/data/counter`, {
+        headers: { 'Authorization': `Token ${MAKE_API}` }
+      });
+      const tellerJson = await tellerRes.json();
+      const teller = tellerJson?.record?.data?.teller || 0;
+
+      // 3. Round-robin: pak de juiste makelaar
+      const index = teller % makelaars.length;
+      const gekozen = makelaars[index];
+      const vandaag = new Date().toISOString().split('T')[0];
+
+      // 4. Update Leadpool item: toegewezen aan, email, datum, status
+      await mondayFetch(`
+        mutation ($itemId: ID!, $columnValues: JSON!) {
+          change_multiple_column_values(
+            item_id: $itemId
+            board_id: 5093190545
+            column_values: $columnValues
+          ) { id }
+        }
+      `, {
+        itemId: item_id,
+        columnValues: JSON.stringify({
+          text_mm2rfv9v: gekozen.naam,                          // Toegewezen aan
+          text_mm2r2f05: gekozen.email,                         // Email toegewezen
+          date_mm2rm4mg: { date: vandaag },                     // Toegewezen op datum
+          color_mm2rne17: { label: "Toegewezen" },              // Lead status
+        }),
+      });
+
+      // 5. Verhoog teller in Make data-store
+      await fetch(`https://eu1.make.com/api/v2/data-stores/${DS_ID}/data/counter`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Token ${MAKE_API}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ data: { teller: teller + 1 } }),
+      });
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          ok: true,
+          gekozen: gekozen.naam,
+          email: gekozen.email,
+          aantal_makelaars: makelaars.length,
+          oude_teller: teller,
+          nieuwe_teller: teller + 1,
+        }),
+      };
+    }if (action === "push_naar_pool") {
       const { item_id } = data;
       // Stap 1: trigger de button om lead naar Leadpool bord te sturen
       const result = await mondayFetch(`
