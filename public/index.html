@@ -1502,15 +1502,32 @@
 
   function renderLeads() {
     const container = document.getElementById('leads-container');
-    const openstaand = leadsData.filter(l => !['bereikt_ja','niet_geinteresseerd'].includes(l.status));
-    const afgerond = leadsData.filter(l => ['bereikt_ja','niet_geinteresseerd'].includes(l.status));
+
+    // ── Sortering: Hot → Warm → Toegewezen → rest ──────────────────────
+    const prioriteit = {
+      'Hot': 1,
+      'Warm': 2,
+      'Toegewezen': 3,
+      'Afspraak': 4,
+      'Deal': 5,
+      'Lost': 6,
+    };
+    const sorted = [...leadsData].sort((a, b) => {
+      const pa = prioriteit[a.lead_status] || 99;
+      const pb = prioriteit[b.lead_status] || 99;
+      return pa - pb;
+    });
+
+    // ── Tellers in header ──────────────────────────────────────────────
+    const openstaand = sorted.filter(l => !['bereikt_ja','niet_geinteresseerd'].includes(l.status));
+    const afgerond = sorted.filter(l => ['bereikt_ja','niet_geinteresseerd'].includes(l.status));
 
     document.getElementById('stat-totaal').textContent = openstaand.length;
     document.getElementById('stat-vandaag').textContent = openstaand.filter(l => !l.status).length;
     document.getElementById('stat-gedaan').textContent = afgerond.length;
     document.getElementById('header-badge').textContent = openstaand.length + ' leads';
 
-    if (leadsData.length === 0) {
+    if (sorted.length === 0) {
       container.innerHTML = `<div class="leeg">
         <div class="leeg-icon">🎉</div>
         <h3>Alles afgehandeld!</h3>
@@ -1519,60 +1536,58 @@
       return;
     }
 
-    container.innerHTML = leadsData.map(lead => {
-      const chipClass = {
-        '': 'chip-nieuw',
-        'niet_bereikbaar': 'chip-urgent',
-        'bereikt_later': 'chip-later',
-        'voicemail': 'chip-wacht',
-        'wellicht_later': 'chip-wacht',
-        'bereikt_ja': 'chip-nieuw',
-        'niet_geinteresseerd': 'chip-wacht',
-      }[lead.status] || 'chip-nieuw';
+    container.innerHTML = sorted.map(lead => {
+      // ── Lead-status chip (Toegewezen / Afspraak / Deal / Lost / Warm / Hot) ──
+      const leadStatusChip = {
+        'Hot':        { cls: 'chip-hot',        label: '🔥 Hot' },
+        'Warm':       { cls: 'chip-warm',       label: '🌡️ Warm' },
+        'Toegewezen': { cls: 'chip-toegewezen', label: '📥 Toegewezen' },
+        'Afspraak':   { cls: 'chip-afspraak',   label: '📅 Afspraak' },
+        'Deal':       { cls: 'chip-deal',       label: '✅ Deal' },
+        'Lost':       { cls: 'chip-lost',       label: '❌ Lost' },
+      }[lead.lead_status] || { cls: 'chip-toegewezen', label: '📥 Toegewezen' };
 
-      const chipLabel = {
-        '': 'Nieuw',
-        'niet_bereikbaar': 'Niet bereikbaar',
-        'bereikt_later': 'Bel terug',
-        'voicemail': 'Voicemail',
-        'wellicht_later': 'Wellicht later',
-        'bereikt_ja': '✅ Bereikt',
-        'niet_geinteresseerd': '❌ Afgerond',
-      }[lead.status] || 'Nieuw';
+      // ── Bel-status chip (Niet bereikbaar / Voicemail / Bel terug etc.) ──
+      const belChip = {
+        'niet_bereikbaar':    { cls: 'chip-urgent', label: 'Niet bereikbaar' },
+        'bereikt_later':      { cls: 'chip-later',  label: 'Bel terug' },
+        'voicemail':          { cls: 'chip-wacht',  label: 'Voicemail' },
+        'wellicht_later':     { cls: 'chip-wacht',  label: 'Wellicht later' },
+        'bereikt_ja':         { cls: 'chip-nieuw',  label: '✅ Bereikt' },
+        'niet_geinteresseerd':{ cls: 'chip-wacht',  label: '❌ Afgerond' },
+      }[lead.status];
 
       const cardClass = {
-        '': 'nieuw',
         'niet_bereikbaar': 'urgent',
-        'bereikt_later': 'later',
-        'bereikt_ja': 'afgerond',
+        'bereikt_later':   'later',
+        'bereikt_ja':      'afgerond',
         'niet_geinteresseerd': 'afgerond',
-      }[lead.status] || '';
+      }[lead.status] || 'nieuw';
 
       return `
         <div class="lead-card ${cardClass}" onclick="openModal('${lead.id}')">
-          <div class="lead-naam">${lead.naam}${lead.warme_lead ? ' 🔥' : ''}</div>
+          <div class="lead-naam">${lead.naam}</div>
           ${lead.adres ? `<div class="lead-adres">📍 ${lead.adres}</div>` : ''}
           ${lead.bij_wie ? `<div class="lead-adres" style="font-size:12px;margin-top:2px">📓 Bezichtigd bij: ${lead.bij_wie}</div>` : ''}
-          ${lead.belpogingen > 0 ? `<div style="font-size:12px;color:var(--grijs-tekst);margin-top:4px">📞 ${lead.belpogingen}× geprobeerd</div>` : ''}    
-            <div class="lead-meta" style="margin-top:8px">
-            <span class="lead-chip ${chipClass}">${chipLabel}</span>
+
+          <div class="lead-meta" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+            <span class="lead-chip ${leadStatusChip.cls}">${leadStatusChip.label}</span>
+            ${belChip ? `<span class="lead-chip ${belChip.cls}">${belChip.label}</span>` : ''}
+            ${lead.belpogingen > 0 ? `<span class="lead-chip chip-belpogingen">📞 ${lead.belpogingen}× geprobeerd</span>` : ''}
           </div>
+
           <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;flex-wrap:wrap">
             ${lead.datum_bezichtiging ? `<span style="color:var(--navy);font-weight:500">🏠 Bezichtiging: <strong>${lead.datum_bezichtiging}</strong></span>` : ''}
             ${lead.datum ? `<span style="color:var(--grijs-tekst)">📥 In pool: <strong>${lead.datum}</strong></span>` : ''}
           </div>
+
           <div style="display:flex;gap:8px;margin-top:6px;font-size:12px;color:var(--grijs-tekst)">
             ${lead.telefoon ? `<span>📞 ${lead.telefoon}</span>` : ''}
             ${lead.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">✉️ ${lead.email}</span>` : ''}
           </div>
+
           ${lead.opmerkingen ? `<div style="margin-top:6px;font-size:12px;color:var(--grijs-tekst);font-style:italic">💬 ${lead.opmerkingen}</div>` : ''}
-          <div id="cloze-badge-${lead.id}" style="margin-top:8px;min-height:22px">
-            ${lead.cloze_bestaand === true
-              ? `<span class="cloze-badge bekend">📁 Bekend in Cloze${lead.cloze_stage ? ' · ' + lead.cloze_stage : ''}</span>`
-              : lead.cloze_bestaand === false
-              ? `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`
-              : `<span style="font-size:11px;color:var(--grijs-tekst)">⏳ Cloze check...</span>`}
-          </div>
+
           <div class="lead-acties" onclick="event.stopPropagation()">
             <button class="btn-bel" onclick="bel('${lead.telefoon}', '${lead.naam}')">
               📞 Bellen
@@ -1581,11 +1596,18 @@
               Status →
             </button>
           </div>
+
+          <div class="leadstatus-knoppen" onclick="event.stopPropagation()" style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn-leadstatus btn-hot"        onclick="zetLeadStatus('${lead.id}', 'Hot')">🔥 Hot</button>
+            <button class="btn-leadstatus btn-warm"       onclick="zetLeadStatus('${lead.id}', 'Warm')">🌡️ Warm</button>
+            <button class="btn-leadstatus btn-afspraak"   onclick="zetLeadStatus('${lead.id}', 'Afspraak')">📅 Afspraak</button>
+            <button class="btn-leadstatus btn-deal"       onclick="zetLeadStatus('${lead.id}', 'Deal')">✅ Deal</button>
+            <button class="btn-leadstatus btn-lost"       onclick="zetLeadStatus('${lead.id}', 'Lost')">❌ Lost</button>
+          </div>
         </div>
       `;
     }).join('');
   }
-
   // ── BELLEN ──────────────────────────────────────────────────────────
   function bel(telefoon, naam) {
     if (!telefoon) { toonToast('Geen telefoonnummer bekend', 'fout'); return; }
