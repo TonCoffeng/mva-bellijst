@@ -187,6 +187,41 @@
     .chip-wacht { background: #f3f4f6; color: #6b7280; }
     .chip-datum { background: #f3f4f6; color: var(--navy); }
 
+    /* ── Lead-status chips (Toegewezen / Afspraak / Deal / Lost / Warm / Hot) ── */
+    .chip-hot         { background: #fee2e2; color: #991b1b; }
+    .chip-warm        { background: #fef3c7; color: #92400e; }
+    .chip-toegewezen  { background: #dbeafe; color: #1e40af; }
+    .chip-afspraak    { background: #e0e7ff; color: #3730a3; }
+    .chip-deal        { background: #d1fae5; color: #065f46; }
+    .chip-lost        { background: #f3f4f6; color: #6b7280; }
+    .chip-belpogingen { background: #fef3c7; color: #92400e; }
+
+    /* ── Lead-status knoppenrij onderaan de lead-card ── */
+    .leadstatus-knoppen {
+      padding-top: 8px;
+      border-top: 1px solid #f0f0f0;
+    }
+    .btn-leadstatus {
+      flex: 1;
+      min-width: auto;
+      padding: 6px 8px;
+      font-size: 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+      font-weight: 500;
+      font-family: 'Roboto', sans-serif;
+      color: var(--navy);
+    }
+    .btn-leadstatus:hover  { background: #f9fafb; }
+    .btn-leadstatus:active { transform: scale(0.97); }
+    .btn-hot:hover      { background: #fee2e2; border-color: #fca5a5; }
+    .btn-warm:hover     { background: #fef3c7; border-color: #fcd34d; }
+    .btn-afspraak:hover { background: #e0e7ff; border-color: #a5b4fc; }
+    .btn-deal:hover     { background: #d1fae5; border-color: #6ee7b7; }
+    .btn-lost:hover     { background: #f3f4f6; border-color: #d1d5db; }
+
     .lead-acties {
       display: flex;
       gap: 8px;
@@ -816,6 +851,9 @@
           warme_lead:         item.warme_lead === 'true' || item.warme_lead === 'v',
           opmerkingen:        item.opmerkingen || '',
           email_makelaar:     item.email_makelaar || '',
+          lead_status:        item.lead_status || '',
+          belpogingen:        Number(item.belpogingen) || 0,
+          bron:               item.bron || '',
         };
       });
 
@@ -1608,6 +1646,37 @@
       `;
     }).join('');
   }
+  // ── LEAD STATUS WIJZIGEN (Hot / Warm / Afspraak / Deal / Lost) ──────
+  async function zetLeadStatus(leadId, nieuweStatus) {
+    const lead = leadsData.find(l => l.id === leadId);
+    if (!lead) return;
+
+    // Optimistisch updaten — voelt sneller
+    const oudeStatus = lead.lead_status;
+    lead.lead_status = nieuweStatus;
+    renderLeads();
+
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_lead_status',
+          data: { item_id: leadId, lead_status: nieuweStatus }
+        })
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || 'Update mislukt');
+
+      toonToast(`✅ Status: ${nieuweStatus}`, 'succes');
+    } catch (err) {
+      // Rollback bij fout
+      lead.lead_status = oudeStatus;
+      renderLeads();
+      toonToast('Status updaten mislukt: ' + err.message, 'fout');
+    }
+  }
+
   // ── BELLEN ──────────────────────────────────────────────────────────
   function bel(telefoon, naam) {
     if (!telefoon) { toonToast('Geen telefoonnummer bekend', 'fout'); return; }
