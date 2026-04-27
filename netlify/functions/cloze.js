@@ -242,6 +242,22 @@ exports.handler = async (event) => {
         }
       }
 
+      // Eigenaar bepalen — Cloze geeft 'assignedTo' (email of object met email/name)
+      let eigenaar_email = null;
+      let eigenaar_naam = null;
+      if (gevonden) {
+        const a = gevonden.assignedTo;
+        if (typeof a === 'string') {
+          eigenaar_email = a;
+        } else if (a && typeof a === 'object') {
+          eigenaar_email = a.email || a.value || null;
+          eigenaar_naam = a.name || null;
+        }
+        // Fallback: bekijk ook 'assigneeName' / 'owner' indien aanwezig
+        if (!eigenaar_naam && gevonden.assigneeName) eigenaar_naam = gevonden.assigneeName;
+        if (!eigenaar_email && gevonden.owner) eigenaar_email = gevonden.owner;
+      }
+
       return {
         statusCode: 200,
         headers,
@@ -251,6 +267,9 @@ exports.handler = async (event) => {
           stage: gevonden?.stage || null,
           // Hoeveel interacties er al zijn (geeft inschatting van relatiediepte)
           interacties: gevonden?.engagement?.score || null,
+          // Eigenaar van het contact in Cloze (null = ongekoppeld)
+          eigenaar_email,
+          eigenaar_naam,
         }),
       };
     }
