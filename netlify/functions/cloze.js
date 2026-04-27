@@ -227,9 +227,9 @@ exports.handler = async (event) => {
     if (action === "check_bestaand") {
       const { email, telefoon, naam } = data;
 
-      // Stap 1: Zoek op email eerst, dan telefoon, dan naam
+      // Zoek op email eerst, dan telefoon, dan naam
       const queries = [email, telefoon, naam].filter(Boolean);
-      let gevondenLijst = null;
+      let gevonden = null;
 
       for (const query of queries) {
         const res = await fetch(
@@ -237,47 +237,9 @@ exports.handler = async (event) => {
         );
         const json = await res.json();
         if (json?.people?.length > 0) {
-          gevondenLijst = json.people[0];
+          gevonden = json.people[0];
           break;
         }
-      }
-
-      // Stap 2: Als gevonden, haal de volledige details op via people/get
-      // (find geeft maar beperkte info terug — geen stage, geen assignedTo)
-      let gevonden = gevondenLijst;
-      if (gevondenLijst) {
-        try {
-          // Cloze gebruikt 'userKey' als identifier — dat is wat we terugkregen
-          const lookupKey = gevondenLijst.userKey || gevondenLijst.id || gevondenLijst.uniqueId || gevondenLijst.emails?.[0]?.value;
-          if (lookupKey) {
-            // Probeer met 'view=full' om alle velden te krijgen
-            const detailRes = await fetch(
-              `https://api.cloze.com/v1/people/get?api_key=${CLOZE_API_KEY}&user_email=${CLOZE_USER}&id=${encodeURIComponent(lookupKey)}&view=full`
-            );
-            const detailJson = await detailRes.json();
-            if (detailJson?.userKey || detailJson?.name) {
-              gevonden = detailJson;
-            }
-          }
-        } catch (e) {
-          // Bij fout: val terug op de find-resultaten
-        }
-      }
-
-      // Eigenaar bepalen — Cloze geeft 'assignedTo' (email of object met email/name)
-      let eigenaar_email = null;
-      let eigenaar_naam = null;
-      if (gevonden) {
-        const a = gevonden.assignedTo;
-        if (typeof a === 'string') {
-          eigenaar_email = a;
-        } else if (a && typeof a === 'object') {
-          eigenaar_email = a.email || a.value || null;
-          eigenaar_naam = a.name || null;
-        }
-        // Fallback: bekijk ook 'assigneeName' / 'owner' indien aanwezig
-        if (!eigenaar_naam && gevonden.assigneeName) eigenaar_naam = gevonden.assigneeName;
-        if (!eigenaar_email && gevonden.owner) eigenaar_email = gevonden.owner;
       }
 
       return {
@@ -289,21 +251,6 @@ exports.handler = async (event) => {
           stage: gevonden?.stage || null,
           // Hoeveel interacties er al zijn (geeft inschatting van relatiediepte)
           interacties: gevonden?.engagement?.score || null,
-          // Eigenaar van het contact in Cloze (null = ongekoppeld)
-          eigenaar_email,
-          eigenaar_naam,
-          // DEBUG: rauwe Cloze data zodat we kunnen zien welke velden er zijn
-          _debug_find_keys: gevondenLijst ? Object.keys(gevondenLijst) : [],
-          _debug_get_keys: gevonden ? Object.keys(gevonden) : [],
-          _debug_assignedTo: gevonden?.assignedTo,
-          _debug_assignee: gevonden?.assignee,
-          _debug_owner: gevonden?.owner,
-          _debug_segments: gevonden?.segments,
-          _debug_segment_value: gevonden?.segment,
-          _debug_step_value: gevonden?.step,
-          _debug_emails: gevonden?.emails,
-          _debug_userkey: gevonden?.userKey,
-          _debug_lookupkey_used: gevondenLijst ? (gevondenLijst.id || gevondenLijst.uniqueId || gevondenLijst.uniqueid || gevondenLijst.userKey || gevondenLijst.emails?.[0]?.value) : null,
         }),
       };
     }
