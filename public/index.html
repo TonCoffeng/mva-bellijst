@@ -327,6 +327,127 @@
       padding-left: 4px;
     }
 
+    /* ── HEALTH-CHECK (alleen level-2) ── */
+    .btn-healthcheck {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.35);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-healthcheck:hover { background: rgba(255,255,255,0.1); }
+
+    .hc-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 250;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .hc-modal-overlay.open { display: flex; }
+    .hc-modal {
+      background: white;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    .hc-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .hc-modal-title { font-size: 18px; font-weight: 700; color: var(--navy); }
+    .hc-modal-sub   { font-size: 12px; color: var(--grijs-tekst); margin-top: 2px; }
+    .hc-modal-close {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: var(--grijs-tekst);
+      padding: 4px 10px;
+    }
+
+    .hc-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--grijs-mid);
+      border-radius: 10px;
+      margin-bottom: 8px;
+    }
+    .hc-status {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 6px;
+    }
+    .hc-status.groen   { background: var(--groen); }
+    .hc-status.geel    { background: var(--geel); }
+    .hc-status.rood    { background: var(--rood); }
+    .hc-status.grijs   { background: var(--grijs-mid); }
+    .hc-status.laden {
+      background: var(--grijs-mid);
+      animation: hc-pulse 1s infinite;
+    }
+    @keyframes hc-pulse {
+      0%, 100% { opacity: 0.4; }
+      50%      { opacity: 1; }
+    }
+    .hc-info { flex: 1; }
+    .hc-naam {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--navy);
+      margin-bottom: 2px;
+    }
+    .hc-detail {
+      font-size: 12px;
+      color: var(--grijs-tekst);
+    }
+    .hc-link {
+      font-size: 11px;
+      color: var(--navy);
+      text-decoration: underline;
+      margin-top: 4px;
+      display: inline-block;
+    }
+    .hc-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 12px;
+      border-top: 1px solid var(--grijs-mid);
+      margin-top: 8px;
+    }
+    .hc-tijd {
+      font-size: 11px;
+      color: var(--grijs-tekst);
+    }
+    .hc-refresh {
+      padding: 8px 16px;
+      background: var(--navy);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .hc-refresh:hover { background: var(--navy-light); }
+    .hc-refresh:disabled { background: var(--grijs-mid); cursor: default; }
+
     .lead-acties {
       display: flex;
       gap: 8px;
@@ -671,6 +792,7 @@
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <button id="btn-terug" class="hidden" onclick="gaNaarLogin()" style="background:none;border:1px solid rgba(255,255,255,0.35);color:white;padding:5px 14px;border-radius:20px;font-size:13px;cursor:pointer;font-family:inherit">← Terug</button>
+    <button id="btn-healthcheck" class="btn-healthcheck hidden" onclick="openHealthCheck()" title="Systeem-check">🩺 Check</button>
     <div class="header-badge" id="header-badge">0 leads</div>
   </div>
 </div>
@@ -875,6 +997,58 @@
   </div>
 </div>
 
+<!-- HEALTH-CHECK MODAL (alleen level-2: Ton, Hans, Monique) -->
+<div class="hc-modal-overlay" id="hc-modal-overlay" onclick="sluitHealthCheck(event)">
+  <div class="hc-modal" onclick="event.stopPropagation()">
+    <div class="hc-modal-header">
+      <div>
+        <div class="hc-modal-title">🩺 Systeem-check</div>
+        <div class="hc-modal-sub">Snelle check van alle essentiële systemen</div>
+      </div>
+      <button class="hc-modal-close" onclick="sluitHealthCheckDirect()">×</button>
+    </div>
+
+    <div id="hc-checks-container">
+      <div class="hc-check">
+        <div class="hc-status laden" id="hc-status-make"></div>
+        <div class="hc-info">
+          <div class="hc-naam">1. Make.com scenario</div>
+          <div class="hc-detail" id="hc-detail-make">Status wordt opgehaald...</div>
+        </div>
+      </div>
+
+      <div class="hc-check">
+        <div class="hc-status laden" id="hc-status-bezichtigingen"></div>
+        <div class="hc-info">
+          <div class="hc-naam">2. Monday Bezichtigingen</div>
+          <div class="hc-detail" id="hc-detail-bezichtigingen">Wordt gecheckt...</div>
+        </div>
+      </div>
+
+      <div class="hc-check">
+        <div class="hc-status laden" id="hc-status-leadpool"></div>
+        <div class="hc-info">
+          <div class="hc-naam">3. Monday Leadpool</div>
+          <div class="hc-detail" id="hc-detail-leadpool">Wordt gecheckt...</div>
+        </div>
+      </div>
+
+      <div class="hc-check">
+        <div class="hc-status laden" id="hc-status-cloze"></div>
+        <div class="hc-info">
+          <div class="hc-naam">4. Cloze API</div>
+          <div class="hc-detail" id="hc-detail-cloze">Wordt gecheckt...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hc-footer">
+      <div class="hc-tijd" id="hc-tijd">Nog niet gecheckt</div>
+      <button class="hc-refresh" id="hc-refresh-btn" onclick="voerHealthCheckUit()">🔄 Opnieuw</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -940,6 +1114,7 @@
     document.getElementById('header-naam').textContent = huidigeMakelaar.naam;
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('btn-terug').classList.remove('hidden');
+    toonHealthCheckKnop();
 
     // Registreer service worker en vraag push permissie
     registreerServiceWorker();
@@ -1040,12 +1215,168 @@
     document.getElementById('overzicht-screen').classList.add('hidden');
     document.getElementById('login-screen').classList.remove('hidden');
     document.getElementById('btn-terug').classList.add('hidden');
+    document.getElementById('btn-healthcheck').classList.add('hidden');
     document.getElementById('header-naam').textContent = 'Welkom';
     document.getElementById('header-badge').textContent = '0 leads';
     document.getElementById('makelaar-select').value = '';
   }
 
   // ── FEEDBACK BEWERKEN ────────────────────────────────────────────────
+  // ── HEALTH-CHECK (alleen level-2: directie + Monique) ───────────────
+  const HC_LEVEL2_EMAILS = [
+    'toncoffeng@makelaarsvan.nl',
+    'hanskoppes@makelaarsvan.nl',
+    'moniqueklaver@makelaarsvan.nl',
+  ];
+
+  function isLevel2(email) {
+    return HC_LEVEL2_EMAILS.includes((email || '').toLowerCase());
+  }
+
+  function toonHealthCheckKnop() {
+    const btn = document.getElementById('btn-healthcheck');
+    if (!btn) return;
+    if (huidigeMakelaar && isLevel2(huidigeMakelaar.email)) {
+      btn.classList.remove('hidden');
+    } else {
+      btn.classList.add('hidden');
+    }
+  }
+
+  function openHealthCheck() {
+    document.getElementById('hc-modal-overlay').classList.add('open');
+    voerHealthCheckUit();
+  }
+
+  function sluitHealthCheck(event) {
+    if (event.target === document.getElementById('hc-modal-overlay')) sluitHealthCheckDirect();
+  }
+
+  function sluitHealthCheckDirect() {
+    document.getElementById('hc-modal-overlay').classList.remove('open');
+  }
+
+  function hcUpdateCheck(naam, status, detail) {
+    const statusEl = document.getElementById('hc-status-' + naam);
+    const detailEl = document.getElementById('hc-detail-' + naam);
+    if (statusEl) statusEl.className = 'hc-status ' + status;
+    if (detailEl) detailEl.innerHTML = detail;
+  }
+
+  async function voerHealthCheckUit() {
+    const refreshBtn = document.getElementById('hc-refresh-btn');
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = 'Bezig...';
+
+    // Reset alles naar laden-status
+    ['make', 'bezichtigingen', 'leadpool', 'cloze'].forEach(n => {
+      hcUpdateCheck(n, 'laden', 'Wordt gecheckt...');
+    });
+
+    // Check 1: Make.com — kunnen we niet rechtstreeks API-checken zonder auth
+    // Dus tonen we een directe link en markeren als 'grijs/info'
+    hcUpdateCheck('make',
+      'grijs',
+      'Niet automatisch checkbaar. <a class="hc-link" href="https://eu1.make.com/1073275/scenarios/5365854" target="_blank">Open Make.com →</a>'
+    );
+
+    // Check 2 + 3 + 4 parallel
+    await Promise.all([
+      hcCheckBezichtigingen(),
+      hcCheckLeadpool(),
+      hcCheckCloze(),
+    ]);
+
+    const nu = new Date().toLocaleString('nl-NL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+    document.getElementById('hc-tijd').textContent = 'Laatst gecheckt: ' + nu;
+    refreshBtn.disabled = false;
+    refreshBtn.textContent = '🔄 Opnieuw';
+  }
+
+  async function hcCheckBezichtigingen() {
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get_bezichtigingen',
+          data: { makelaar_naam: huidigeMakelaar?.naam || 'Ton Coffeng' }
+        })
+      });
+      const json = await res.json();
+      const items = json?.bezichtigingen || [];
+
+      if (items.length === 0) {
+        hcUpdateCheck('bezichtigingen', 'rood', 'Geen bezichtigingen gevonden');
+        return;
+      }
+
+      // Zoek nieuwste datum
+      const datums = items.map(b => b.datum).filter(Boolean).sort();
+      const nieuwste = datums[datums.length - 1];
+      const dagenOud = nieuwste ? Math.floor((Date.now() - new Date(nieuwste).getTime()) / 86400000) : 999;
+
+      let status = 'groen';
+      let extra = '';
+      if (dagenOud > 14) { status = 'rood'; extra = ' ⚠️ oud!'; }
+      else if (dagenOud > 7) { status = 'geel'; extra = ' (let op)'; }
+
+      hcUpdateCheck('bezichtigingen', status,
+        items.length + ' items. Nieuwste: ' + (nieuwste || '?') + extra
+      );
+    } catch (err) {
+      hcUpdateCheck('bezichtigingen', 'rood', 'Fout: ' + err.message);
+    }
+  }
+
+  async function hcCheckLeadpool() {
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get_leads',
+          data: {
+            board_id: '5093190545',
+            makelaar_naam: huidigeMakelaar?.naam || 'Ton Coffeng',
+          }
+        })
+      });
+      const json = await res.json();
+      const items = json?.leads || [];
+
+      hcUpdateCheck('leadpool', items.length > 0 ? 'groen' : 'geel',
+        items.length + ' leads in jouw leadpool'
+      );
+    } catch (err) {
+      hcUpdateCheck('leadpool', 'rood', 'Fout: ' + err.message);
+    }
+  }
+
+  async function hcCheckCloze() {
+    try {
+      const start = Date.now();
+      const res = await fetch('/.netlify/functions/cloze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'check_bestaand',
+          data: { naam: 'TestCheck', email: 'noreply@example.com' }
+        })
+      });
+      const ms = Date.now() - start;
+      const json = await res.json();
+
+      if (res.ok && typeof json.bestaand !== 'undefined') {
+        hcUpdateCheck('cloze', 'groen', 'API bereikbaar (' + ms + 'ms)');
+      } else {
+        hcUpdateCheck('cloze', 'geel', 'API antwoordde maar onverwacht');
+      }
+    } catch (err) {
+      hcUpdateCheck('cloze', 'rood', 'Fout: ' + err.message);
+    }
+  }
+
   function bewerkFeedback(bezId) {
     // Toon het grid en de opslaan knop weer
     document.getElementById(`fg-${bezId}`).style.display = 'grid';
