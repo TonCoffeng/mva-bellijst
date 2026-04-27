@@ -1273,11 +1273,10 @@
       hcUpdateCheck(n, 'laden', 'Wordt gecheckt...');
     });
 
-    // Check 1: Make.com — kunnen we niet rechtstreeks API-checken zonder auth
-    // Dus tonen we een directe link en markeren als 'grijs/info'
+    // Check 1: Make.com — geen open API zonder auth, dus alleen link
     hcUpdateCheck('make',
       'grijs',
-      'Niet automatisch checkbaar. <a class="hc-link" href="https://eu1.make.com/1073275/scenarios/5365854" target="_blank">Open Make.com →</a>'
+      'Geen automatische check beschikbaar. <a class="hc-link" href="https://eu1.make.com/1073275/scenarios/5365854" target="_blank">Open Make.com om status te zien →</a>'
     );
 
     // Check 2 + 3 + 4 parallel
@@ -1295,19 +1294,20 @@
 
   async function hcCheckBezichtigingen() {
     try {
+      // Systeem-check: heel het board, niet alleen 'mijn' bezichtigingen
       const res = await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'get_bezichtigingen',
-          data: { makelaar_naam: huidigeMakelaar?.naam || 'Ton Coffeng' }
+          data: { makelaar_naam: '__ALLE__' }
         })
       });
       const json = await res.json();
       const items = json?.bezichtigingen || [];
 
       if (items.length === 0) {
-        hcUpdateCheck('bezichtigingen', 'rood', 'Geen bezichtigingen gevonden');
+        hcUpdateCheck('bezichtigingen', 'rood', 'Board is leeg — Make.com levert niets aan');
         return;
       }
 
@@ -1318,11 +1318,11 @@
 
       let status = 'groen';
       let extra = '';
-      if (dagenOud > 14) { status = 'rood'; extra = ' ⚠️ oud!'; }
-      else if (dagenOud > 7) { status = 'geel'; extra = ' (let op)'; }
+      if (dagenOud > 14) { status = 'rood'; extra = ' ⚠️ stilte sinds 2 weken'; }
+      else if (dagenOud > 7) { status = 'geel'; extra = ' ⚠️ stilte sinds 1 week'; }
 
       hcUpdateCheck('bezichtigingen', status,
-        items.length + ' items. Nieuwste: ' + (nieuwste || '?') + extra
+        items.length + ' items in board · nieuwste: ' + (nieuwste || '?') + extra
       );
     } catch (err) {
       hcUpdateCheck('bezichtigingen', 'rood', 'Fout: ' + err.message);
@@ -1331,6 +1331,7 @@
 
   async function hcCheckLeadpool() {
     try {
+      // Systeem-check: heel het leadpool-board, niet alleen 'mijn' leads
       const res = await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1338,15 +1339,33 @@
           action: 'get_leads',
           data: {
             board_id: '5093190545',
-            makelaar_naam: huidigeMakelaar?.naam || 'Ton Coffeng',
+            makelaar_naam: '__ALLE__',
           }
         })
       });
       const json = await res.json();
       const items = json?.leads || [];
 
-      hcUpdateCheck('leadpool', items.length > 0 ? 'groen' : 'geel',
-        items.length + ' leads in jouw leadpool'
+      if (items.length === 0) {
+        hcUpdateCheck('leadpool', 'rood', 'Leadpool is leeg');
+        return;
+      }
+
+      // Zoek nieuwste datum (datum_ontvangen of datum_bezichtiging)
+      const datums = items
+        .map(l => l.datum_ontvangen || l.datum_bezichtiging || l.datum)
+        .filter(Boolean)
+        .sort();
+      const nieuwste = datums[datums.length - 1];
+      const dagenOud = nieuwste ? Math.floor((Date.now() - new Date(nieuwste).getTime()) / 86400000) : 999;
+
+      let status = 'groen';
+      let extra = '';
+      if (dagenOud > 30) { status = 'rood'; extra = ' ⚠️ geen activiteit sinds 1 maand'; }
+      else if (dagenOud > 14) { status = 'geel'; extra = ' ⚠️ rustig sinds 2 weken'; }
+
+      hcUpdateCheck('leadpool', status,
+        items.length + ' leads in pool · nieuwste: ' + (nieuwste || '?') + extra
       );
     } catch (err) {
       hcUpdateCheck('leadpool', 'rood', 'Fout: ' + err.message);
