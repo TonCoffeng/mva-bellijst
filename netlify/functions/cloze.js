@@ -293,6 +293,13 @@ exports.handler = async (event) => {
           // Eigenaar van het contact in Cloze (null = ongekoppeld)
           eigenaar_email,
           eigenaar_naam,
+          // DEBUG: rauwe Cloze data zodat we kunnen zien welke velden er zijn
+          _debug_find_keys: gevondenLijst ? Object.keys(gevondenLijst) : [],
+          _debug_get_keys: gevonden ? Object.keys(gevonden) : [],
+          _debug_assignedTo: gevonden?.assignedTo,
+          _debug_assignee: gevonden?.assignee,
+          _debug_owner: gevonden?.owner,
+          _debug_segments: gevonden?.segments,
         }),
       };
     }
