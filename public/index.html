@@ -222,6 +222,111 @@
     .btn-deal:hover     { background: #d1fae5; border-color: #6ee7b7; }
     .btn-lost:hover     { background: #f3f4f6; border-color: #d1d5db; }
 
+    /* ── BELLIJST TOOLBAR (zoek / sorteer / filter) ── */
+    .bellijst-toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .bellijst-zoek {
+      flex: 1;
+      position: relative;
+    }
+    .bellijst-zoek input {
+      width: 100%;
+      padding: 10px 36px 10px 14px;
+      border: 1px solid var(--grijs-mid);
+      border-radius: 10px;
+      font-size: 13px;
+      font-family: inherit;
+      color: var(--navy);
+      background: var(--wit);
+      box-sizing: border-box;
+    }
+    .bellijst-zoek-wis {
+      display: none;
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      color: var(--grijs-tekst);
+      padding: 4px 8px;
+    }
+    .bellijst-knop {
+      position: relative;
+      background: white;
+      border: 1px solid var(--grijs-mid);
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--navy);
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .bellijst-knop:hover { background: #f9fafb; }
+    .bellijst-knop.actief {
+      background: var(--navy);
+      color: white;
+      border-color: var(--navy);
+    }
+    .bellijst-dropdown {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: calc(100% + 4px);
+      background: white;
+      border: 1px solid var(--grijs-mid);
+      border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      z-index: 50;
+      min-width: 180px;
+      overflow: hidden;
+    }
+    .bellijst-dropdown.open { display: block; }
+    .bellijst-dropdown button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 10px 14px;
+      background: none;
+      border: none;
+      font-size: 13px;
+      color: var(--navy);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .bellijst-dropdown button:hover { background: #f4f5f8; }
+    .bellijst-dropdown button.gekozen {
+      background: #eef2ff;
+      font-weight: 600;
+    }
+    .bellijst-dropdown .dropdown-titel {
+      font-size: 11px;
+      color: var(--grijs-tekst);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      padding: 8px 14px 4px;
+      text-transform: uppercase;
+    }
+    .bellijst-dropdown hr {
+      border: none;
+      border-top: 1px solid #f0f0f0;
+      margin: 4px 0;
+    }
+    .bellijst-teller {
+      font-size: 11px;
+      color: var(--grijs-tekst);
+      margin-bottom: 8px;
+      padding-left: 4px;
+    }
+
     .lead-acties {
       display: flex;
       gap: 8px;
@@ -661,6 +766,48 @@
   </div>
 
   <div class="section-title">Jouw leads</div>
+
+  <div class="bellijst-toolbar">
+    <div class="bellijst-zoek">
+      <input id="bellijst-zoek-input" type="search" autocomplete="off"
+        placeholder="Zoek op naam, adres of gevende makelaar..."
+        oninput="updateZoek()" />
+      <button id="bellijst-zoek-wis" class="bellijst-zoek-wis" onclick="wisZoek()">&#10005;</button>
+    </div>
+
+    <div style="position:relative">
+      <button id="btn-sorteer" class="bellijst-knop" onclick="toggleDropdown('sorteer')">
+        ↕ Sorteer
+      </button>
+      <div id="dropdown-sorteer" class="bellijst-dropdown">
+        <div class="dropdown-titel">Sorteer op</div>
+        <button data-sort="status" onclick="setSortering('status')">Status (Hot eerst)</button>
+        <button data-sort="datum"  onclick="setSortering('datum')">Datum bezichtiging (nieuwste)</button>
+      </div>
+    </div>
+
+    <div style="position:relative">
+      <button id="btn-filter" class="bellijst-knop" onclick="toggleDropdown('filter')">
+        ⚲ Filter
+      </button>
+      <div id="dropdown-filter" class="bellijst-dropdown">
+        <div class="dropdown-titel">Status</div>
+        <button data-filter="alles"      onclick="setFilter('alles')">Alles</button>
+        <button data-filter="Hot"        onclick="setFilter('Hot')">🔥 Hot</button>
+        <button data-filter="Warm"       onclick="setFilter('Warm')">🌡️ Warm</button>
+        <button data-filter="Toegewezen" onclick="setFilter('Toegewezen')">📥 Toegewezen</button>
+        <button data-filter="Afspraak"   onclick="setFilter('Afspraak')">📅 Afspraak</button>
+        <button data-filter="Deal"       onclick="setFilter('Deal')">✅ Deal</button>
+        <button data-filter="Lost"       onclick="setFilter('Lost')">❌ Lost</button>
+        <hr>
+        <div class="dropdown-titel">Belstatus</div>
+        <button data-bel-filter="aan" onclick="toggleNogNietGebeld()">📞 Alleen nog niet gebeld</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bellijst-teller" class="bellijst-teller" style="display:none"></div>
+
   <div id="leads-container">
     <div class="loading">
       <div class="spinner"></div>
@@ -737,6 +884,12 @@
   let huidigeLead = null;
   let gekozenStatus = null;
   let leadsData = [];
+
+  // ── BELLIJST UI STATE (zoek / sorteer / filter) ─────────────────────
+  let bellijstZoek = '';
+  let bellijstSortering = 'status';   // 'status' of 'datum'
+  let bellijstFilter = 'alles';       // 'alles' / 'Hot' / 'Warm' / 'Toegewezen' / 'Afspraak' / 'Deal' / 'Lost'
+  let bellijstNogNietGebeld = false;  // toggle: alleen leads met belpogingen=0
 
   // ── MAKELAARS DYNAMISCH LADEN UIT MONDAY ────────────────────────────
   async function laadMakelaars() {
@@ -1538,10 +1691,83 @@
     }
   }
 
+  // ── BELLIJST TOOLBAR HANDLERS ───────────────────────────────────────
+  function updateZoek() {
+    const input = document.getElementById('bellijst-zoek-input');
+    bellijstZoek = (input.value || '').trim();
+    document.getElementById('bellijst-zoek-wis').style.display = bellijstZoek ? 'block' : 'none';
+    renderLeads();
+  }
+
+  function wisZoek() {
+    const input = document.getElementById('bellijst-zoek-input');
+    input.value = '';
+    bellijstZoek = '';
+    document.getElementById('bellijst-zoek-wis').style.display = 'none';
+    renderLeads();
+    input.focus();
+  }
+
+  function toggleDropdown(welke) {
+    const sorteer = document.getElementById('dropdown-sorteer');
+    const filter  = document.getElementById('dropdown-filter');
+    if (welke === 'sorteer') {
+      filter.classList.remove('open');
+      sorteer.classList.toggle('open');
+    } else {
+      sorteer.classList.remove('open');
+      filter.classList.toggle('open');
+    }
+    markeerDropdownGekozen();
+  }
+
+  function markeerDropdownGekozen() {
+    document.querySelectorAll('#dropdown-sorteer button[data-sort]').forEach(b => {
+      b.classList.toggle('gekozen', b.dataset.sort === bellijstSortering);
+    });
+    document.querySelectorAll('#dropdown-filter button[data-filter]').forEach(b => {
+      b.classList.toggle('gekozen', b.dataset.filter === bellijstFilter);
+    });
+    const belBtn = document.querySelector('#dropdown-filter button[data-bel-filter]');
+    if (belBtn) belBtn.classList.toggle('gekozen', bellijstNogNietGebeld);
+
+    document.getElementById('btn-sorteer').classList.toggle('actief', bellijstSortering !== 'status');
+    document.getElementById('btn-filter').classList.toggle('actief',
+      bellijstFilter !== 'alles' || bellijstNogNietGebeld);
+  }
+
+  function setSortering(welke) {
+    bellijstSortering = welke;
+    document.getElementById('dropdown-sorteer').classList.remove('open');
+    markeerDropdownGekozen();
+    renderLeads();
+  }
+
+  function setFilter(welke) {
+    bellijstFilter = welke;
+    document.getElementById('dropdown-filter').classList.remove('open');
+    markeerDropdownGekozen();
+    renderLeads();
+  }
+
+  function toggleNogNietGebeld() {
+    bellijstNogNietGebeld = !bellijstNogNietGebeld;
+    markeerDropdownGekozen();
+    renderLeads();
+  }
+
+  // Sluit dropdowns bij klik buiten
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.bellijst-knop') && !e.target.closest('.bellijst-dropdown')) {
+      document.getElementById('dropdown-sorteer')?.classList.remove('open');
+      document.getElementById('dropdown-filter')?.classList.remove('open');
+    }
+  });
+
   function renderLeads() {
     const container = document.getElementById('leads-container');
 
-    // ── Sortering: Hot → Warm → Toegewezen → rest ──────────────────────
+    // ── Sortering: status of datum ─────────────────────────────────────
     const prioriteit = {
       'Hot': 1,
       'Warm': 2,
@@ -1550,27 +1776,75 @@
       'Deal': 5,
       'Lost': 6,
     };
-    const sorted = [...leadsData].sort((a, b) => {
-      const pa = prioriteit[a.lead_status] || 99;
-      const pb = prioriteit[b.lead_status] || 99;
-      return pa - pb;
-    });
+    let lijst = [...leadsData];
 
-    // ── Tellers in header ──────────────────────────────────────────────
-    const openstaand = sorted.filter(l => !['bereikt_ja','niet_geinteresseerd'].includes(l.status));
-    const afgerond = sorted.filter(l => ['bereikt_ja','niet_geinteresseerd'].includes(l.status));
+    // 1. Status-filter
+    if (bellijstFilter !== 'alles') {
+      lijst = lijst.filter(l => (l.lead_status || 'Toegewezen') === bellijstFilter);
+    }
+
+    // 2. "Alleen nog niet gebeld"
+    if (bellijstNogNietGebeld) {
+      lijst = lijst.filter(l => (Number(l.belpogingen) || 0) === 0);
+    }
+
+    // 3. Zoekterm
+    if (bellijstZoek) {
+      const term = bellijstZoek.toLowerCase();
+      lijst = lijst.filter(l =>
+        (l.naam || '').toLowerCase().includes(term) ||
+        (l.adres || '').toLowerCase().includes(term) ||
+        (l.bij_wie || '').toLowerCase().includes(term)
+      );
+    }
+
+    // 4. Sortering
+    if (bellijstSortering === 'datum') {
+      lijst.sort((a, b) => (b.datum_bezichtiging || '').localeCompare(a.datum_bezichtiging || ''));
+    } else {
+      lijst.sort((a, b) => {
+        const pa = prioriteit[a.lead_status] || 99;
+        const pb = prioriteit[b.lead_status] || 99;
+        return pa - pb;
+      });
+    }
+
+    const sorted = lijst;
+
+    // ── Tellers in header (op volledige lijst, niet filter) ────────────
+    const openstaand = leadsData.filter(l => !['bereikt_ja','niet_geinteresseerd'].includes(l.status));
+    const afgerond = leadsData.filter(l => ['bereikt_ja','niet_geinteresseerd'].includes(l.status));
 
     document.getElementById('stat-totaal').textContent = openstaand.length;
     document.getElementById('stat-vandaag').textContent = openstaand.filter(l => !l.status).length;
     document.getElementById('stat-gedaan').textContent = afgerond.length;
     document.getElementById('header-badge').textContent = openstaand.length + ' leads';
 
+    // ── Filter/zoek-teller boven de lijst ──────────────────────────────
+    const teller = document.getElementById('bellijst-teller');
+    if (teller) {
+      const filterActief = bellijstZoek || bellijstFilter !== 'alles' || bellijstNogNietGebeld;
+      if (filterActief) {
+        teller.style.display = 'block';
+        teller.textContent = sorted.length + ' van ' + leadsData.length + ' leads zichtbaar';
+      } else {
+        teller.style.display = 'none';
+      }
+    }
+
     if (sorted.length === 0) {
-      container.innerHTML = `<div class="leeg">
-        <div class="leeg-icon">🎉</div>
-        <h3>Alles afgehandeld!</h3>
-        <p>Je hebt geen openstaande leads meer.</p>
-      </div>`;
+      const filterActief = bellijstZoek || bellijstFilter !== 'alles' || bellijstNogNietGebeld;
+      container.innerHTML = filterActief
+        ? `<div class="leeg">
+            <div class="leeg-icon">🔍</div>
+            <h3>Geen resultaten</h3>
+            <p>Geen leads die voldoen aan je zoek- of filtercriteria.</p>
+          </div>`
+        : `<div class="leeg">
+            <div class="leeg-icon">🎉</div>
+            <h3>Alles afgehandeld!</h3>
+            <p>Je hebt geen openstaande leads meer.</p>
+          </div>`;
       return;
     }
 
