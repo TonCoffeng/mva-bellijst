@@ -247,16 +247,15 @@ exports.handler = async (event) => {
       let gevonden = gevondenLijst;
       if (gevondenLijst) {
         try {
-          const personId = gevondenLijst.id || gevondenLijst.uniqueId || gevondenLijst.uniqueid;
-          const personEmail = gevondenLijst.emails?.[0]?.value || email;
-          // Cloze gebruikt soms id, soms email als identifier
-          const lookupKey = personId || personEmail;
+          // Cloze gebruikt 'userKey' als identifier — dat is wat we terugkregen
+          const lookupKey = gevondenLijst.userKey || gevondenLijst.id || gevondenLijst.uniqueId || gevondenLijst.emails?.[0]?.value;
           if (lookupKey) {
+            // Probeer met 'view=full' om alle velden te krijgen
             const detailRes = await fetch(
-              `https://api.cloze.com/v1/people/get?api_key=${CLOZE_API_KEY}&user_email=${CLOZE_USER}&id=${encodeURIComponent(lookupKey)}`
+              `https://api.cloze.com/v1/people/get?api_key=${CLOZE_API_KEY}&user_email=${CLOZE_USER}&id=${encodeURIComponent(lookupKey)}&view=full`
             );
             const detailJson = await detailRes.json();
-            if (detailJson?.id || detailJson?.name) {
+            if (detailJson?.userKey || detailJson?.name) {
               gevonden = detailJson;
             }
           }
@@ -300,6 +299,11 @@ exports.handler = async (event) => {
           _debug_assignee: gevonden?.assignee,
           _debug_owner: gevonden?.owner,
           _debug_segments: gevonden?.segments,
+          _debug_segment_value: gevonden?.segment,
+          _debug_step_value: gevonden?.step,
+          _debug_emails: gevonden?.emails,
+          _debug_userkey: gevonden?.userKey,
+          _debug_lookupkey_used: gevondenLijst ? (gevondenLijst.id || gevondenLijst.uniqueId || gevondenLijst.uniqueid || gevondenLijst.userKey || gevondenLijst.emails?.[0]?.value) : null,
         }),
       };
     }
