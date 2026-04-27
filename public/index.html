@@ -1666,7 +1666,8 @@
           const badge = document.getElementById(`cloze-badge-${b.id}`);
           if (!badge) return;
           if (json.bestaand) {
-            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
+            const stageLabel = (json.stage && json.stage !== 'none') ? json.stage : 'niet gekoppeld';
+            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze · ${stageLabel}</span>`;
           } else {
             badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`;
           }
@@ -2032,7 +2033,8 @@
         const badge = document.getElementById(`cloze-badge-${lead.id}`);
         if (badge) {
           if (json.bestaand) {
-            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
+            const stageLabel = (json.stage && json.stage !== 'none') ? json.stage : 'niet gekoppeld';
+            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze · ${stageLabel}</span>`;
           } else {
             badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`;
           }
