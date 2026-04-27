@@ -227,9 +227,9 @@ exports.handler = async (event) => {
     if (action === "check_bestaand") {
       const { email, telefoon, naam } = data;
 
-      // Zoek op email eerst, dan telefoon, dan naam
+      // Stap 1: Zoek op email eerst, dan telefoon, dan naam
       const queries = [email, telefoon, naam].filter(Boolean);
-      let gevonden = null;
+      let gevondenLijst = null;
 
       for (const query of queries) {
         const res = await fetch(
@@ -237,8 +237,31 @@ exports.handler = async (event) => {
         );
         const json = await res.json();
         if (json?.people?.length > 0) {
-          gevonden = json.people[0];
+          gevondenLijst = json.people[0];
           break;
+        }
+      }
+
+      // Stap 2: Als gevonden, haal de volledige details op via people/get
+      // (find geeft maar beperkte info terug — geen stage, geen assignedTo)
+      let gevonden = gevondenLijst;
+      if (gevondenLijst) {
+        try {
+          const personId = gevondenLijst.id || gevondenLijst.uniqueId || gevondenLijst.uniqueid;
+          const personEmail = gevondenLijst.emails?.[0]?.value || email;
+          // Cloze gebruikt soms id, soms email als identifier
+          const lookupKey = personId || personEmail;
+          if (lookupKey) {
+            const detailRes = await fetch(
+              `https://api.cloze.com/v1/people/get?api_key=${CLOZE_API_KEY}&user_email=${CLOZE_USER}&id=${encodeURIComponent(lookupKey)}`
+            );
+            const detailJson = await detailRes.json();
+            if (detailJson?.id || detailJson?.name) {
+              gevonden = detailJson;
+            }
+          }
+        } catch (e) {
+          // Bij fout: val terug op de find-resultaten
         }
       }
 
