@@ -14,6 +14,11 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ### Gewijzigd
 - **Cloze-badge tekst:** "Bekend in Cloze · none" → "Bekend in Cloze · niet gekoppeld" wanneer Cloze geen stage teruggeeft (`public/index.html`, beide render-paden)
+- **"Afgehandeld" knop hernoemd naar "Archiveren"** met vereenvoudigde flow:
+  - Geen Cloze-stage prompt meer (was: 1=Lead / 2=Out / 3=Status niet wijzigen)
+  - Geen aparte opmerking-prompt meer
+  - Eén bevestigingspopup → lead verdwijnt uit lijst, Monday-status op "afgehandeld", Cloze blijft ongemoeid
+  - Achterliggende functienaam `markeerAfgehandeld` blijft zoals 'ie was
 
 ### Gerepareerd
 - **Bug — "Lead niet gevonden" bij Afgehandeld:** `markeerAfgehandeld` zocht in `leadsData` (bellijst), maar de bezichtigingen-view gebruikt een aparte data-store. Toegevoegd: globale `bezichtigingenData`, lookup zoekt nu eerst in bezichtigingen, valt terug op leads.
