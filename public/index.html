@@ -1968,19 +1968,18 @@
     if (btn) { btn.disabled = true; btn.textContent = 'Bezig...'; }
 
     try {
-      // Monday: status op "afgehandeld" — lead verdwijnt uit gevende-view, blijft in Monday
-      await fetch('/.netlify/functions/monday', {
+      // Monday: archiveer_bezichtiging zet 'Archiefstatus' checkbox op true
+      // → bezichtiging verdwijnt uit gevende-view, blijft op het Monday-board
+      const res = await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'update_status',
-          data: {
-            item_id: itemId,
-            board_id: huidigeMakelaar?.boardId,
-            status: 'afgehandeld'
-          }
+          action: 'archiveer_bezichtiging',
+          data: { item_id: itemId }
         })
       });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || 'Onbekende fout');
 
       toonToast(`✅ ${naam} gearchiveerd`, 'succes');
       // Verwijder lead uit lijst, DOM én update tellers
