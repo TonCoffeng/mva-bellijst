@@ -225,25 +225,58 @@ exports.handler = async (event) => {
 
     // ── CHECK OF PERSOON AL IN CLOZE STAAT ────────────────────────────
     if (action === "debug_get_full") {
-      // TIJDELIJK: probeer per persoon de volledige data op te halen
-      // via verschillende mogelijke endpoints om te zien welke 'assignedTo' geeft
+      // TIJDELIJK: probeer meerdere Cloze endpoints om assignedTo te vinden
       const { portable_id } = data;
       const results = {};
 
-      // Probeer 1: /v1/people/profile (Cloze documenteerde endpoint voor full profile)
+      // Probeer 1: find met details=true parameter
       try {
-        const r1 = await fetch(`https://api.cloze.com/v1/people/profile?api_key=${CLOZE_API_KEY}&uniqueid=${encodeURIComponent(portable_id)}`);
-        const j1 = await r1.json();
-        results.profile_endpoint = {
-          status: r1.status,
-          alle_velden: j1?.party ? Object.keys(j1.party) : Object.keys(j1 || {}),
-          assignedTo: j1?.party?.assignedTo || j1?.assignedTo || null,
-          owner: j1?.party?.owner || j1?.owner || null,
-          stage: j1?.party?.stage || j1?.stage || null,
-          segment: j1?.party?.segment || j1?.segment || null,
-          raw_first_500: JSON.stringify(j1).slice(0, 500)
+        const r = await fetch(`https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&uniqueid=${encodeURIComponent(portable_id)}&details=true`);
+        const j = await r.json();
+        const p = j?.people?.[0] || j;
+        results.find_details_true = {
+          status: r.status,
+          alle_velden: p ? Object.keys(p) : [],
+          assignedTo: p?.assignedTo,
+          owner: p?.owner,
+          team: p?.team,
+          stage: p?.stage,
+          segment: p?.segment,
         };
-      } catch (e) { results.profile_endpoint = { error: e.message }; }
+      } catch (e) { results.find_details_true = { error: e.message }; }
+
+      // Probeer 2: /v1/people/get
+      try {
+        const r = await fetch(`https://api.cloze.com/v1/people/get?api_key=${CLOZE_API_KEY}&uniqueid=${encodeURIComponent(portable_id)}`);
+        const j = await r.json();
+        results.get_endpoint = {
+          status: r.status,
+          alle_velden: Object.keys(j || {}),
+          raw_first_400: JSON.stringify(j).slice(0, 400),
+        };
+      } catch (e) { results.get_endpoint = { error: e.message }; }
+
+      // Probeer 3: /v1/people/profile met person_id ipv uniqueid
+      try {
+        const r = await fetch(`https://api.cloze.com/v1/people/profile?api_key=${CLOZE_API_KEY}&person_id=${encodeURIComponent(portable_id)}`);
+        const j = await r.json();
+        results.profile_with_person_id = {
+          status: r.status,
+          alle_velden: Object.keys(j || {}),
+          raw_first_400: JSON.stringify(j).slice(0, 400),
+        };
+      } catch (e) { results.profile_with_person_id = { error: e.message }; }
+
+      // Probeer 4: /v1/people/get met person_id
+      try {
+        const r = await fetch(`https://api.cloze.com/v1/people/get?api_key=${CLOZE_API_KEY}&person_id=${encodeURIComponent(portable_id)}`);
+        const j = await r.json();
+        results.get_person_id = {
+          status: r.status,
+          alle_velden: Object.keys(j || {}),
+          raw_first_400: JSON.stringify(j).slice(0, 400),
+        };
+      } catch (e) { results.get_person_id = { error: e.message }; }
 
       return {
         statusCode: 200,
