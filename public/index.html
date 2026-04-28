@@ -1644,7 +1644,7 @@
                 id="btn-afgehandeld-${b.id}"
                 onclick="markeerAfgehandeld('${b.id}', '${b.naam.replace(/'/g, "\'")}', '${b.adres?.replace(/'/g, "\'") || ''}')"
                 style="flex:0 0 auto;padding:12px 14px;background:#2E7D32;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
-                ✅ Archiveren
+                ✅ Zonder resultaat
               </button>
             </div>
           </div>`;
@@ -1955,7 +1955,7 @@
   // == ARCHIVEREN (lead uit lijst, Monday-status op 'afgehandeld', Cloze ongemoeid) ====
   async function markeerAfgehandeld(itemId, naam, adres) {
     // Bevestiging
-    if (!confirm(`Weet je zeker dat je "${naam}" wilt archiveren?\n\nDe lead verdwijnt uit jouw lijst maar blijft beschikbaar in Monday.`)) {
+    if (!confirm(`"${naam}" markeren als zonder resultaat?\n\nDe bezichtiging verdwijnt uit jouw lijst maar blijft beschikbaar in Monday.`)) {
       return;
     }
 
@@ -1981,11 +1981,11 @@
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error || 'Onbekende fout');
 
-      toonToast(`✅ ${naam} gearchiveerd`, 'succes');
+      toonToast(`✅ ${naam} gemarkeerd als zonder resultaat`, 'succes');
       // Verwijder lead uit lijst, DOM én update tellers
       verwijderUitBezLijst(itemId);
     } catch (err) {
-      if (btn) { btn.disabled = false; btn.textContent = '✅ Archiveren'; }
+      if (btn) { btn.disabled = false; btn.textContent = '✅ Zonder resultaat'; }
       toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
     }
   }
