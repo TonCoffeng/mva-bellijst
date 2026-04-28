@@ -1644,7 +1644,7 @@
                 id="btn-afgehandeld-${b.id}"
                 onclick="markeerAfgehandeld('${b.id}', '${b.naam.replace(/'/g, "\'")}', '${b.adres?.replace(/'/g, "\'") || ''}')"
                 style="flex:0 0 auto;padding:12px 14px;background:#2E7D32;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
-                ✅ Afgehandeld
+                ✅ Archiveren
               </button>
             </div>
           </div>`;
@@ -1952,27 +1952,12 @@
     if (elBadge) elBadge.textContent = totaal + ' bezichtigingen';
   }
 
-  // == AFGEHANDELD (niet doorsturen) ====================================
+  // == ARCHIVEREN (lead uit lijst, Monday-status op 'afgehandeld', Cloze ongemoeid) ====
   async function markeerAfgehandeld(itemId, naam, adres) {
-    // Stap 1: stage kiezen via simpele prompt
-    const stageKeuze = prompt(
-      `Lead "${naam}" afhandelen voor Cloze.\n\n` +
-      `Kies status:\n` +
-      `  1 = Lead (potentiële klant)\n` +
-      `  2 = Out (geen vervolg)\n` +
-      `  3 = Status niet wijzigen\n\n` +
-      `Typ 1, 2 of 3:`,
-      '3'
-    );
-    if (stageKeuze === null) return; // geannuleerd
-    let stage_override;
-    if (stageKeuze.trim() === '1') stage_override = 'lead';
-    else if (stageKeuze.trim() === '2') stage_override = 'out';
-    else if (stageKeuze.trim() === '3') stage_override = null;
-    else { toonToast('Ongeldige keuze. Kies 1, 2 of 3.', 'fout'); return; }
-
-    // Stap 2: opmerking (optioneel)
-    const opmerking = prompt(`Opmerking meegeven aan Cloze (optioneel):`, '') || '';
+    // Bevestiging
+    if (!confirm(`Weet je zeker dat je "${naam}" wilt archiveren?\n\nDe lead verdwijnt uit jouw lijst maar blijft beschikbaar in Monday.`)) {
+      return;
+    }
 
     // Vind de lead-data — eerst bezichtigingen (gevende-makelaar view), dan bellijst (fallback)
     const lead = bezichtigingenData.find(b => String(b.id) === String(itemId))
@@ -1983,26 +1968,7 @@
     if (btn) { btn.disabled = true; btn.textContent = 'Bezig...'; }
 
     try {
-      // 1. Cloze bijwerken met stage_override + opmerking
-      await fetch('/.netlify/functions/cloze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'verwerk_lead',
-          data: {
-            naam: lead.naam,
-            email: lead.email,
-            telefoon: lead.telefoon,
-            adres: lead.adres,
-            makelaar_email: huidigeMakelaar?.email || '',
-            feedback: [],
-            opmerking: opmerking,
-            stage_override: stage_override
-          }
-        })
-      });
-
-      // 2. Monday: status op "afgehandeld" (niet naar pool)
+      // Monday: status op "afgehandeld" — lead verdwijnt uit gevende-view, blijft in Monday
       await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2016,11 +1982,11 @@
         })
       });
 
-      toonToast(`✅ ${naam} afgehandeld${stage_override ? ' (Cloze: ' + stage_override + ')' : ''}`, 'succes');
+      toonToast(`✅ ${naam} gearchiveerd`, 'succes');
       // Verwijder lead uit lijst, DOM én update tellers
       verwijderUitBezLijst(itemId);
     } catch (err) {
-      if (btn) { btn.disabled = false; btn.textContent = '✅ Afgehandeld'; }
+      if (btn) { btn.disabled = false; btn.textContent = '✅ Archiveren'; }
       toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
     }
   }
