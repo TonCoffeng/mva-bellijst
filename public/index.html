@@ -482,6 +482,18 @@
       cursor: pointer;
     }
     .btn-status:active { background: var(--grijs-mid); }
+    .btn-cloze {
+      padding: 12px 14px;
+      background: #dbeafe;
+      color: #1d4ed8;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: 'Roboto', sans-serif;
+      cursor: pointer;
+    }
+    .btn-cloze:active { background: #bfdbfe; }
 
     /* ── STATUS MODAL ── */
     .modal-overlay {
@@ -2028,6 +2040,7 @@
         const json = await res.json();
         lead.cloze_bestaand = json.bestaand;
         lead.cloze_stage = json.stage;
+        lead.cloze_id = json.id;
 
         // Update badge in DOM zonder volledige re-render
         const badge = document.getElementById(`cloze-badge-${lead.id}`);
@@ -2259,6 +2272,10 @@
             <button class="btn-status" onclick="openModal('${lead.id}')">
               Status →
             </button>
+            ${lead.cloze_bestaand && lead.cloze_id ? `
+            <button class="btn-cloze" onclick="window.open('https://app.cloze.com/app/#/people/${lead.cloze_id}', '_blank')">
+              📁 Open in Cloze
+            </button>` : ''}
           </div>
 
           <div class="leadstatus-knoppen" onclick="event.stopPropagation()" style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
