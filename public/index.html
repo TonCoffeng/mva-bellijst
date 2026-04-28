@@ -482,18 +482,6 @@
       cursor: pointer;
     }
     .btn-status:active { background: var(--grijs-mid); }
-    .btn-cloze {
-      padding: 12px 14px;
-      background: #dbeafe;
-      color: #1d4ed8;
-      border: none;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      font-family: 'Roboto', sans-serif;
-      cursor: pointer;
-    }
-    .btn-cloze:active { background: #bfdbfe; }
 
     /* ── STATUS MODAL ── */
     .modal-overlay {
@@ -1070,6 +1058,7 @@
   let huidigeLead = null;
   let gekozenStatus = null;
   let leadsData = [];
+  let bezichtigingenData = [];  // globale store voor de gevende-makelaar view
 
   // ── BELLIJST UI STATE (zoek / sorteer / filter) ─────────────────────
   let bellijstZoek = '';
@@ -1530,6 +1519,7 @@
       const items = json?.bezichtigingen || [];
            // Nieuwste bezichtigingen eerst (Rogier's wens)
            items.sort((a, b) => (b.datum || '').localeCompare(a.datum || ''));
+      bezichtigingenData = items;  // globaal opslaan zodat actie-functies de lead kunnen vinden
 
       const totaal = items.length;
       const gedeeld = items.filter(b => b.in_pool).length;
@@ -1903,12 +1893,9 @@
       const json = await res.json();
       if (json.error) throw new Error(json.error);
 
-      btn.textContent = '✅ Staat bij jou!';
-      btn.style.background = '#2e7d32';
-      if (poolBtn) { poolBtn.disabled = true; poolBtn.textContent = '✅ Al toegewezen'; poolBtn.classList.add('gedeeld'); }
-      document.getElementById(`bez-${itemId}`).classList.add('al-gedeeld');
-
       toonToast(`✅ ${naam} staat op jouw bellijst!`, 'succes');
+      // Lead verdwijnt uit gevende-makelaar lijst (komt op eigen bellijst terug)
+      verwijderUitBezLijst(itemId);
     } catch (err) {
       btn.disabled = false;
       btn.textContent = '👤 Zelf bellen';
@@ -1935,23 +1922,36 @@
 
       if (json.error) throw new Error(json.error);
 
-      btn.textContent = '✅ In de pool!';
-      btn.classList.add('gedeeld');
-      document.getElementById(`bez-${itemId}`).classList.add('al-gedeeld');
-
-      // Stats bijwerken
-      const gedeeld = parseInt(document.getElementById('stat-geven-gedeeld').textContent) + 1;
-      const nieuw = parseInt(document.getElementById('stat-geven-nieuw').textContent) - 1;
-      document.getElementById('stat-geven-gedeeld').textContent = gedeeld;
-      document.getElementById('stat-geven-nieuw').textContent = Math.max(0, nieuw);
-
       toonToast(`✅ ${naam} staat in de pool!`, 'succes');
+      // Lead verdwijnt uit lijst, DOM én tellers worden bijgewerkt
+      verwijderUitBezLijst(itemId);
     } catch (err) {
       btn.disabled = false;
       btn.textContent = '📤 Geef door aan pool';
       toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
     }
   }
+  // Hulpfunctie: verwijder bezichtiging uit lijst + UI + update tellers
+  function verwijderUitBezLijst(itemId) {
+    // 1. Uit globale data
+    bezichtigingenData = bezichtigingenData.filter(b => String(b.id) !== String(itemId));
+    // 2. Card uit DOM
+    const card = document.getElementById(`bez-${itemId}`);
+    if (card) card.remove();
+    // 3. Tellers updaten
+    const totaal = bezichtigingenData.length;
+    const gedeeld = bezichtigingenData.filter(b => b.in_pool).length;
+    const openFeedback = bezichtigingenData.filter(b => !b.feedback).length;
+    const elTotaal = document.getElementById('stat-geven-totaal');
+    const elNieuw = document.getElementById('stat-geven-nieuw');
+    const elGedeeld = document.getElementById('stat-geven-gedeeld');
+    const elBadge = document.getElementById('header-badge');
+    if (elTotaal) elTotaal.textContent = totaal;
+    if (elNieuw) elNieuw.textContent = openFeedback;
+    if (elGedeeld) elGedeeld.textContent = gedeeld;
+    if (elBadge) elBadge.textContent = totaal + ' bezichtigingen';
+  }
+
   // == AFGEHANDELD (niet doorsturen) ====================================
   async function markeerAfgehandeld(itemId, naam, adres) {
     // Stap 1: stage kiezen via simpele prompt
@@ -1974,8 +1974,9 @@
     // Stap 2: opmerking (optioneel)
     const opmerking = prompt(`Opmerking meegeven aan Cloze (optioneel):`, '') || '';
 
-    // Vind de lead-data
-    const lead = leadsData.find(l => String(l.id) === String(itemId));
+    // Vind de lead-data — eerst bezichtigingen (gevende-makelaar view), dan bellijst (fallback)
+    const lead = bezichtigingenData.find(b => String(b.id) === String(itemId))
+              || leadsData.find(l => String(l.id) === String(itemId));
     if (!lead) { toonToast('Lead niet gevonden.', 'fout'); return; }
 
     const btn = document.getElementById(`btn-afgehandeld-${itemId}`);
@@ -2016,9 +2017,8 @@
       });
 
       toonToast(`✅ ${naam} afgehandeld${stage_override ? ' (Cloze: ' + stage_override + ')' : ''}`, 'succes');
-      // Verwijder de kaart uit de UI
-      const card = document.getElementById(`bez-${itemId}`);
-      if (card) card.remove();
+      // Verwijder lead uit lijst, DOM én update tellers
+      verwijderUitBezLijst(itemId);
     } catch (err) {
       if (btn) { btn.disabled = false; btn.textContent = '✅ Afgehandeld'; }
       toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
@@ -2040,7 +2040,6 @@
         const json = await res.json();
         lead.cloze_bestaand = json.bestaand;
         lead.cloze_stage = json.stage;
-        lead.cloze_id = json.id;
 
         // Update badge in DOM zonder volledige re-render
         const badge = document.getElementById(`cloze-badge-${lead.id}`);
@@ -2272,10 +2271,6 @@
             <button class="btn-status" onclick="openModal('${lead.id}')">
               Status →
             </button>
-            ${lead.cloze_bestaand && lead.cloze_id ? `
-            <button class="btn-cloze" onclick="window.open('https://app.cloze.com/app/#/people/${lead.cloze_id}', '_blank')">
-              📁 Open in Cloze
-            </button>` : ''}
           </div>
 
           <div class="leadstatus-knoppen" onclick="event.stopPropagation()" style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
