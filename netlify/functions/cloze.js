@@ -224,6 +224,34 @@ exports.handler = async (event) => {
     }
 
     // ── CHECK OF PERSOON AL IN CLOZE STAAT ────────────────────────────
+    if (action === "debug_get_full") {
+      // TIJDELIJK: probeer per persoon de volledige data op te halen
+      // via verschillende mogelijke endpoints om te zien welke 'assignedTo' geeft
+      const { portable_id } = data;
+      const results = {};
+
+      // Probeer 1: /v1/people/profile (Cloze documenteerde endpoint voor full profile)
+      try {
+        const r1 = await fetch(`https://api.cloze.com/v1/people/profile?api_key=${CLOZE_API_KEY}&uniqueid=${encodeURIComponent(portable_id)}`);
+        const j1 = await r1.json();
+        results.profile_endpoint = {
+          status: r1.status,
+          alle_velden: j1?.party ? Object.keys(j1.party) : Object.keys(j1 || {}),
+          assignedTo: j1?.party?.assignedTo || j1?.assignedTo || null,
+          owner: j1?.party?.owner || j1?.owner || null,
+          stage: j1?.party?.stage || j1?.stage || null,
+          segment: j1?.party?.segment || j1?.segment || null,
+          raw_first_500: JSON.stringify(j1).slice(0, 500)
+        };
+      } catch (e) { results.profile_endpoint = { error: e.message }; }
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify(results, null, 2)
+      };
+    }
+
     if (action === "debug_raw_find") {
       // TIJDELIJKE DIAGNOSE — laat zien welke velden Cloze terugstuurt
       // zodat we weten hoe het ID-veld heet, etc.
