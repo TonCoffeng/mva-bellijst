@@ -224,6 +224,38 @@ exports.handler = async (event) => {
     }
 
     // ── CHECK OF PERSOON AL IN CLOZE STAAT ────────────────────────────
+    if (action === "debug_raw_find") {
+      // TIJDELIJKE DIAGNOSE — laat zien welke velden Cloze terugstuurt
+      // zodat we weten hoe het ID-veld heet, etc.
+      const { email, telefoon, naam } = data;
+      const queries = [email, telefoon, naam].filter(Boolean);
+      let raw = null;
+      let usedQuery = null;
+
+      for (const query of queries) {
+        const res = await fetch(
+          `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(query)}&pagesize=1`
+        );
+        const json = await res.json();
+        if (json?.people?.length > 0) {
+          raw = json.people[0];
+          usedQuery = query;
+          break;
+        }
+      }
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          gebruikt_zoekwoord: usedQuery,
+          gevonden: !!raw,
+          alle_top_level_velden: raw ? Object.keys(raw) : [],
+          raw_object: raw,
+        }, null, 2),
+      };
+    }
+
     if (action === "check_bestaand") {
       const { email, telefoon, naam } = data;
 
