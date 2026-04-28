@@ -248,6 +248,51 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify(result) };
     }
 
+    // ── ARCHIVEREN: zet 'Archiefstatus' boolean op true voor bezichtiging ─────
+    if (action === "archiveer_bezichtiging") {
+      const { item_id } = data;
+      const BOARD_ID = "5093190482"; // Bezichtigingen-board
+
+      // Zoek de Archiefstatus kolom op naam (robuust tegen ID-wijzigingen)
+      const colResult = await mondayFetch(`
+        query ($boardId: ID!) {
+          boards(ids: [$boardId]) { columns { id title type } }
+        }
+      `, { boardId: BOARD_ID });
+
+      const cols = colResult?.data?.boards?.[0]?.columns || [];
+      const archiefCol = cols.find(c =>
+        (c.title || '').toLowerCase().includes('archief') &&
+        (c.type === 'checkbox' || c.type === 'boolean')
+      );
+
+      if (!archiefCol) {
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ error: "Archiefstatus-kolom niet gevonden op het bezichtigingen-board" })
+        };
+      }
+
+      const result = await mondayFetch(`
+        mutation ($itemId: ID!, $boardId: ID!, $colId: String!, $value: JSON!) {
+          change_column_value(
+            item_id: $itemId
+            board_id: $boardId
+            column_id: $colId
+            value: $value
+          ) { id }
+        }
+      `, {
+        itemId: item_id,
+        boardId: BOARD_ID,
+        colId: archiefCol.id,
+        value: JSON.stringify({ checked: "true" }),
+      });
+
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, kolom: archiefCol.id, result }) };
+    }
+
 
     // ── ALLE MAKELAARS (ook gevende, zonder vinkje) ───────────────────
     if (action === "get_alle_makelaars") {
@@ -309,6 +354,20 @@ exports.handler = async (event) => {
     // ── BEZICHTIGINGEN OPHALEN (gevende makelaar) ─────────────────────
     if (action === "get_bezichtigingen") {
       const { makelaar_naam } = data;
+
+      // Eerst: zoek de Archiefstatus-kolom-ID (via naam, zodat we niet hard-coderen)
+      const colResult = await mondayFetch(`
+        query {
+          boards(ids: [5093190482]) { columns { id title type } }
+        }
+      `);
+      const colsAll = colResult?.data?.boards?.[0]?.columns || [];
+      const archiefCol = colsAll.find(c =>
+        (c.title || '').toLowerCase().includes('archief') &&
+        (c.type === 'checkbox' || c.type === 'boolean')
+      );
+      const archiefColId = archiefCol?.id || null;
+
       const result = await mondayFetch(`
         query {
           boards(ids: [5093190482]) {
@@ -332,6 +391,11 @@ exports.handler = async (event) => {
         const datum = datumVal?.date || get('date_mm1fn58e');
         const tijdstip = datumVal?.time ? datumVal.time.substring(0, 5) : null;
 
+        // Archiefstatus checkbox waarde — true als gearchiveerd
+        const gearchiveerd = archiefColId
+          ? (get(archiefColId) === 'true' || get(archiefColId) === 'v')
+          : false;
+
         return {
           id:       item.id,
           naam:     item.name,
@@ -343,10 +407,12 @@ exports.handler = async (event) => {
           email:    get('email_mm1fm8b7'),
           niet_naar_pool: get('boolean_mm1s4qcy') === 'true',
           doorgegeven:    get('boolean_mm2q35j3') === 'true',
+          gearchiveerd,
           feedback: get('text_mm1fy05p'), // Adres klant kolom hergebruiken voor feedback
           in_pool:  false,
         };
       }).filter(b => {
+        if (b.gearchiveerd) return false;       // gearchiveerde bezichtigingen verbergen
         if (b.niet_naar_pool) return false;
         if (b.doorgegeven) return false;
         if (!makelaar_naam) return true;
