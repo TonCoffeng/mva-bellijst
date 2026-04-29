@@ -1655,8 +1655,9 @@
               <button
                 class="btn-zichzelf"
                 id="btn-zelf-${b.id}"
-                onclick="geefAanZichzelf('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
-                style="flex:0 0 auto;padding:12px 14px;background:var(--navy);color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
+                disabled
+                title="Tijdelijk uitgeschakeld — wordt binnenkort opgeleverd"
+                style="flex:0 0 auto;padding:12px 14px;background:#cbd5e1;color:#64748b;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:not-allowed;white-space:nowrap;opacity:0.7">
                 👤 Zelf bellen
               </button>` : ''}
               <button
