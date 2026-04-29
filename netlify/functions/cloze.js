@@ -224,99 +224,6 @@ exports.handler = async (event) => {
     }
 
     // ── CHECK OF PERSOON AL IN CLOZE STAAT ────────────────────────────
-    if (action === "debug_get_full") {
-      // TIJDELIJK: probeer meerdere Cloze endpoints om assignedTo te vinden
-      const { portable_id } = data;
-      const results = {};
-
-      // Probeer 1: find met details=true parameter
-      try {
-        const r = await fetch(`https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&uniqueid=${encodeURIComponent(portable_id)}&details=true`);
-        const j = await r.json();
-        const p = j?.people?.[0] || j;
-        results.find_details_true = {
-          status: r.status,
-          alle_velden: p ? Object.keys(p) : [],
-          assignedTo: p?.assignedTo,
-          owner: p?.owner,
-          team: p?.team,
-          stage: p?.stage,
-          segment: p?.segment,
-        };
-      } catch (e) { results.find_details_true = { error: e.message }; }
-
-      // Probeer 2: /v1/people/get
-      try {
-        const r = await fetch(`https://api.cloze.com/v1/people/get?api_key=${CLOZE_API_KEY}&uniqueid=${encodeURIComponent(portable_id)}`);
-        const j = await r.json();
-        results.get_endpoint = {
-          status: r.status,
-          alle_velden: Object.keys(j || {}),
-          raw_first_400: JSON.stringify(j).slice(0, 400),
-        };
-      } catch (e) { results.get_endpoint = { error: e.message }; }
-
-      // Probeer 3: /v1/people/profile met person_id ipv uniqueid
-      try {
-        const r = await fetch(`https://api.cloze.com/v1/people/profile?api_key=${CLOZE_API_KEY}&person_id=${encodeURIComponent(portable_id)}`);
-        const j = await r.json();
-        results.profile_with_person_id = {
-          status: r.status,
-          alle_velden: Object.keys(j || {}),
-          raw_first_400: JSON.stringify(j).slice(0, 400),
-        };
-      } catch (e) { results.profile_with_person_id = { error: e.message }; }
-
-      // Probeer 4: /v1/people/get met person_id
-      try {
-        const r = await fetch(`https://api.cloze.com/v1/people/get?api_key=${CLOZE_API_KEY}&person_id=${encodeURIComponent(portable_id)}`);
-        const j = await r.json();
-        results.get_person_id = {
-          status: r.status,
-          alle_velden: Object.keys(j || {}),
-          raw_first_400: JSON.stringify(j).slice(0, 400),
-        };
-      } catch (e) { results.get_person_id = { error: e.message }; }
-
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify(results, null, 2)
-      };
-    }
-
-    if (action === "debug_raw_find") {
-      // TIJDELIJKE DIAGNOSE — laat zien welke velden Cloze terugstuurt
-      // zodat we weten hoe het ID-veld heet, etc.
-      const { email, telefoon, naam } = data;
-      const queries = [email, telefoon, naam].filter(Boolean);
-      let raw = null;
-      let usedQuery = null;
-
-      for (const query of queries) {
-        const res = await fetch(
-          `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(query)}&pagesize=1`
-        );
-        const json = await res.json();
-        if (json?.people?.length > 0) {
-          raw = json.people[0];
-          usedQuery = query;
-          break;
-        }
-      }
-
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          gebruikt_zoekwoord: usedQuery,
-          gevonden: !!raw,
-          alle_top_level_velden: raw ? Object.keys(raw) : [],
-          raw_object: raw,
-        }, null, 2),
-      };
-    }
-
     if (action === "check_bestaand") {
       const { email, telefoon, naam } = data;
 
@@ -325,10 +232,17 @@ exports.handler = async (event) => {
       let gevonden = null;
 
       for (const query of queries) {
-        const res = await fetch(
-          `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(query)}&pagesize=1`
-        );
+        const url = `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&user_email=${CLOZE_USER}&freeformquery=${encodeURIComponent(query)}&pagesize=1`;
+        const res = await fetch(url);
         const json = await res.json();
+
+        // 🔍 DEBUG LOG voor Cloze support — toont ruwe respons
+        console.log('=== CLOZE FIND DEBUG ===');
+        console.log('Query:', query);
+        console.log('URL (zonder key):', url.replace(CLOZE_API_KEY, '***'));
+        console.log('Raw response:', JSON.stringify(json, null, 2));
+        console.log('=== EINDE DEBUG ===');
+
         if (json?.people?.length > 0) {
           gevonden = json.people[0];
           break;
@@ -356,7 +270,6 @@ exports.handler = async (event) => {
         headers,
         body: JSON.stringify({
           bestaand: !!gevonden,
-          id: gevonden?.id || null,
           naam: gevonden?.name || null,
           stage: gevonden?.stage || null,
           // Hoeveel interacties er al zijn (geeft inschatting van relatiediepte)
