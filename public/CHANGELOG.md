@@ -16,6 +16,12 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 ### Open punt
 - Cloze API geeft voor team-contacten (toegewezen aan collega) `bestaand: false` terug, ondanks dat de UI ze wél toont. Mail naar Cloze support staat klaar om beta-API team-scope toegang te activeren. De "Open in Cloze" knop op email/telefoon werkt in de tussentijd als fallback.
 
+### Gewijzigd (middag)
+- **"Zelf bellen" knop tijdelijk uitgeschakeld** in de bezichtigingen-view. Reden: bij gebruik kwam de lead via de bestaande Round Robin (Make.com) terecht bij een willekeurige collega in plaats van bij de gevende makelaar zelf. De knop verdween dus uit de gevende lijst maar verscheen niet in de eigen bellijst. Tijdelijk gedeactiveerd om verwarring te voorkomen.
+  - `public/index.html`: knop is grijs/disabled met tooltip "Tijdelijk uitgeschakeld — wordt binnenkort opgeleverd". De achterliggende `geefAanZichzelf()` functie blijft staan zodat de knop straks zonder code-wijziging weer geactiveerd kan worden.
+  - Echte fix vereist of een filter in het Make.com Round Robin scenario (zodat het de "zelf bellen"-leads overslaat), of een `monday.js` aanpassing die het Bezichtigingen-item rechtstreeks toewijst aan de gevende makelaar zonder de Leadpool-pool-button te triggeren. Wordt later opgepakt.
+- **Diagnose-action `diag_bellijsten` verwijderd** uit `netlify/functions/monday.js` — was eenmalig gebruikt om alle Bellijst_* boards en hun kolomstructuur op te halen. Hieruit bleek dat momenteel alleen `Bellijst_Maurits` (id 5093529769) en `Bellijst_Matthias` (id 5093235114) als echte Monday-boards bestaan. De andere "Bellijst_X" waarden in de Boards-kolom van het Meedoen-board zijn alleen tekst-labels.
+
 ---
 
 ## 2026-04-28
