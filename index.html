@@ -516,6 +516,26 @@
       background: #dcfce7;
       color: #15803d;
     }
+    .cloze-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      background: #f1f5f9;
+      color: #475569;
+      text-decoration: none;
+      border: 1px solid #e2e8f0;
+      margin-left: 6px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .cloze-link:hover, .cloze-link:active {
+      background: #e2e8f0;
+      color: #1e293b;
+    }
   </style>
 </head>
 <body>
@@ -1009,8 +1029,9 @@
               ${b.telefoon ? `<span>📞 ${b.telefoon}</span>` : ''}
               ${b.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px">✉️ ${b.email}</span>` : ''}
             </div>
-            <div id="cloze-badge-${b.id}" style="margin-top:6px;min-height:20px">
+            <div id="cloze-badge-${b.id}" style="margin-top:6px;min-height:20px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
               <span style="font-size:11px;color:var(--grijs-tekst)">⏳ Cloze check...</span>
+              ${(b.email || b.telefoon) ? `<a href="${clozeProfielUrl(b.email, b.telefoon)}" target="_blank" rel="noopener" class="cloze-link" title="Open profiel in Cloze (toont eigenaar)">🔗 Bekijk in Cloze</a>` : ''}
             </div>
 
             <!-- FEEDBACK WEERGAVE / INVOER -->
@@ -1075,6 +1096,9 @@
 
       // Cloze check per bezichtiging
       items.forEach(b => {
+        const linkHtml = (b.email || b.telefoon)
+          ? ` <a href="${clozeProfielUrl(b.email, b.telefoon)}" target="_blank" rel="noopener" class="cloze-link" title="Open profiel in Cloze (toont eigenaar)">🔗 Bekijk in Cloze</a>`
+          : '';
         if (!b.email && !b.telefoon) {
           const badge = document.getElementById(`cloze-badge-${b.id}`);
           if (badge) badge.innerHTML = '';
@@ -1091,13 +1115,13 @@
           const badge = document.getElementById(`cloze-badge-${b.id}`);
           if (!badge) return;
           if (json.bestaand) {
-            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
+            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>${linkHtml}`;
           } else {
-            badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`;
+            badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>${linkHtml}`;
           }
         }).catch(() => {
           const badge = document.getElementById(`cloze-badge-${b.id}`);
-          if (badge) badge.innerHTML = '';
+          if (badge) badge.innerHTML = linkHtml;
         });
       });
 
@@ -1199,10 +1223,13 @@
         // Update badge in DOM zonder volledige re-render
         const badge = document.getElementById(`cloze-badge-${lead.id}`);
         if (badge) {
+          const linkHtml = (lead.email || lead.telefoon)
+            ? ` <a href="${clozeProfielUrl(lead.email, lead.telefoon)}" target="_blank" rel="noopener" class="cloze-link" title="Open profiel in Cloze (toont eigenaar)">🔗 Bekijk in Cloze</a>`
+            : '';
           if (json.bestaand) {
-            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
+            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>${linkHtml}`;
           } else {
-            badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`;
+            badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>${linkHtml}`;
           }
         }
       } catch (e) { /* stille fout — badge blijft leeg */ }
@@ -1274,12 +1301,13 @@
             ${lead.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">✉️ ${lead.email}</span>` : ''}
           </div>
           ${lead.opmerkingen ? `<div style="margin-top:6px;font-size:12px;color:var(--grijs-tekst);font-style:italic">💬 ${lead.opmerkingen}</div>` : ''}
-          <div id="cloze-badge-${lead.id}" style="margin-top:8px;min-height:22px">
+          <div id="cloze-badge-${lead.id}" style="margin-top:8px;min-height:22px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
             ${lead.cloze_bestaand === true
               ? `<span class="cloze-badge bekend">📁 Bekend in Cloze${lead.cloze_stage ? ' · ' + lead.cloze_stage : ''}</span>`
               : lead.cloze_bestaand === false
               ? `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`
               : `<span style="font-size:11px;color:var(--grijs-tekst)">⏳ Cloze check...</span>`}
+            ${(lead.email || lead.telefoon) ? `<a href="${clozeProfielUrl(lead.email, lead.telefoon)}" target="_blank" rel="noopener" class="cloze-link" title="Open profiel in Cloze (toont eigenaar)">🔗 Bekijk in Cloze</a>` : ''}
           </div>
           <div class="lead-acties" onclick="event.stopPropagation()">
             <button class="btn-bel" onclick="bel('${lead.telefoon}', '${lead.naam}')">
@@ -1292,6 +1320,22 @@
         </div>
       `;
     }).join('');
+  }
+
+  // ── BEKIJK IN CLOZE — opent direct het profiel in Cloze (UI, niet API) ──
+  // Werkt zolang de makelaar ingelogd is in Cloze. Toont volledige profiel
+  // inclusief assignee/eigenaar — werkt voor álle team-contacten, niet alleen
+  // de eigen contacten van de ingelogde gebruiker (waar de API beperkt op is).
+  function clozeProfielUrl(email, telefoon) {
+    if (email) {
+      return `https://www.cloze.com/in/#contact=${encodeURIComponent(email)}`;
+    }
+    if (telefoon) {
+      // strip + en spaties uit telefoonnummer voor Cloze lookup
+      const schoon = String(telefoon).replace(/[^0-9]/g, '');
+      return `https://www.cloze.com/in/#contact=${schoon}`;
+    }
+    return null;
   }
 
   // ── BELLEN ──────────────────────────────────────────────────────────
