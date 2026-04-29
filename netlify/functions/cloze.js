@@ -265,11 +265,18 @@ exports.handler = async (event) => {
         if (!eigenaar_email && gevonden.owner) eigenaar_email = gevonden.owner;
       }
 
+      // Cloze persoon-id — voor "Open in Cloze" knop in de UI
+      // Cloze gebruikt meerdere id-velden; we proberen ze in volgorde
+      const cloze_id = gevonden
+        ? (gevonden.id || gevonden.direct || gevonden.portableId || gevonden.syncKey || null)
+        : null;
+
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           bestaand: !!gevonden,
+          id: cloze_id,
           naam: gevonden?.name || null,
           stage: gevonden?.stage || null,
           // Hoeveel interacties er al zijn (geeft inschatting van relatiediepte)
