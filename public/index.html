@@ -1600,7 +1600,7 @@
             </div>
             <div id="cloze-badge-${b.id}" style="margin-top:6px;min-height:20px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
               <span style="font-size:11px;color:var(--grijs-tekst)">⏳ Cloze check...</span>
-              ${clozeKnopHtml(b.email, b.telefoon)}
+              ${clozeKnopHtml(b.email, b.telefoon, b.cloze_id)}
             </div>
 
             <!-- FEEDBACK WEERGAVE / INVOER -->
@@ -1672,7 +1672,6 @@
 
       // Cloze check per bezichtiging
       items.forEach(b => {
-        const knop = clozeKnopHtml(b.email, b.telefoon);
         if (!b.email && !b.telefoon) {
           const badge = document.getElementById(`cloze-badge-${b.id}`);
           if (badge) badge.innerHTML = '';
@@ -1692,6 +1691,8 @@
           b.cloze_id = json.id;
           const badge = document.getElementById(`cloze-badge-${b.id}`);
           if (!badge) return;
+          // Knop ná de check opbouwen — gebruikt cloze_id voor directe profielopening
+          const knop = clozeKnopHtml(b.email, b.telefoon, b.cloze_id);
           if (json.bestaand) {
             const stageLabel = (json.stage && json.stage !== 'none') ? json.stage : 'niet gekoppeld';
             badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze · ${stageLabel}</span>${knop}`;
@@ -1700,7 +1701,7 @@
           }
         }).catch(() => {
           const badge = document.getElementById(`cloze-badge-${b.id}`);
-          if (badge) badge.innerHTML = knop;
+          if (badge) badge.innerHTML = clozeKnopHtml(b.email, b.telefoon, b.cloze_id);
         });
       });
 
@@ -2016,11 +2017,14 @@
   }
 
   // ── BEKIJK IN CLOZE — opent direct het persoonsprofiel in Cloze (UI, niet API) ──
-  // Gebruikt Cloze's officiële URL-scheme: werkt voor élke bekende persoon
-  // zonder dat we Cloze's interne id nodig hebben. Werkt zolang de makelaar
-  // is ingelogd in Cloze in dezelfde browser.
+  // Voorkeur: bij bekende cloze_id wordt direct het profiel geopend in app.cloze.com.
+  // Anders: fallback naar Cloze's URL-scheme op email of telefoon. Werkt zolang
+  // de makelaar is ingelogd in Cloze in dezelfde browser.
   // Documentatie: https://help.cloze.com/article/2197-cloze-url-scheme-x-callback-urls
-  function clozeProfielUrl(email, telefoon) {
+  function clozeProfielUrl(email, telefoon, clozeId) {
+    if (clozeId) {
+      return `https://app.cloze.com/app/#/people/${encodeURIComponent(clozeId)}`;
+    }
     if (email) {
       return `https://www.cloze.com/in/#contact=${encodeURIComponent(email)}`;
     }
@@ -2032,10 +2036,13 @@
     return null;
   }
 
-  function clozeKnopHtml(email, telefoon) {
-    const url = clozeProfielUrl(email, telefoon);
+  function clozeKnopHtml(email, telefoon, clozeId) {
+    const url = clozeProfielUrl(email, telefoon, clozeId);
     if (!url) return '';
-    return ` <a href="${url}" target="_blank" rel="noopener" class="btn-cloze" onclick="event.stopPropagation()" title="Open dit profiel in Cloze (toont eigenaar en historie)">🔗 Open in Cloze</a>`;
+    const tooltip = clozeId
+      ? 'Open dit profiel in Cloze'
+      : 'Open Cloze (profiel als bekend, anders algemeen scherm)';
+    return ` <a href="${url}" target="_blank" rel="noopener" class="btn-cloze" onclick="event.stopPropagation()" title="${tooltip}">🔗 Open Cloze</a>`;
   }
 
   async function checkClozeBestaand() {
@@ -2058,7 +2065,7 @@
         // Update badge in DOM zonder volledige re-render — knop blijft staan
         const badge = document.getElementById(`cloze-badge-${lead.id}`);
         if (badge) {
-          const knop = clozeKnopHtml(lead.email, lead.telefoon);
+          const knop = clozeKnopHtml(lead.email, lead.telefoon, lead.cloze_id);
           if (json.bestaand) {
             const stageLabel = (json.stage && json.stage !== 'none') ? json.stage : 'niet gekoppeld';
             badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze · ${stageLabel}</span>${knop}`;
@@ -2283,7 +2290,7 @@
               : lead.cloze_bestaand === false
               ? `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`
               : `<span style="font-size:11px;color:var(--grijs-tekst)">⏳ Cloze check...</span>`}
-            ${clozeKnopHtml(lead.email, lead.telefoon)}
+            ${clozeKnopHtml(lead.email, lead.telefoon, lead.cloze_id)}
           </div>
 
           ${lead.opmerkingen ? `<div style="margin-top:6px;font-size:12px;color:var(--grijs-tekst);font-style:italic">💬 ${lead.opmerkingen}</div>` : ''}
