@@ -47,39 +47,6 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify(result) };
     }
 
-    // ── DIAGNOSE: ALLE BELLIJST_* BOARDS + KOLOMMEN ────────────────────
-    // Eenmalige diagnose voor "Zelf bellen"-feature: haalt alle persoonlijke
-    // bellijst-boards op met hun ID's en kolomstructuur, zodat we kunnen
-    // zien of ze identiek zijn en welke kolommen we moeten vullen.
-    if (action === "diag_bellijsten") {
-      const result = await mondayFetch(`
-        query {
-          boards(limit: 100) {
-            id
-            name
-            columns { id title type settings_str }
-          }
-        }
-      `);
-      const allBoards = result?.data?.boards || [];
-      const bellijsten = allBoards
-        .filter(b => b.name && b.name.toLowerCase().startsWith('bellijst_'))
-        .map(b => ({
-          id: b.id,
-          name: b.name,
-          aantal_kolommen: b.columns.length,
-          kolommen: b.columns.map(c => ({ id: c.id, title: c.title, type: c.type })),
-        }));
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          aantal_bellijsten: bellijsten.length,
-          bellijsten,
-        }, null, 2),
-      };
-    }
-
     // ── LEADS OPHALEN ─────────────────────────────────────────────────
     if (action === "get_leads") {
       const { board_id, makelaar_naam, makelaar_email } = data;
