@@ -69,7 +69,7 @@ exports.handler = async (event) => {
 
     // ── LEADS OPHALEN ─────────────────────────────────────────────────
     if (action === "get_leads") {
-      const { board_id, makelaar_naam, makelaar_email } = data;
+      const { board_id, makelaar_naam, makelaar_email, bron } = data;
 
       const result = await mondayFetch(`
         query ($boardId: ID!) {
@@ -135,6 +135,10 @@ exports.handler = async (event) => {
         // Sluit afgehandelde leadpool-leads uit (Lost en Deal verdwijnen uit de lijst)
         if (lead.lead_status === 'Lost' || lead.lead_status === 'Deal') return false;
 
+        // BRON 'eigen' = eigen bellijst-board: hele board is per definitie van
+        // deze makelaar, geen extra filter nodig (behalve Lost/Deal hierboven).
+        if (bron === 'eigen') return true;
+
         // Geen filter = alle leads
         if (!makelaar_naam && !makelaar_email) return true;
 
@@ -157,6 +161,71 @@ exports.handler = async (event) => {
 
       return { statusCode: 200, headers, body: JSON.stringify({ leads }) };
     }
+
+    // ── EIGEN BELLIJST-BOARD OPHALEN (voor login-flow) ──────────────────
+    // Geeft het bellijst-board-ID terug van een makelaar, op basis van email
+    // (of naam als fallback). Wordt gebruikt door de app bij login om de
+    // "Mijn leads"-tab te kunnen vullen. Lookup verloopt via dezelfde route
+    // als push_naar_eigen_bellijst: Meedoen-board → Boards-label → BELLIJST_LABELS.
+    if (action === "get_eigen_bellijst_board") {
+      const { makelaar_naam, makelaar_email } = data;
+      if (!makelaar_naam && !makelaar_email) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: "makelaar_naam of makelaar_email verplicht" }) };
+      }
+
+      const meedoenResult = await mondayFetch(`
+        query {
+          boards(ids: [5093235823]) {
+            items_page(limit: 50) {
+              items { name column_values { id text } }
+            }
+          }
+        }
+      `);
+      const meedoenItems = meedoenResult?.data?.boards?.[0]?.items_page?.items || [];
+
+      const emailLower = (makelaar_email || '').toLowerCase();
+      const naamLower = (makelaar_naam || '').toLowerCase();
+      const voornaam = naamLower.split(' ')[0];
+
+      let gevonden = null;
+      if (emailLower) {
+        gevonden = meedoenItems.find(m => {
+          const e = m.column_values.find(c => c.id === 'text_mm1nxwsn')?.text || '';
+          return e.toLowerCase() === emailLower;
+        });
+      }
+      if (!gevonden && naamLower) {
+        gevonden = meedoenItems.find(m => m.name.toLowerCase() === naamLower);
+      }
+      if (!gevonden && voornaam) {
+        const matches = meedoenItems.filter(m => m.name.toLowerCase().split(' ')[0] === voornaam);
+        if (matches.length === 1) gevonden = matches[0];
+      }
+
+      if (!gevonden) {
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ ok: false, reden: "Makelaar niet gevonden in Meedoen-board" })
+        };
+      }
+
+      const boardLabel = gevonden.column_values.find(c => c.id === 'text_mm1gbj3q')?.text || '';
+      const boardId = BELLIJST_LABELS[boardLabel] || null;
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          ok: !!boardId,
+          board_id: boardId,
+          board_label: boardLabel,
+          makelaar: gevonden.name,
+        }),
+      };
+    }
+
     // ── LEADPOOL STATUS UPDATE (voor ontvangende makelaar) ──────────────
     if (action === "update_lead_status") {
       const { item_id, lead_status } = data;
