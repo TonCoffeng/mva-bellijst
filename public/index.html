@@ -1655,9 +1655,8 @@
               <button
                 class="btn-zichzelf"
                 id="btn-zelf-${b.id}"
-                disabled
-                title="Tijdelijk uitgeschakeld — wordt binnenkort opgeleverd"
-                style="flex:0 0 auto;padding:12px 14px;background:#cbd5e1;color:#64748b;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:not-allowed;white-space:nowrap;opacity:0.7">
+                onclick="geefAanZichzelf('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
+                style="flex:0 0 auto;padding:12px 14px;background:#25346c;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
                 👤 Zelf bellen
               </button>` : ''}
               <button
@@ -1897,23 +1896,24 @@
 
   // ── LEAD NAAR POOL STUREN ────────────────────────────────────────────
   // ── ZELF BELLEN — lead direct aan zichzelf toewijzen ─────────────────
+  // Gebruikt push_naar_eigen_bellijst (slaat Round Robin volledig over).
+  // Backend zoekt het bellijst-board op via Meedoen Leadpool board → label
+  // → BELLIJST_LABELS mapping in monday.js.
   async function geefAanZichzelf(itemId, naam, adres) {
     const btn = document.getElementById(`btn-zelf-${itemId}`);
-    const poolBtn = document.getElementById(`btn-${itemId}`);
     btn.disabled = true;
     btn.textContent = 'Bezig...';
 
     try {
-      // Push naar pool maar met board_afkomstig = eigen bellijst
       const res = await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'push_naar_pool',
+          action: 'push_naar_eigen_bellijst',
           data: {
             item_id: itemId,
             makelaar_naam: huidigeMakelaar.naam,
-            board_afkomstig: `Bellijst_${huidigeMakelaar.naam.split(' ')[0]}`,
+            makelaar_email: huidigeMakelaar.email,
           }
         })
       });
