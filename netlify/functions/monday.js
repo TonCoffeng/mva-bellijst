@@ -1,3 +1,23 @@
+// ── MAPPING: Boards-label uit Meedoen Leadpool → bellijst-board-ID ────
+// De "Boards" kolom op het Meedoen Leadpool board (5093235823) bevat per
+// makelaar een uniek label (bv. "Bellijst_MauritsvL"). Dat label wordt
+// hier vertaald naar het echte Monday board-ID. Bij nieuwe makelaars:
+// regel hier toevoegen + label invullen op het Meedoen-board.
+const BELLIJST_LABELS = {
+  'Bellijst_Ton':       '5095598157',
+  'Bellijst_Mathias':   '5093235114',  // Mathias Elias (1 t)
+  'Bellijst_Maurits':   '5093529769',  // Maurits Rodermond
+  'Bellijst_MauritsvL': '5095568381',  // Maurits van Leeuwen
+  'Bellijst_Rogier':    '5095567991',
+  'Bellijst_Jori':      '5095568083',
+  'Bellijst_Anthonie':  '5095568346',
+  'Bellijst_Wilma':     '5095568404',
+  'Bellijst_Pelle':     '5095568419',
+  'Bellijst_Filipe':    '5095568453',
+  'Bellijst_GertJan':   '5095568495',
+  'Bellijst_Jan-Jaap':  '5095568639',
+};
+
 exports.handler = async (event) => {
   const MONDAY_TOKEN = process.env.MONDAY_TOKEN;
 
@@ -535,7 +555,160 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, result }) };
     }
 
-    // ── FEEDBACK OPSLAAN IN BEZICHTIGINGEN BORD ───────────────────────
+    // ── PUSH NAAR EIGEN BELLIJST (Zelf bellen flow) ─────────────────────
+    // Slaat de Round Robin volledig over: maakt direct een item aan op het
+    // bellijst-board van de gevende makelaar. Mapping verloopt via de
+    // "Boards"-kolom op het Meedoen Leadpool board (text_mm1gbj3q), dat
+    // label wordt vertaald naar een board-ID via BELLIJST_LABELS bovenin.
+    //
+    // Waarom via Meedoen-board: voornaam-mapping rammelt zodra er twee
+    // makelaars dezelfde voornaam hebben (Maurits R. + Maurits vL.). De
+    // labels op het Meedoen-board zijn uniek en al beheerd in Monday.
+    if (action === "push_naar_eigen_bellijst") {
+      const { item_id, makelaar_naam, makelaar_email } = data;
+      if (!item_id || (!makelaar_naam && !makelaar_email)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: "item_id en makelaar_naam (of makelaar_email) verplicht" }) };
+      }
+
+      // 1. Haal Meedoen-board op om de juiste makelaar te vinden
+      const meedoenResult = await mondayFetch(`
+        query {
+          boards(ids: [5093235823]) {
+            items_page(limit: 50) {
+              items { name column_values { id text } }
+            }
+          }
+        }
+      `);
+      const meedoenItems = meedoenResult?.data?.boards?.[0]?.items_page?.items || [];
+
+      // Match: eerst op email (uniek), anders op volledige naam, anders op voornaam
+      const emailLower = (makelaar_email || '').toLowerCase();
+      const naamLower = (makelaar_naam || '').toLowerCase();
+      const voornaam = naamLower.split(' ')[0];
+
+      let gevonden = null;
+      if (emailLower) {
+        gevonden = meedoenItems.find(m => {
+          const e = m.column_values.find(c => c.id === 'text_mm1nxwsn')?.text || '';
+          return e.toLowerCase() === emailLower;
+        });
+      }
+      if (!gevonden && naamLower) {
+        gevonden = meedoenItems.find(m => m.name.toLowerCase() === naamLower);
+      }
+      if (!gevonden && voornaam) {
+        // Voorzichtig: alleen matchen als exact één makelaar deze voornaam heeft
+        const matches = meedoenItems.filter(m => m.name.toLowerCase().split(' ')[0] === voornaam);
+        if (matches.length === 1) gevonden = matches[0];
+      }
+
+      if (!gevonden) {
+        return {
+          statusCode: 404,
+          headers,
+          body: JSON.stringify({ error: `Geen makelaar gevonden in Meedoen-board voor: ${makelaar_naam || makelaar_email}` })
+        };
+      }
+
+      // 2. Lees Boards-label en vertaal naar board-ID
+      const boardLabel = gevonden.column_values.find(c => c.id === 'text_mm1gbj3q')?.text || '';
+      const targetBoardId = BELLIJST_LABELS[boardLabel];
+      if (!targetBoardId) {
+        return {
+          statusCode: 404,
+          headers,
+          body: JSON.stringify({ error: `Geen bellijst-board-ID voor label: "${boardLabel}" (makelaar: ${gevonden.name}). Voeg toe aan BELLIJST_LABELS.` })
+        };
+      }
+
+      // 3. Haal de bezichtiging-data op zodat we 'm kunnen kopiëren
+      const bezResult = await mondayFetch(`
+        query ($itemId: ID!) {
+          items(ids: [$itemId]) {
+            id
+            name
+            column_values { id text value }
+          }
+        }
+      `, { itemId: item_id });
+
+      const bezItem = bezResult?.data?.items?.[0];
+      if (!bezItem) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: "Bezichtiging niet gevonden" }) };
+      }
+
+      const bezCols = bezItem.column_values || [];
+      const bezGet = (id) => bezCols.find(c => c.id === id)?.text || '';
+      const bezGetVal = (id) => {
+        const raw = bezCols.find(c => c.id === id)?.value;
+        try { return raw ? JSON.parse(raw) : null; } catch { return null; }
+      };
+
+      // Bezichtigingen-board kolom-IDs (zie get_bezichtigingen voor referentie)
+      const naam        = bezItem.name;
+      const adres       = bezGet('text_mm1ff7f1');
+      const datumVal    = bezGetVal('date_mm1fn58e');
+      const datum       = datumVal?.date || bezGet('date_mm1fn58e');
+      const telefoon    = bezGet('phone_mm1fjavy');
+      const email       = bezGet('email_mm1fm8b7');
+
+      // 4. Maak nieuw item aan op het bellijst-board
+      // Kolom-IDs gespiegeld aan get_leads structuur. NB: bellijst-boards
+      // zijn gekopieerd van Mathias' board en delen dezelfde kolomstructuur.
+      const nieuweKolommen = {
+        phone_mm1fzq2g: telefoon ? { phone: telefoon, countryShortName: "NL" } : null,
+        email_mm1fnwvn: email ? { email: email, text: email } : null,
+        text_mm1frktj:  adres,                     // Adres
+        text_mm1fa4bf:  gevonden.name,             // Bij wie (gevende makelaar — uit Meedoen)
+        date_mm1fs4t7:  datum ? { date: datum } : null, // Datum bezichtiging
+        text_mm1mpcr0:  boardLabel,                // Board afkomstig (gebruik label)
+      };
+
+      // Verwijder null/lege waarden — Monday API klaagt anders
+      const opgeschoond = Object.fromEntries(
+        Object.entries(nieuweKolommen).filter(([_, v]) => v !== null && v !== '')
+      );
+
+      const createResult = await mondayFetch(`
+        mutation ($boardId: ID!, $itemName: String!, $columnValues: JSON!) {
+          create_item(
+            board_id: $boardId
+            item_name: $itemName
+            column_values: $columnValues
+          ) { id }
+        }
+      `, {
+        boardId: targetBoardId,
+        itemName: naam,
+        columnValues: JSON.stringify(opgeschoond),
+      });
+
+      // 5. Markeer de bezichtiging als doorgegeven (zelfde als push_naar_pool)
+      // → verdwijnt uit de gevende lijst.
+      await mondayFetch(`
+        mutation ($itemId: ID!) {
+          change_column_value(
+            item_id: $itemId
+            board_id: 5093190482
+            column_id: "boolean_mm2q35j3"
+            value: "{\"checked\":\"true\"}"
+          ) { id }
+        }
+      `, { itemId: item_id });
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          ok: true,
+          gevonden_makelaar: gevonden.name,
+          board_label: boardLabel,
+          target_board: targetBoardId,
+          nieuw_item: createResult?.data?.create_item?.id || null,
+        }),
+      };
+    }
     if (action === "sla_feedback_op") {
       const { item_id, feedback_tekst } = data;
       const result = await mondayFetch(`
