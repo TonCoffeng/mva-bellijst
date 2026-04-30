@@ -891,6 +891,19 @@
 
 <!-- OVERZICHT SCHERM -->
 <div id="overzicht-screen" class="hidden">
+  <div class="leadbron-tabs" style="display:flex;gap:8px;margin-bottom:12px;background:#fff;border-radius:12px;padding:4px;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+    <button id="tab-leadpool"
+      onclick="switchBron('leadpool')"
+      style="flex:1;padding:10px 12px;border:none;background:#1A2B5F;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.15s">
+      📥 Toegewezen aan mij <span id="count-leadpool" style="opacity:0.7;font-weight:500"></span>
+    </button>
+    <button id="tab-eigen"
+      onclick="switchBron('eigen')"
+      style="flex:1;padding:10px 12px;border:none;background:transparent;color:#1A2B5F;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.15s">
+      👤 Mijn leads <span id="count-eigen" style="opacity:0.7;font-weight:500"></span>
+    </button>
+  </div>
+
   <div class="stats-bar">
     <div class="stat-card oranje">
       <div class="stat-number" id="stat-vandaag">0</div>
@@ -1120,7 +1133,7 @@
   laadMakelaars();
 
   // ── LOGIN ───────────────────────────────────────────────────────────
-  function login(rol) {
+  async function login(rol) {
     const select = document.getElementById('makelaar-select');
     const opt = select.options[select.selectedIndex];
     if (!opt.value) { toonToast('Kies eerst jouw naam', 'fout'); return; }
@@ -1128,7 +1141,9 @@
     huidigeMakelaar = {
       email: opt.value,
       naam: opt.dataset.naam || opt.text,
-      boardId: opt.dataset.board || '5093190545',
+      boardId: opt.dataset.board || '5093190545',  // Leadpool board (pool/round-robin)
+      eigenBoardId: null,    // wordt straks gevuld via get_eigen_bellijst_board
+      eigenBoardLabel: null,
     };
 
     document.getElementById('header-naam').textContent = huidigeMakelaar.naam;
@@ -1138,6 +1153,25 @@
 
     // Registreer service worker en vraag push permissie
     registreerServiceWorker();
+
+    // Eigen bellijst-board ophalen (voor "Mijn leads"-tab). Niet blokkerend:
+    // als 't faalt blijft de app werkend, alleen de eigen-tab is dan leeg.
+    fetch('/.netlify/functions/monday', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'get_eigen_bellijst_board',
+        data: { makelaar_naam: huidigeMakelaar.naam, makelaar_email: huidigeMakelaar.email }
+      })
+    })
+      .then(r => r.json())
+      .then(j => {
+        if (j?.ok && j.board_id) {
+          huidigeMakelaar.eigenBoardId = j.board_id;
+          huidigeMakelaar.eigenBoardLabel = j.board_label;
+        }
+      })
+      .catch(() => { /* stil falen — eigen-tab blijft leeg */ });
 
     if (rol === 'geven') {
       document.getElementById('geven-screen').classList.remove('hidden');
@@ -1149,10 +1183,47 @@
     }
   }
 
+  // ── BRON-STATE: welke tab is actief ('leadpool' of 'eigen') ────────
+  let huidigeBron = 'leadpool';
+
+  // Tab-switch: andere bron, andere lijst, tabs visueel updaten
+  function switchBron(bron) {
+    if (bron === huidigeBron) return;
+    huidigeBron = bron;
+
+    const tabLeadpool = document.getElementById('tab-leadpool');
+    const tabEigen = document.getElementById('tab-eigen');
+    const actiefStyle = 'background:#1A2B5F;color:#fff';
+    const inactiefStyle = 'background:transparent;color:#1A2B5F';
+
+    if (bron === 'leadpool') {
+      tabLeadpool.style.cssText = tabLeadpool.style.cssText.replace(/background:[^;]+;color:[^;]+/, actiefStyle);
+      tabEigen.style.cssText = tabEigen.style.cssText.replace(/background:[^;]+;color:[^;]+/, inactiefStyle);
+    } else {
+      tabLeadpool.style.cssText = tabLeadpool.style.cssText.replace(/background:[^;]+;color:[^;]+/, inactiefStyle);
+      tabEigen.style.cssText = tabEigen.style.cssText.replace(/background:[^;]+;color:[^;]+/, actiefStyle);
+    }
+
+    laadLeads();
+  }
+
   // ── LEADS LADEN (via monday API) ────────────────────────────────────
   async function laadLeads() {
     document.getElementById('leads-container').innerHTML =
       '<div class="loading"><div class="spinner"></div>Leads ophalen...</div>';
+
+    // Bepaal welk board en met welke filter-bron
+    const isEigen = huidigeBron === 'eigen';
+    const boardId = isEigen ? huidigeMakelaar.eigenBoardId : huidigeMakelaar.boardId;
+
+    // Eigen-tab maar nog geen board-ID? Toon bericht ipv. lege call.
+    if (isEigen && !boardId) {
+      document.getElementById('leads-container').innerHTML =
+        '<div class="empty-state"><p>Geen eigen bellijst-board gekoppeld. Vraag Ton om je toe te voegen aan het Meedoen Leadpool board met een geldig Boards-label.</p></div>';
+      const elEigen = document.getElementById('count-eigen');
+      if (elEigen) elEigen.textContent = '(0)';
+      return;
+    }
 
     try {
       const res = await fetch('/.netlify/functions/monday', {
@@ -1161,8 +1232,9 @@
         body: JSON.stringify({
           action: 'get_leads',
           data: {
-            board_id: huidigeMakelaar.boardId,
+            board_id: boardId,
             makelaar_naam: huidigeMakelaar.naam,
+            bron: isEigen ? 'eigen' : 'leadpool',
           }
         })
       });
@@ -2206,6 +2278,10 @@
     document.getElementById('stat-vandaag').textContent = openstaand.filter(l => !l.status).length;
     document.getElementById('stat-gedaan').textContent = afgerond.length;
     document.getElementById('header-badge').textContent = openstaand.length + ' leads';
+
+    // Tab-count updaten (alleen die van de actieve bron — andere tab kennen we niet zonder extra call)
+    const countEl = document.getElementById(huidigeBron === 'eigen' ? 'count-eigen' : 'count-leadpool');
+    if (countEl) countEl.textContent = '(' + leadsData.length + ')';
 
     // ── Filter/zoek-teller boven de lijst ──────────────────────────────
     const teller = document.getElementById('bellijst-teller');
