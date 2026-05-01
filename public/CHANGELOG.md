@@ -5,6 +5,23 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-01
+
+### Toegevoegd
+- **Cloze team-scope geactiveerd** — bellijst toont nu ook contacten die bij collega's binnen het MVA-team staan, in plaats van alleen die van de eigen account. Voorheen gaven team-contacten `bestaand: false` (zie open punt 2026-04-29). Verifieerd met Anthea Klijn (assigned to Filipe Bataglia): zonder fix 0 hits, met fix 1 hit incl. eigenaar.
+  - `netlify/functions/cloze.js`: `&scope=team` toegevoegd aan de `/v1/people/find` URL in `check_bestaand`. Eigenaar-detectie uitgebreid: leest primair `gevonden.assignee` (string met email — wat Cloze daadwerkelijk teruggeeft bij scope=team), met `assignedTo` / `owner` / `assigneeName` als fallbacks. Comment-blok toegevoegd dat documenteert waarom dit erin zit.
+  - **Vereiste setting in Cloze:** API key "MVA Ledpool" moet onder Permissions → Advanced → "Read Permissions" (`read_relation`) aan hebben staan. Zonder die scope geeft Cloze leeg terug, ongeacht de URL-parameter.
+- **Eigenaar-tag in lead-card** — paarse `cloze-badge.eigenaar` met 👤 icoon en de naam van de collega die het contact bezit. Toont alleen wanneer eigenaar ≠ huidige makelaar (geen ruis voor je eigen contacten). Werkt zowel in de bezichtigingen-view als in de bellijst.
+  - `public/index.html`: helper `formatMakelaarNaam(email)` met hardcoded mapping `MAKELAARS_NAMEN` (14 MVA-emails → leesbare namen). Algoritmische parser op tussenvoegsels bleek onbetrouwbaar (`mauritsrodermond` → "Mauritsro der Mond", `jorinetiv` → "Jor in Etiv") door MVA's naming convention zonder scheidingstekens. Helper `eigenaarTagHtml()` filtert op eigenaar ≠ ingelogde makelaar. Nieuwe CSS-regel `.cloze-badge.eigenaar`. `lead.cloze_eigenaar` / `b.cloze_eigenaar` opgeslagen in drie render-paden zodat de tag re-renders overleeft.
+
+### Onderhoud
+- **Nieuwe collega = één regel toevoegen aan `MAKELAARS_NAMEN`** in `public/index.html` (~regel 2128). Niet vergeten bij personeelswisselingen.
+
+### Open punt
+- **`eigenaar_naam` blijft `null`** in de Cloze response — Cloze geeft alleen het email-veld terug, geen weergave-naam. Vandaar de hardcoded mapping aan onze kant. Geen blocker, alleen onderhoudslast.
+
+---
+
 ## 2026-04-30
 
 ### Infrastructuur (Make.com + Monday — geen app-wijzigingen)
