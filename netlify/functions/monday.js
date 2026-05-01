@@ -476,9 +476,25 @@ exports.handler = async (event) => {
         };
 
         // Datum + tijdstip uit value JSON
+        // 2026-05-01: Monday slaat tijden op als UTC ('10:00:00' = 12:00 Amsterdam zomertijd).
+        // We converteren naar Europe/Amsterdam zodat de bellijst de juiste lokale tijd toont.
+        // toLocaleTimeString met timeZone handelt zomertijd/wintertijd automatisch af.
         const datumVal = getVal('date_mm1fn58e');
         const datum = datumVal?.date || get('date_mm1fn58e');
-        const tijdstip = datumVal?.time ? datumVal.time.substring(0, 5) : null;
+        let tijdstip = null;
+        if (datumVal?.time && datumVal?.date) {
+          try {
+            const utcDate = new Date(`${datumVal.date}T${datumVal.time}Z`);
+            tijdstip = utcDate.toLocaleTimeString('nl-NL', {
+              timeZone: 'Europe/Amsterdam',
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+          } catch {
+            // Fallback bij ongeldige datum/tijd: behoud oude gedrag
+            tijdstip = datumVal.time.substring(0, 5);
+          }
+        }
 
         // Archiefstatus checkbox waarde — true als gearchiveerd
         const gearchiveerd = archiefColId
