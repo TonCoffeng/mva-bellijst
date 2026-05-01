@@ -777,6 +777,10 @@
       background: #dcfce7;
       color: #15803d;
     }
+    .cloze-badge.eigenaar {
+      background: #ede9fe;
+      color: #5b21b6;
+    }
     .btn-cloze {
       display: inline-flex;
       align-items: center;
@@ -1761,13 +1765,15 @@
           b.cloze_bestaand = json.bestaand;
           b.cloze_stage = json.stage;
           b.cloze_id = json.id;
+          b.cloze_eigenaar = json.eigenaar_email || null;
           const badge = document.getElementById(`cloze-badge-${b.id}`);
           if (!badge) return;
           // Knop ná de check opbouwen — gebruikt cloze_id voor directe profielopening
           const knop = clozeKnopHtml(b.email, b.telefoon, b.cloze_id);
+          const eigenaarTag = eigenaarTagHtml(b.cloze_eigenaar);
           if (json.bestaand) {
             const stageLabel = (json.stage && json.stage !== 'none') ? json.stage : 'niet gekoppeld';
-            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze · ${stageLabel}</span>${knop}`;
+            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze · ${stageLabel}</span>${eigenaarTag}${knop}`;
           } else {
             badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>${knop}`;
           }
@@ -2118,6 +2124,44 @@
     return ` <a href="${url}" target="_blank" rel="noopener" class="btn-cloze" onclick="event.stopPropagation()" title="${tooltip}">🔗 Open Cloze</a>`;
   }
 
+  // ── MAKELAAR EMAIL → LEESBARE NAAM ──────────────────────────────────
+  // Cloze geeft alleen een email terug als 'assignee'. We zetten die om in
+  // een leesbare naam via een vaste mapping. Een algoritmische parser (op
+  // basis van prefix + tussenvoegsels) bleek onbetrouwbaar omdat MVA-namen
+  // zonder scheiding lopen ('mauritsrodermond' bevat 'der' midden in een
+  // naam, etc.). Vandaar: hardcoded lijst. Eén regel toevoegen wanneer een
+  // collega in dienst komt.
+  const MAKELAARS_NAMEN = {
+    'toncoffeng@makelaarsvan.nl':        'Ton Coffeng',
+    'hanskoppes@makelaarsvan.nl':        'Hans Koppes',
+    'moniqueklaver@makelaarsvan.nl':     'Monique Klaver',
+    'mauritsrodermond@makelaarsvan.nl':  'Maurits Rodermond',
+    'mauritsvanleeuwen@makelaarsvan.nl': 'Maurits van Leeuwen',
+    'rogierdevries@makelaarsvan.nl':     'Rogier de Vries',
+    'mathiaselias@makelaarsvan.nl':      'Mathias Elias',
+    'jorinetiv@makelaarsvan.nl':         'Jori Netiv',
+    'pellefreijsen@makelaarsvan.nl':     'Pelle Freijsen',
+    'anthonieschilder@makelaarsvan.nl':  'Anthonie Schilder',
+    'wilmaout@makelaarsvan.nl':          'Wilma Out',
+    'janjaaptenarve@makelaarsvan.nl':    'Jan Jaap ten Arve',
+    'gertjanmulder@makelaarsvan.nl':     'Gert Jan Mulder',
+    'filipebataglia@makelaarsvan.nl':    'Filipe Bataglia',
+  };
+
+  function formatMakelaarNaam(email) {
+    if (!email || typeof email !== 'string') return null;
+    const lower = email.toLowerCase().trim();
+    return MAKELAARS_NAMEN[lower] || email;
+  }
+
+  // Eigenaar-tag HTML (alleen tonen als eigenaar ≠ huidige makelaar)
+  function eigenaarTagHtml(eigenaarEmail) {
+    if (!eigenaarEmail) return '';
+    if (huidigeMakelaar && eigenaarEmail.toLowerCase() === huidigeMakelaar.email.toLowerCase()) return '';
+    const naam = formatMakelaarNaam(eigenaarEmail) || eigenaarEmail;
+    return ` <span class="cloze-badge eigenaar" title="${eigenaarEmail}">👤 ${naam}</span>`;
+  }
+
   async function checkClozeBestaand() {
     for (const lead of leadsData) {
       if (!lead.email && !lead.telefoon) continue;
@@ -2134,14 +2178,16 @@
         lead.cloze_bestaand = json.bestaand;
         lead.cloze_stage = json.stage;
         lead.cloze_id = json.id;
+        lead.cloze_eigenaar = json.eigenaar_email || null;
 
         // Update badge in DOM zonder volledige re-render — knop blijft staan
         const badge = document.getElementById(`cloze-badge-${lead.id}`);
         if (badge) {
           const knop = clozeKnopHtml(lead.email, lead.telefoon, lead.cloze_id);
+          const eigenaarTag = eigenaarTagHtml(lead.cloze_eigenaar);
           if (json.bestaand) {
             const stageLabel = (json.stage && json.stage !== 'none') ? json.stage : 'niet gekoppeld';
-            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze · ${stageLabel}</span>${knop}`;
+            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze · ${stageLabel}</span>${eigenaarTag}${knop}`;
           } else {
             badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>${knop}`;
           }
@@ -2363,7 +2409,7 @@
 
           <div id="cloze-badge-${lead.id}" style="margin-top:6px;min-height:20px;display:flex;align-items:center;flex-wrap:wrap;gap:4px" onclick="event.stopPropagation()">
             ${lead.cloze_bestaand === true
-              ? `<span class="cloze-badge bekend">📁 Bekend in Cloze · ${(lead.cloze_stage && lead.cloze_stage !== 'none') ? lead.cloze_stage : 'niet gekoppeld'}</span>`
+              ? `<span class="cloze-badge bekend">📁 Bekend in Cloze · ${(lead.cloze_stage && lead.cloze_stage !== 'none') ? lead.cloze_stage : 'niet gekoppeld'}</span>${eigenaarTagHtml(lead.cloze_eigenaar)}`
               : lead.cloze_bestaand === false
               ? `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`
               : `<span style="font-size:11px;color:var(--grijs-tekst)">⏳ Cloze check...</span>`}
