@@ -224,6 +224,12 @@ exports.handler = async (event) => {
     }
 
     // ── CHECK OF PERSOON AL IN CLOZE STAAT ────────────────────────────
+    // 2026-05-01: scope=team toegevoegd zodat we contacten van het hele MVA-team
+    // zien (niet alleen die van de eigen account). Vereist dat de gebruikte
+    // API key (MVA Ledpool) de scope "Read Permissions" (read_relation) aan
+    // heeft staan in Cloze settings. Verifieerd met Anthea Klijn (assigned to
+    // filipebataglia@makelaarsvan.nl): zonder scope=team 0 hits, met scope=team
+    // 1 hit incl. assignee veld.
     if (action === "check_bestaand") {
       const { email, telefoon, naam } = data;
 
@@ -232,7 +238,7 @@ exports.handler = async (event) => {
       let gevonden = null;
 
       for (const query of queries) {
-        const url = `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&user_email=${CLOZE_USER}&freeformquery=${encodeURIComponent(query)}&pagesize=1`;
+        const url = `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&user_email=${CLOZE_USER}&freeformquery=${encodeURIComponent(query)}&pagesize=1&scope=team`;
         const res = await fetch(url);
         const json = await res.json();
 
@@ -249,18 +255,33 @@ exports.handler = async (event) => {
         }
       }
 
-      // Eigenaar bepalen — Cloze geeft 'assignedTo' (email of object met email/name)
+      // Eigenaar bepalen — bij scope=team geeft Cloze een 'assignee' string
+      // (email van de toegewezen makelaar). Houd 'assignedTo' en andere
+      // varianten als fallback voor robuustheid.
       let eigenaar_email = null;
       let eigenaar_naam = null;
       if (gevonden) {
-        const a = gevonden.assignedTo;
-        if (typeof a === 'string') {
-          eigenaar_email = a;
-        } else if (a && typeof a === 'object') {
-          eigenaar_email = a.email || a.value || null;
-          eigenaar_naam = a.name || null;
+        // Primair: assignee (zoals daadwerkelijk teruggegeven door Cloze bij scope=team)
+        const assignee = gevonden.assignee;
+        if (typeof assignee === 'string') {
+          eigenaar_email = assignee;
+        } else if (assignee && typeof assignee === 'object') {
+          eigenaar_email = assignee.email || assignee.value || null;
+          eigenaar_naam = assignee.name || null;
         }
-        // Fallback: bekijk ook 'assigneeName' / 'owner' indien aanwezig
+
+        // Fallback: assignedTo (oudere/alternatieve veldnaam)
+        if (!eigenaar_email) {
+          const a = gevonden.assignedTo;
+          if (typeof a === 'string') {
+            eigenaar_email = a;
+          } else if (a && typeof a === 'object') {
+            eigenaar_email = a.email || a.value || null;
+            eigenaar_naam = eigenaar_naam || a.name || null;
+          }
+        }
+
+        // Verdere fallbacks
         if (!eigenaar_naam && gevonden.assigneeName) eigenaar_naam = gevonden.assigneeName;
         if (!eigenaar_email && gevonden.owner) eigenaar_email = gevonden.owner;
       }
