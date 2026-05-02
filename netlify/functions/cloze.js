@@ -1,6 +1,11 @@
 exports.handler = async (event) => {
+  // Operationele Cloze (bezichtigingen, leads, bellijst)
   const CLOZE_API_KEY = process.env.CLOZE_API_KEY;
   const CLOZE_USER    = 'toncoffeng@makelaarsvan.nl';
+
+  // Recruitment Cloze (aparte omgeving voor MVA Talent)
+  const CLOZE_RECRUIT_API_KEY = process.env.CLOZE_RECRUIT_API_KEY;
+  const CLOZE_RECRUIT_USER    = process.env.CLOZE_RECRUIT_USER || 'recruiting@makelaarsvan.nl';
 
   const headers = {
     "Access-Control-Allow-Origin": "*",
@@ -14,9 +19,18 @@ exports.handler = async (event) => {
 
   const { action, data } = JSON.parse(event.body || "{}");
 
-  // Helper: Cloze API call
+  // Helper: Cloze API call (operationeel)
   const cloze = async (endpoint, body = null, method = 'POST') => {
     const url = `https://api.cloze.com/v1/${endpoint}?api_key=${CLOZE_API_KEY}&user_email=${CLOZE_USER}`;
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(url, opts);
+    return res.json();
+  };
+
+  // Helper: Cloze API call (recruitment omgeving)
+  const clozeRecruit = async (endpoint, body = null, method = 'POST') => {
+    const url = `https://api.cloze.com/v1/${endpoint}?api_key=${CLOZE_RECRUIT_API_KEY}&user_email=${CLOZE_RECRUIT_USER}`;
     const opts = { method, headers: { 'Content-Type': 'application/json' } };
     if (body) opts.body = JSON.stringify(body);
     const res = await fetch(url, opts);
@@ -224,12 +238,6 @@ exports.handler = async (event) => {
     }
 
     // ── CHECK OF PERSOON AL IN CLOZE STAAT ────────────────────────────
-    // 2026-05-01: scope=team toegevoegd zodat we contacten van het hele MVA-team
-    // zien (niet alleen die van de eigen account). Vereist dat de gebruikte
-    // API key (MVA Ledpool) de scope "Read Permissions" (read_relation) aan
-    // heeft staan in Cloze settings. Verifieerd met Anthea Klijn (assigned to
-    // filipebataglia@makelaarsvan.nl): zonder scope=team 0 hits, met scope=team
-    // 1 hit incl. assignee veld.
     if (action === "check_bestaand") {
       const { email, telefoon, naam } = data;
 
@@ -238,66 +246,37 @@ exports.handler = async (event) => {
       let gevonden = null;
 
       for (const query of queries) {
-        const url = `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&user_email=${CLOZE_USER}&freeformquery=${encodeURIComponent(query)}&pagesize=1&scope=team`;
-        const res = await fetch(url);
+        const res = await fetch(
+          `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(query)}&pagesize=1`
+        );
         const json = await res.json();
-
-        // 🔍 DEBUG LOG voor Cloze support — toont ruwe respons
-        console.log('=== CLOZE FIND DEBUG ===');
-        console.log('Query:', query);
-        console.log('URL (zonder key):', url.replace(CLOZE_API_KEY, '***'));
-        console.log('Raw response:', JSON.stringify(json, null, 2));
-        console.log('=== EINDE DEBUG ===');
-
         if (json?.people?.length > 0) {
           gevonden = json.people[0];
           break;
         }
       }
 
-      // Eigenaar bepalen — bij scope=team geeft Cloze een 'assignee' string
-      // (email van de toegewezen makelaar). Houd 'assignedTo' en andere
-      // varianten als fallback voor robuustheid.
+      // Eigenaar bepalen — Cloze geeft 'assignedTo' (email of object met email/name)
       let eigenaar_email = null;
       let eigenaar_naam = null;
       if (gevonden) {
-        // Primair: assignee (zoals daadwerkelijk teruggegeven door Cloze bij scope=team)
-        const assignee = gevonden.assignee;
-        if (typeof assignee === 'string') {
-          eigenaar_email = assignee;
-        } else if (assignee && typeof assignee === 'object') {
-          eigenaar_email = assignee.email || assignee.value || null;
-          eigenaar_naam = assignee.name || null;
+        const a = gevonden.assignedTo;
+        if (typeof a === 'string') {
+          eigenaar_email = a;
+        } else if (a && typeof a === 'object') {
+          eigenaar_email = a.email || a.value || null;
+          eigenaar_naam = a.name || null;
         }
-
-        // Fallback: assignedTo (oudere/alternatieve veldnaam)
-        if (!eigenaar_email) {
-          const a = gevonden.assignedTo;
-          if (typeof a === 'string') {
-            eigenaar_email = a;
-          } else if (a && typeof a === 'object') {
-            eigenaar_email = a.email || a.value || null;
-            eigenaar_naam = eigenaar_naam || a.name || null;
-          }
-        }
-
-        // Verdere fallbacks
+        // Fallback: bekijk ook 'assigneeName' / 'owner' indien aanwezig
         if (!eigenaar_naam && gevonden.assigneeName) eigenaar_naam = gevonden.assigneeName;
         if (!eigenaar_email && gevonden.owner) eigenaar_email = gevonden.owner;
       }
-
-      // Cloze persoon-id — voor "Open in Cloze" knop in de UI
-      // Cloze gebruikt meerdere id-velden; we proberen ze in volgorde
-      const cloze_id = gevonden
-        ? (gevonden.id || gevonden.direct || gevonden.portableId || gevonden.syncKey || null)
-        : null;
 
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           bestaand: !!gevonden,
-          id: cloze_id,
           naam: gevonden?.name || null,
           stage: gevonden?.stage || null,
           // Hoeveel interacties er al zijn (geeft inschatting van relatiediepte)
@@ -305,6 +284,72 @@ exports.handler = async (event) => {
           // Eigenaar van het contact in Cloze (null = ongekoppeld)
           eigenaar_email,
           eigenaar_naam,
+        }),
+      };
+    }
+
+    // ── VOEG MVA TALENT TOE — naar recruitment Cloze ────────────────────
+    // Aanroepen wanneer een gevende makelaar iemand wil aanmerken als
+    // potentieel MVA-talent (bv. bezoeker bij bezichtiging blijkt zelf
+    // makelaar te zijn met DNA dat past bij MVA).
+    // Schrijft NIET naar de operationele Cloze maar naar de recruitment-omgeving.
+    if (action === "voeg_talent_toe") {
+      if (!CLOZE_RECRUIT_API_KEY) {
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ error: "CLOZE_RECRUIT_API_KEY niet ingesteld in Netlify env vars" }),
+        };
+      }
+
+      const { naam, email, telefoon, spotter_naam, spotter_email, context, adres } = data;
+
+      // Notitie samenstellen — wie heeft hem gespot, waar, met welke toelichting
+      const datumNL = new Date().toLocaleDateString('nl-NL', {
+        day: 'numeric', month: 'long', year: 'numeric'
+      });
+      const notitieRegels = [
+        `🌱 Aangemerkt als MVA Talent op ${datumNL}`,
+        spotter_naam ? `Spotter: ${spotter_naam}` : null,
+        adres ? `Context: bezichtiging ${adres}` : null,
+        context ? `Toelichting: ${context}` : null,
+      ].filter(Boolean);
+      const notitie = notitieRegels.join('\n');
+
+      // 1. Contact aanmaken/updaten in recruitment Cloze
+      const personBody = {
+        name: naam,
+        ...(email    && { emails: [{ value: email }] }),
+        ...(telefoon && { phones: [{ value: telefoon, type: 'mobile' }] }),
+        stage: 'lead',
+        keywords: ['MVA Talent', 'Leadpool spot'],
+        segments: ['Kandidaat'],
+        assignedTo: CLOZE_RECRUIT_USER,
+        atAGlanceNotes: notitie,
+      };
+      const personResult = await clozeRecruit('people/create', personBody);
+
+      // 2. Notitie als activiteit op de tijdlijn
+      const noteBody = {
+        date: new Date().toISOString(),
+        style: 'note',
+        account: CLOZE_RECRUIT_USER,
+        subject: `🌱 MVA Talent gespot${spotter_naam ? ` door ${spotter_naam}` : ''}`,
+        body: notitie,
+        recipients: [
+          ...(email    ? [{ value: email,    name: naam }] : []),
+          ...(telefoon ? [{ value: telefoon, name: naam }] : []),
+        ],
+      };
+      const noteResult = await clozeRecruit('timeline/communication/create', noteBody);
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          ok: true,
+          person: personResult,
+          note: noteResult,
         }),
       };
     }
