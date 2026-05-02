@@ -222,232 +222,6 @@
     .btn-deal:hover     { background: #d1fae5; border-color: #6ee7b7; }
     .btn-lost:hover     { background: #f3f4f6; border-color: #d1d5db; }
 
-    /* ── BELLIJST TOOLBAR (zoek / sorteer / filter) ── */
-    .bellijst-toolbar {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-      align-items: center;
-    }
-    .bellijst-zoek {
-      flex: 1;
-      position: relative;
-    }
-    .bellijst-zoek input {
-      width: 100%;
-      padding: 10px 36px 10px 14px;
-      border: 1px solid var(--grijs-mid);
-      border-radius: 10px;
-      font-size: 13px;
-      font-family: inherit;
-      color: var(--navy);
-      background: var(--wit);
-      box-sizing: border-box;
-    }
-    .bellijst-zoek-wis {
-      display: none;
-      position: absolute;
-      right: 8px;
-      top: 50%;
-      transform: translateY(-50%);
-      background: none;
-      border: none;
-      font-size: 16px;
-      cursor: pointer;
-      color: var(--grijs-tekst);
-      padding: 4px 8px;
-    }
-    .bellijst-knop {
-      position: relative;
-      background: white;
-      border: 1px solid var(--grijs-mid);
-      border-radius: 10px;
-      padding: 9px 12px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--navy);
-      cursor: pointer;
-      font-family: inherit;
-      white-space: nowrap;
-    }
-    .bellijst-knop:hover { background: #f9fafb; }
-    .bellijst-knop.actief {
-      background: var(--navy);
-      color: white;
-      border-color: var(--navy);
-    }
-    .bellijst-dropdown {
-      display: none;
-      position: absolute;
-      right: 0;
-      top: calc(100% + 4px);
-      background: white;
-      border: 1px solid var(--grijs-mid);
-      border-radius: 10px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-      z-index: 50;
-      min-width: 180px;
-      overflow: hidden;
-    }
-    .bellijst-dropdown.open { display: block; }
-    .bellijst-dropdown button {
-      display: block;
-      width: 100%;
-      text-align: left;
-      padding: 10px 14px;
-      background: none;
-      border: none;
-      font-size: 13px;
-      color: var(--navy);
-      cursor: pointer;
-      font-family: inherit;
-    }
-    .bellijst-dropdown button:hover { background: #f4f5f8; }
-    .bellijst-dropdown button.gekozen {
-      background: #eef2ff;
-      font-weight: 600;
-    }
-    .bellijst-dropdown .dropdown-titel {
-      font-size: 11px;
-      color: var(--grijs-tekst);
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      padding: 8px 14px 4px;
-      text-transform: uppercase;
-    }
-    .bellijst-dropdown hr {
-      border: none;
-      border-top: 1px solid #f0f0f0;
-      margin: 4px 0;
-    }
-    .bellijst-teller {
-      font-size: 11px;
-      color: var(--grijs-tekst);
-      margin-bottom: 8px;
-      padding-left: 4px;
-    }
-
-    /* ── HEALTH-CHECK (alleen level-2) ── */
-    .btn-healthcheck {
-      background: none;
-      border: 1px solid rgba(255,255,255,0.35);
-      color: white;
-      padding: 5px 10px;
-      border-radius: 20px;
-      font-size: 13px;
-      cursor: pointer;
-      font-family: inherit;
-    }
-    .btn-healthcheck:hover { background: rgba(255,255,255,0.1); }
-
-    .hc-modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 250;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .hc-modal-overlay.open { display: flex; }
-    .hc-modal {
-      background: white;
-      border-radius: 16px;
-      width: 100%;
-      max-width: 520px;
-      max-height: 90vh;
-      overflow-y: auto;
-      padding: 20px;
-    }
-    .hc-modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-    .hc-modal-title { font-size: 18px; font-weight: 700; color: var(--navy); }
-    .hc-modal-sub   { font-size: 12px; color: var(--grijs-tekst); margin-top: 2px; }
-    .hc-modal-close {
-      background: none;
-      border: none;
-      font-size: 22px;
-      cursor: pointer;
-      color: var(--grijs-tekst);
-      padding: 4px 10px;
-    }
-
-    .hc-check {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 14px;
-      border: 1px solid var(--grijs-mid);
-      border-radius: 10px;
-      margin-bottom: 8px;
-    }
-    .hc-status {
-      width: 12px; height: 12px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      margin-top: 6px;
-    }
-    .hc-status.groen   { background: var(--groen); }
-    .hc-status.geel    { background: var(--geel); }
-    .hc-status.rood    { background: var(--rood); }
-    .hc-status.grijs   { background: var(--grijs-mid); }
-    .hc-status.laden {
-      background: var(--grijs-mid);
-      animation: hc-pulse 1s infinite;
-    }
-    @keyframes hc-pulse {
-      0%, 100% { opacity: 0.4; }
-      50%      { opacity: 1; }
-    }
-    .hc-info { flex: 1; }
-    .hc-naam {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--navy);
-      margin-bottom: 2px;
-    }
-    .hc-detail {
-      font-size: 12px;
-      color: var(--grijs-tekst);
-    }
-    .hc-link {
-      font-size: 11px;
-      color: var(--navy);
-      text-decoration: underline;
-      margin-top: 4px;
-      display: inline-block;
-    }
-    .hc-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-top: 12px;
-      border-top: 1px solid var(--grijs-mid);
-      margin-top: 8px;
-    }
-    .hc-tijd {
-      font-size: 11px;
-      color: var(--grijs-tekst);
-    }
-    .hc-refresh {
-      padding: 8px 16px;
-      background: var(--navy);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      font-family: inherit;
-    }
-    .hc-refresh:hover { background: var(--navy-light); }
-    .hc-refresh:disabled { background: var(--grijs-mid); cursor: default; }
-
     .lead-acties {
       display: flex;
       gap: 8px;
@@ -715,6 +489,106 @@
     .btn-naar-pool:disabled { background: var(--grijs-mid); color: var(--grijs-tekst); cursor: default; }
     .btn-naar-pool.gedeeld { background: var(--groen); }
 
+    /* ── MVA TALENT KNOP (recruitment) ── */
+    .btn-talent {
+      flex: 0 0 auto;
+      padding: 12px 14px;
+      background: #f4f5f8;
+      color: var(--navy);
+      border: 1.5px solid var(--grijs-mid);
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all .15s;
+    }
+    .btn-talent:hover { background: #e8eaf6; border-color: var(--navy); }
+    .btn-talent.aangemeld {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border-color: #81c784;
+      cursor: default;
+    }
+
+    /* ── TALENT MODAL ── */
+    .talent-modal-bg {
+      position: fixed; inset: 0;
+      background: rgba(20, 30, 60, .55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .talent-modal-bg.actief { display: flex; }
+    .talent-modal {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 12px 48px rgba(0,0,0,.25);
+    }
+    .talent-modal h3 {
+      margin: 0 0 6px;
+      color: var(--navy);
+      font-size: 20px;
+    }
+    .talent-modal p {
+      margin: 0 0 16px;
+      color: var(--grijs-tekst);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .talent-modal label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--grijs-tekst);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .talent-modal textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border: 1px solid var(--grijs-mid);
+      border-radius: 10px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--navy);
+      resize: vertical;
+      min-height: 70px;
+      margin-bottom: 16px;
+    }
+    .talent-modal-acties {
+      display: flex;
+      gap: 8px;
+    }
+    .talent-modal-acties button {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+    }
+    .talent-modal-acties .annuleer {
+      background: #f4f5f8;
+      color: var(--grijs-tekst);
+    }
+    .talent-modal-acties .bevestig {
+      background: var(--navy);
+      color: white;
+    }
+    .talent-modal-acties .bevestig:disabled {
+      background: var(--grijs-mid);
+      cursor: default;
+    }
+
     .hidden { display: none !important; }
 
     /* ── FEEDBACK KNOPPEN ── */
@@ -777,29 +651,6 @@
       background: #dcfce7;
       color: #15803d;
     }
-    .cloze-badge.eigenaar {
-      background: #ede9fe;
-      color: #5b21b6;
-    }
-    .btn-cloze {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 500;
-      background: #f1f5f9;
-      color: #475569;
-      text-decoration: none;
-      border: 1px solid #e2e8f0;
-      cursor: pointer;
-      transition: background .15s, color .15s;
-    }
-    .btn-cloze:hover, .btn-cloze:active {
-      background: #e2e8f0;
-      color: #1e293b;
-    }
   </style>
 </head>
 <body>
@@ -815,7 +666,6 @@
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <button id="btn-terug" class="hidden" onclick="gaNaarLogin()" style="background:none;border:1px solid rgba(255,255,255,0.35);color:white;padding:5px 14px;border-radius:20px;font-size:13px;cursor:pointer;font-family:inherit">← Terug</button>
-    <button id="btn-healthcheck" class="btn-healthcheck hidden" onclick="openHealthCheck()" title="Systeem-check">🩺 Check</button>
     <div class="header-badge" id="header-badge">0 leads</div>
   </div>
 </div>
@@ -895,19 +745,6 @@
 
 <!-- OVERZICHT SCHERM -->
 <div id="overzicht-screen" class="hidden">
-  <div class="leadbron-tabs" style="display:flex;gap:8px;margin-bottom:12px;background:#fff;border-radius:12px;padding:4px;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
-    <button id="tab-leadpool"
-      onclick="switchBron('leadpool')"
-      style="flex:1;padding:10px 12px;border:none;background:#1A2B5F;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.15s">
-      📥 Toegewezen aan mij <span id="count-leadpool" style="opacity:0.7;font-weight:500"></span>
-    </button>
-    <button id="tab-eigen"
-      onclick="switchBron('eigen')"
-      style="flex:1;padding:10px 12px;border:none;background:transparent;color:#1A2B5F;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.15s">
-      👤 Mijn leads <span id="count-eigen" style="opacity:0.7;font-weight:500"></span>
-    </button>
-  </div>
-
   <div class="stats-bar">
     <div class="stat-card oranje">
       <div class="stat-number" id="stat-vandaag">0</div>
@@ -924,48 +761,6 @@
   </div>
 
   <div class="section-title">Jouw leads</div>
-
-  <div class="bellijst-toolbar">
-    <div class="bellijst-zoek">
-      <input id="bellijst-zoek-input" type="search" autocomplete="off"
-        placeholder="Zoek op naam, adres of gevende makelaar..."
-        oninput="updateZoek()" />
-      <button id="bellijst-zoek-wis" class="bellijst-zoek-wis" onclick="wisZoek()">&#10005;</button>
-    </div>
-
-    <div style="position:relative">
-      <button id="btn-sorteer" class="bellijst-knop" onclick="toggleDropdown('sorteer')">
-        ↕ Sorteer
-      </button>
-      <div id="dropdown-sorteer" class="bellijst-dropdown">
-        <div class="dropdown-titel">Sorteer op</div>
-        <button data-sort="status" onclick="setSortering('status')">Status (Hot eerst)</button>
-        <button data-sort="datum"  onclick="setSortering('datum')">Datum bezichtiging (nieuwste)</button>
-      </div>
-    </div>
-
-    <div style="position:relative">
-      <button id="btn-filter" class="bellijst-knop" onclick="toggleDropdown('filter')">
-        ⚲ Filter
-      </button>
-      <div id="dropdown-filter" class="bellijst-dropdown">
-        <div class="dropdown-titel">Status</div>
-        <button data-filter="alles"      onclick="setFilter('alles')">Alles</button>
-        <button data-filter="Hot"        onclick="setFilter('Hot')">🔥 Hot</button>
-        <button data-filter="Warm"       onclick="setFilter('Warm')">🌡️ Warm</button>
-        <button data-filter="Toegewezen" onclick="setFilter('Toegewezen')">📥 Toegewezen</button>
-        <button data-filter="Afspraak"   onclick="setFilter('Afspraak')">📅 Afspraak</button>
-        <button data-filter="Deal"       onclick="setFilter('Deal')">✅ Deal</button>
-        <button data-filter="Lost"       onclick="setFilter('Lost')">❌ Lost</button>
-        <hr>
-        <div class="dropdown-titel">Belstatus</div>
-        <button data-bel-filter="aan" onclick="toggleNogNietGebeld()">📞 Alleen nog niet gebeld</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="bellijst-teller" class="bellijst-teller" style="display:none"></div>
-
   <div id="leads-container">
     <div class="loading">
       <div class="spinner"></div>
@@ -1033,58 +828,6 @@
   </div>
 </div>
 
-<!-- HEALTH-CHECK MODAL (alleen level-2: Ton, Hans, Monique) -->
-<div class="hc-modal-overlay" id="hc-modal-overlay" onclick="sluitHealthCheck(event)">
-  <div class="hc-modal" onclick="event.stopPropagation()">
-    <div class="hc-modal-header">
-      <div>
-        <div class="hc-modal-title">🩺 Systeem-check</div>
-        <div class="hc-modal-sub">Snelle check van alle essentiële systemen</div>
-      </div>
-      <button class="hc-modal-close" onclick="sluitHealthCheckDirect()">×</button>
-    </div>
-
-    <div id="hc-checks-container">
-      <div class="hc-check">
-        <div class="hc-status laden" id="hc-status-make"></div>
-        <div class="hc-info">
-          <div class="hc-naam">1. Make.com scenario</div>
-          <div class="hc-detail" id="hc-detail-make">Status wordt opgehaald...</div>
-        </div>
-      </div>
-
-      <div class="hc-check">
-        <div class="hc-status laden" id="hc-status-bezichtigingen"></div>
-        <div class="hc-info">
-          <div class="hc-naam">2. Monday Bezichtigingen</div>
-          <div class="hc-detail" id="hc-detail-bezichtigingen">Wordt gecheckt...</div>
-        </div>
-      </div>
-
-      <div class="hc-check">
-        <div class="hc-status laden" id="hc-status-leadpool"></div>
-        <div class="hc-info">
-          <div class="hc-naam">3. Monday Leadpool</div>
-          <div class="hc-detail" id="hc-detail-leadpool">Wordt gecheckt...</div>
-        </div>
-      </div>
-
-      <div class="hc-check">
-        <div class="hc-status laden" id="hc-status-cloze"></div>
-        <div class="hc-info">
-          <div class="hc-naam">4. Cloze API</div>
-          <div class="hc-detail" id="hc-detail-cloze">Wordt gecheckt...</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="hc-footer">
-      <div class="hc-tijd" id="hc-tijd">Nog niet gecheckt</div>
-      <button class="hc-refresh" id="hc-refresh-btn" onclick="voerHealthCheckUit()">🔄 Opnieuw</button>
-    </div>
-  </div>
-</div>
-
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -1094,13 +837,6 @@
   let huidigeLead = null;
   let gekozenStatus = null;
   let leadsData = [];
-  let bezichtigingenData = [];  // globale store voor de gevende-makelaar view
-
-  // ── BELLIJST UI STATE (zoek / sorteer / filter) ─────────────────────
-  let bellijstZoek = '';
-  let bellijstSortering = 'status';   // 'status' of 'datum'
-  let bellijstFilter = 'alles';       // 'alles' / 'Hot' / 'Warm' / 'Toegewezen' / 'Afspraak' / 'Deal' / 'Lost'
-  let bellijstNogNietGebeld = false;  // toggle: alleen leads met belpogingen=0
 
   // ── MAKELAARS DYNAMISCH LADEN UIT MONDAY ────────────────────────────
   async function laadMakelaars() {
@@ -1137,7 +873,7 @@
   laadMakelaars();
 
   // ── LOGIN ───────────────────────────────────────────────────────────
-  async function login(rol) {
+  function login(rol) {
     const select = document.getElementById('makelaar-select');
     const opt = select.options[select.selectedIndex];
     if (!opt.value) { toonToast('Kies eerst jouw naam', 'fout'); return; }
@@ -1145,37 +881,15 @@
     huidigeMakelaar = {
       email: opt.value,
       naam: opt.dataset.naam || opt.text,
-      boardId: opt.dataset.board || '5093190545',  // Leadpool board (pool/round-robin)
-      eigenBoardId: null,    // wordt straks gevuld via get_eigen_bellijst_board
-      eigenBoardLabel: null,
+      boardId: opt.dataset.board || '5093190545',
     };
 
     document.getElementById('header-naam').textContent = huidigeMakelaar.naam;
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('btn-terug').classList.remove('hidden');
-    toonHealthCheckKnop();
 
     // Registreer service worker en vraag push permissie
     registreerServiceWorker();
-
-    // Eigen bellijst-board ophalen (voor "Mijn leads"-tab). Niet blokkerend:
-    // als 't faalt blijft de app werkend, alleen de eigen-tab is dan leeg.
-    fetch('/.netlify/functions/monday', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'get_eigen_bellijst_board',
-        data: { makelaar_naam: huidigeMakelaar.naam, makelaar_email: huidigeMakelaar.email }
-      })
-    })
-      .then(r => r.json())
-      .then(j => {
-        if (j?.ok && j.board_id) {
-          huidigeMakelaar.eigenBoardId = j.board_id;
-          huidigeMakelaar.eigenBoardLabel = j.board_label;
-        }
-      })
-      .catch(() => { /* stil falen — eigen-tab blijft leeg */ });
 
     if (rol === 'geven') {
       document.getElementById('geven-screen').classList.remove('hidden');
@@ -1187,47 +901,10 @@
     }
   }
 
-  // ── BRON-STATE: welke tab is actief ('leadpool' of 'eigen') ────────
-  let huidigeBron = 'leadpool';
-
-  // Tab-switch: andere bron, andere lijst, tabs visueel updaten
-  function switchBron(bron) {
-    if (bron === huidigeBron) return;
-    huidigeBron = bron;
-
-    const tabLeadpool = document.getElementById('tab-leadpool');
-    const tabEigen = document.getElementById('tab-eigen');
-    const actiefStyle = 'background:#1A2B5F;color:#fff';
-    const inactiefStyle = 'background:transparent;color:#1A2B5F';
-
-    if (bron === 'leadpool') {
-      tabLeadpool.style.cssText = tabLeadpool.style.cssText.replace(/background:[^;]+;color:[^;]+/, actiefStyle);
-      tabEigen.style.cssText = tabEigen.style.cssText.replace(/background:[^;]+;color:[^;]+/, inactiefStyle);
-    } else {
-      tabLeadpool.style.cssText = tabLeadpool.style.cssText.replace(/background:[^;]+;color:[^;]+/, inactiefStyle);
-      tabEigen.style.cssText = tabEigen.style.cssText.replace(/background:[^;]+;color:[^;]+/, actiefStyle);
-    }
-
-    laadLeads();
-  }
-
   // ── LEADS LADEN (via monday API) ────────────────────────────────────
   async function laadLeads() {
     document.getElementById('leads-container').innerHTML =
       '<div class="loading"><div class="spinner"></div>Leads ophalen...</div>';
-
-    // Bepaal welk board en met welke filter-bron
-    const isEigen = huidigeBron === 'eigen';
-    const boardId = isEigen ? huidigeMakelaar.eigenBoardId : huidigeMakelaar.boardId;
-
-    // Eigen-tab maar nog geen board-ID? Toon bericht ipv. lege call.
-    if (isEigen && !boardId) {
-      document.getElementById('leads-container').innerHTML =
-        '<div class="empty-state"><p>Geen eigen bellijst-board gekoppeld. Vraag Ton om je toe te voegen aan het Meedoen Leadpool board met een geldig Boards-label.</p></div>';
-      const elEigen = document.getElementById('count-eigen');
-      if (elEigen) elEigen.textContent = '(0)';
-      return;
-    }
 
     try {
       const res = await fetch('/.netlify/functions/monday', {
@@ -1236,9 +913,8 @@
         body: JSON.stringify({
           action: 'get_leads',
           data: {
-            board_id: boardId,
+            board_id: huidigeMakelaar.boardId,
             makelaar_naam: huidigeMakelaar.naam,
-            bron: isEigen ? 'eigen' : 'leadpool',
           }
         })
       });
@@ -1311,187 +987,12 @@
     document.getElementById('overzicht-screen').classList.add('hidden');
     document.getElementById('login-screen').classList.remove('hidden');
     document.getElementById('btn-terug').classList.add('hidden');
-    document.getElementById('btn-healthcheck').classList.add('hidden');
     document.getElementById('header-naam').textContent = 'Welkom';
     document.getElementById('header-badge').textContent = '0 leads';
     document.getElementById('makelaar-select').value = '';
   }
 
   // ── FEEDBACK BEWERKEN ────────────────────────────────────────────────
-  // ── HEALTH-CHECK (alleen level-2: directie + Monique) ───────────────
-  const HC_LEVEL2_EMAILS = [
-    'toncoffeng@makelaarsvan.nl',
-    'hanskoppes@makelaarsvan.nl',
-    'moniqueklaver@makelaarsvan.nl',
-  ];
-
-  function isLevel2(email) {
-    return HC_LEVEL2_EMAILS.includes((email || '').toLowerCase());
-  }
-
-  function toonHealthCheckKnop() {
-    const btn = document.getElementById('btn-healthcheck');
-    if (!btn) return;
-    if (huidigeMakelaar && isLevel2(huidigeMakelaar.email)) {
-      btn.classList.remove('hidden');
-    } else {
-      btn.classList.add('hidden');
-    }
-  }
-
-  function openHealthCheck() {
-    document.getElementById('hc-modal-overlay').classList.add('open');
-    voerHealthCheckUit();
-  }
-
-  function sluitHealthCheck(event) {
-    if (event.target === document.getElementById('hc-modal-overlay')) sluitHealthCheckDirect();
-  }
-
-  function sluitHealthCheckDirect() {
-    document.getElementById('hc-modal-overlay').classList.remove('open');
-  }
-
-  function hcUpdateCheck(naam, status, detail) {
-    const statusEl = document.getElementById('hc-status-' + naam);
-    const detailEl = document.getElementById('hc-detail-' + naam);
-    if (statusEl) statusEl.className = 'hc-status ' + status;
-    if (detailEl) detailEl.innerHTML = detail;
-  }
-
-  async function voerHealthCheckUit() {
-    const refreshBtn = document.getElementById('hc-refresh-btn');
-    refreshBtn.disabled = true;
-    refreshBtn.textContent = 'Bezig...';
-
-    // Reset alles naar laden-status
-    ['make', 'bezichtigingen', 'leadpool', 'cloze'].forEach(n => {
-      hcUpdateCheck(n, 'laden', 'Wordt gecheckt...');
-    });
-
-    // Check 1: Make.com — geen open API zonder auth, dus alleen link
-    hcUpdateCheck('make',
-      'grijs',
-      'Geen automatische check beschikbaar. <a class="hc-link" href="https://eu1.make.com/1073275/scenarios/5365854" target="_blank">Open Make.com om status te zien →</a>'
-    );
-
-    // Check 2 + 3 + 4 parallel
-    await Promise.all([
-      hcCheckBezichtigingen(),
-      hcCheckLeadpool(),
-      hcCheckCloze(),
-    ]);
-
-    const nu = new Date().toLocaleString('nl-NL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
-    document.getElementById('hc-tijd').textContent = 'Laatst gecheckt: ' + nu;
-    refreshBtn.disabled = false;
-    refreshBtn.textContent = '🔄 Opnieuw';
-  }
-
-  async function hcCheckBezichtigingen() {
-    try {
-      // Systeem-check: heel het board, niet alleen 'mijn' bezichtigingen
-      const res = await fetch('/.netlify/functions/monday', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'get_bezichtigingen',
-          data: { makelaar_naam: '__ALLE__' }
-        })
-      });
-      const json = await res.json();
-      const items = json?.bezichtigingen || [];
-
-      if (items.length === 0) {
-        hcUpdateCheck('bezichtigingen', 'rood', 'Board is leeg — Make.com levert niets aan');
-        return;
-      }
-
-      // Zoek nieuwste datum
-      const datums = items.map(b => b.datum).filter(Boolean).sort();
-      const nieuwste = datums[datums.length - 1];
-      const dagenOud = nieuwste ? Math.floor((Date.now() - new Date(nieuwste).getTime()) / 86400000) : 999;
-
-      let status = 'groen';
-      let extra = '';
-      if (dagenOud > 14) { status = 'rood'; extra = ' ⚠️ stilte sinds 2 weken'; }
-      else if (dagenOud > 7) { status = 'geel'; extra = ' ⚠️ stilte sinds 1 week'; }
-
-      hcUpdateCheck('bezichtigingen', status,
-        items.length + ' items in board · nieuwste: ' + (nieuwste || '?') + extra
-      );
-    } catch (err) {
-      hcUpdateCheck('bezichtigingen', 'rood', 'Fout: ' + err.message);
-    }
-  }
-
-  async function hcCheckLeadpool() {
-    try {
-      // Systeem-check: heel het leadpool-board, niet alleen 'mijn' leads
-      const res = await fetch('/.netlify/functions/monday', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'get_leads',
-          data: {
-            board_id: '5093190545',
-            makelaar_naam: '__ALLE__',
-          }
-        })
-      });
-      const json = await res.json();
-      const items = json?.leads || [];
-
-      if (items.length === 0) {
-        hcUpdateCheck('leadpool', 'rood', 'Leadpool is leeg');
-        return;
-      }
-
-      // Zoek nieuwste datum (datum_ontvangen of datum_bezichtiging)
-      const datums = items
-        .map(l => l.datum_ontvangen || l.datum_bezichtiging || l.datum)
-        .filter(Boolean)
-        .sort();
-      const nieuwste = datums[datums.length - 1];
-      const dagenOud = nieuwste ? Math.floor((Date.now() - new Date(nieuwste).getTime()) / 86400000) : 999;
-
-      let status = 'groen';
-      let extra = '';
-      if (dagenOud > 30) { status = 'rood'; extra = ' ⚠️ geen activiteit sinds 1 maand'; }
-      else if (dagenOud > 14) { status = 'geel'; extra = ' ⚠️ rustig sinds 2 weken'; }
-
-      hcUpdateCheck('leadpool', status,
-        items.length + ' leads in pool · nieuwste: ' + (nieuwste || '?') + extra
-      );
-    } catch (err) {
-      hcUpdateCheck('leadpool', 'rood', 'Fout: ' + err.message);
-    }
-  }
-
-  async function hcCheckCloze() {
-    try {
-      const start = Date.now();
-      const res = await fetch('/.netlify/functions/cloze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'check_bestaand',
-          data: { naam: 'TestCheck', email: 'noreply@example.com' }
-        })
-      });
-      const ms = Date.now() - start;
-      const json = await res.json();
-
-      if (res.ok && typeof json.bestaand !== 'undefined') {
-        hcUpdateCheck('cloze', 'groen', 'API bereikbaar (' + ms + 'ms)');
-      } else {
-        hcUpdateCheck('cloze', 'geel', 'API antwoordde maar onverwacht');
-      }
-    } catch (err) {
-      hcUpdateCheck('cloze', 'rood', 'Fout: ' + err.message);
-    }
-  }
-
   function bewerkFeedback(bezId) {
     // Toon het grid en de opslaan knop weer
     document.getElementById(`fg-${bezId}`).style.display = 'grid';
@@ -1614,7 +1115,6 @@
       const items = json?.bezichtigingen || [];
            // Nieuwste bezichtigingen eerst (Rogier's wens)
            items.sort((a, b) => (b.datum || '').localeCompare(a.datum || ''));
-      bezichtigingenData = items;  // globaal opslaan zodat actie-functies de lead kunnen vinden
 
       const totaal = items.length;
       const gedeeld = items.filter(b => b.in_pool).length;
@@ -1674,9 +1174,8 @@
               ${b.telefoon ? `<span>📞 ${b.telefoon}</span>` : ''}
               ${b.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px">✉️ ${b.email}</span>` : ''}
             </div>
-            <div id="cloze-badge-${b.id}" style="margin-top:6px;min-height:20px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
+            <div id="cloze-badge-${b.id}" style="margin-top:6px;min-height:20px">
               <span style="font-size:11px;color:var(--grijs-tekst)">⏳ Cloze check...</span>
-              ${clozeKnopHtml(b.email, b.telefoon, b.cloze_id)}
             </div>
 
             <!-- FEEDBACK WEERGAVE / INVOER -->
@@ -1732,7 +1231,7 @@
                 class="btn-zichzelf"
                 id="btn-zelf-${b.id}"
                 onclick="geefAanZichzelf('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
-                style="flex:0 0 auto;padding:12px 14px;background:#25346c;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
+                style="flex:0 0 auto;padding:12px 14px;background:var(--navy);color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
                 👤 Zelf bellen
               </button>` : ''}
               <button
@@ -1740,7 +1239,14 @@
                 id="btn-afgehandeld-${b.id}"
                 onclick="markeerAfgehandeld('${b.id}', '${b.naam.replace(/'/g, "\'")}', '${b.adres?.replace(/'/g, "\'") || ''}')"
                 style="flex:0 0 auto;padding:12px 14px;background:#2E7D32;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
-                ✅ Zonder resultaat
+                ✅ Afgehandeld
+              </button>
+              <button
+                class="btn-talent"
+                id="btn-talent-${b.id}"
+                onclick="opentalentModal('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${(b.email || '').replace(/'/g, "\\'")}', '${(b.telefoon || '').replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
+                title="Aanmerken als MVA Talent (recruitment)">
+                🌱 MVA Talent
               </button>
             </div>
           </div>`;
@@ -1761,25 +1267,16 @@
             data: { email: b.email, telefoon: b.telefoon, naam: b.naam }
           })
         }).then(r => r.json()).then(json => {
-          // Sla cloze data op het bezichtiging-object (voor latere acties)
-          b.cloze_bestaand = json.bestaand;
-          b.cloze_stage = json.stage;
-          b.cloze_id = json.id;
-          b.cloze_eigenaar = json.eigenaar_email || null;
           const badge = document.getElementById(`cloze-badge-${b.id}`);
           if (!badge) return;
-          // Knop ná de check opbouwen — gebruikt cloze_id voor directe profielopening
-          const knop = clozeKnopHtml(b.email, b.telefoon, b.cloze_id);
-          const eigenaarTag = eigenaarTagHtml(b.cloze_eigenaar);
           if (json.bestaand) {
-            const stageLabel = (json.stage && json.stage !== 'none') ? json.stage : 'niet gekoppeld';
-            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze · ${stageLabel}</span>${eigenaarTag}${knop}`;
+            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
           } else {
-            badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>${knop}`;
+            badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`;
           }
         }).catch(() => {
           const badge = document.getElementById(`cloze-badge-${b.id}`);
-          if (badge) badge.innerHTML = clozeKnopHtml(b.email, b.telefoon, b.cloze_id);
+          if (badge) badge.innerHTML = '';
         });
       });
 
@@ -1974,33 +1471,35 @@
 
   // ── LEAD NAAR POOL STUREN ────────────────────────────────────────────
   // ── ZELF BELLEN — lead direct aan zichzelf toewijzen ─────────────────
-  // Gebruikt push_naar_eigen_bellijst (slaat Round Robin volledig over).
-  // Backend zoekt het bellijst-board op via Meedoen Leadpool board → label
-  // → BELLIJST_LABELS mapping in monday.js.
   async function geefAanZichzelf(itemId, naam, adres) {
     const btn = document.getElementById(`btn-zelf-${itemId}`);
+    const poolBtn = document.getElementById(`btn-${itemId}`);
     btn.disabled = true;
     btn.textContent = 'Bezig...';
 
     try {
+      // Push naar pool maar met board_afkomstig = eigen bellijst
       const res = await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'push_naar_eigen_bellijst',
+          action: 'push_naar_pool',
           data: {
             item_id: itemId,
             makelaar_naam: huidigeMakelaar.naam,
-            makelaar_email: huidigeMakelaar.email,
+            board_afkomstig: `Bellijst_${huidigeMakelaar.naam.split(' ')[0]}`,
           }
         })
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
 
+      btn.textContent = '✅ Staat bij jou!';
+      btn.style.background = '#2e7d32';
+      if (poolBtn) { poolBtn.disabled = true; poolBtn.textContent = '✅ Al toegewezen'; poolBtn.classList.add('gedeeld'); }
+      document.getElementById(`bez-${itemId}`).classList.add('al-gedeeld');
+
       toonToast(`✅ ${naam} staat op jouw bellijst!`, 'succes');
-      // Lead verdwijnt uit gevende-makelaar lijst (komt op eigen bellijst terug)
-      verwijderUitBezLijst(itemId);
     } catch (err) {
       btn.disabled = false;
       btn.textContent = '👤 Zelf bellen';
@@ -2027,140 +1526,165 @@
 
       if (json.error) throw new Error(json.error);
 
+      btn.textContent = '✅ In de pool!';
+      btn.classList.add('gedeeld');
+      document.getElementById(`bez-${itemId}`).classList.add('al-gedeeld');
+
+      // Stats bijwerken
+      const gedeeld = parseInt(document.getElementById('stat-geven-gedeeld').textContent) + 1;
+      const nieuw = parseInt(document.getElementById('stat-geven-nieuw').textContent) - 1;
+      document.getElementById('stat-geven-gedeeld').textContent = gedeeld;
+      document.getElementById('stat-geven-nieuw').textContent = Math.max(0, nieuw);
+
       toonToast(`✅ ${naam} staat in de pool!`, 'succes');
-      // Lead verdwijnt uit lijst, DOM én tellers worden bijgewerkt
-      verwijderUitBezLijst(itemId);
     } catch (err) {
       btn.disabled = false;
       btn.textContent = '📤 Geef door aan pool';
       toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
     }
   }
-  // Hulpfunctie: verwijder bezichtiging uit lijst + UI + update tellers
-  function verwijderUitBezLijst(itemId) {
-    // 1. Uit globale data
-    bezichtigingenData = bezichtigingenData.filter(b => String(b.id) !== String(itemId));
-    // 2. Card uit DOM
-    const card = document.getElementById(`bez-${itemId}`);
-    if (card) card.remove();
-    // 3. Tellers updaten
-    const totaal = bezichtigingenData.length;
-    const gedeeld = bezichtigingenData.filter(b => b.in_pool).length;
-    const openFeedback = bezichtigingenData.filter(b => !b.feedback).length;
-    const elTotaal = document.getElementById('stat-geven-totaal');
-    const elNieuw = document.getElementById('stat-geven-nieuw');
-    const elGedeeld = document.getElementById('stat-geven-gedeeld');
-    const elBadge = document.getElementById('header-badge');
-    if (elTotaal) elTotaal.textContent = totaal;
-    if (elNieuw) elNieuw.textContent = openFeedback;
-    if (elGedeeld) elGedeeld.textContent = gedeeld;
-    if (elBadge) elBadge.textContent = totaal + ' bezichtigingen';
-  }
-
-  // == ARCHIVEREN (lead uit lijst, Monday-status op 'afgehandeld', Cloze ongemoeid) ====
+  // == AFGEHANDELD (niet doorsturen) ====================================
   async function markeerAfgehandeld(itemId, naam, adres) {
-    // Bevestiging
-    if (!confirm(`"${naam}" markeren als zonder resultaat?\n\nDe bezichtiging verdwijnt uit jouw lijst maar blijft beschikbaar in Monday.`)) {
-      return;
-    }
+    // Stap 1: stage kiezen via simpele prompt
+    const stageKeuze = prompt(
+      `Lead "${naam}" afhandelen voor Cloze.\n\n` +
+      `Kies status:\n` +
+      `  1 = Lead (potentiële klant)\n` +
+      `  2 = Out (geen vervolg)\n` +
+      `  3 = Status niet wijzigen\n\n` +
+      `Typ 1, 2 of 3:`,
+      '3'
+    );
+    if (stageKeuze === null) return; // geannuleerd
+    let stage_override;
+    if (stageKeuze.trim() === '1') stage_override = 'lead';
+    else if (stageKeuze.trim() === '2') stage_override = 'out';
+    else if (stageKeuze.trim() === '3') stage_override = null;
+    else { toonToast('Ongeldige keuze. Kies 1, 2 of 3.', 'fout'); return; }
 
-    // Vind de lead-data — eerst bezichtigingen (gevende-makelaar view), dan bellijst (fallback)
-    const lead = bezichtigingenData.find(b => String(b.id) === String(itemId))
-              || leadsData.find(l => String(l.id) === String(itemId));
+    // Stap 2: opmerking (optioneel)
+    const opmerking = prompt(`Opmerking meegeven aan Cloze (optioneel):`, '') || '';
+
+    // Vind de lead-data
+    const lead = leadsData.find(l => String(l.id) === String(itemId));
     if (!lead) { toonToast('Lead niet gevonden.', 'fout'); return; }
 
     const btn = document.getElementById(`btn-afgehandeld-${itemId}`);
     if (btn) { btn.disabled = true; btn.textContent = 'Bezig...'; }
 
     try {
-      // Monday: archiveer_bezichtiging zet 'Archiefstatus' checkbox op true
-      // → bezichtiging verdwijnt uit gevende-view, blijft op het Monday-board
-      const res = await fetch('/.netlify/functions/monday', {
+      // 1. Cloze bijwerken met stage_override + opmerking
+      await fetch('/.netlify/functions/cloze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'archiveer_bezichtiging',
-          data: { item_id: itemId }
+          action: 'verwerk_lead',
+          data: {
+            naam: lead.naam,
+            email: lead.email,
+            telefoon: lead.telefoon,
+            adres: lead.adres,
+            makelaar_email: huidigeMakelaar?.email || '',
+            feedback: [],
+            opmerking: opmerking,
+            stage_override: stage_override
+          }
         })
       });
-      const json = await res.json();
-      if (!res.ok || json.error) throw new Error(json.error || 'Onbekende fout');
 
-      toonToast(`✅ ${naam} gemarkeerd als zonder resultaat`, 'succes');
-      // Verwijder lead uit lijst, DOM én update tellers
-      verwijderUitBezLijst(itemId);
+      // 2. Monday: status op "afgehandeld" (niet naar pool)
+      await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_status',
+          data: {
+            item_id: itemId,
+            board_id: huidigeMakelaar?.boardId,
+            status: 'afgehandeld'
+          }
+        })
+      });
+
+      toonToast(`✅ ${naam} afgehandeld${stage_override ? ' (Cloze: ' + stage_override + ')' : ''}`, 'succes');
+      // Verwijder de kaart uit de UI
+      const card = document.getElementById(`bez-${itemId}`);
+      if (card) card.remove();
     } catch (err) {
-      if (btn) { btn.disabled = false; btn.textContent = '✅ Zonder resultaat'; }
+      if (btn) { btn.disabled = false; btn.textContent = '✅ Afgehandeld'; }
       toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
     }
   }
 
-  // ── BEKIJK IN CLOZE — opent direct het persoonsprofiel in Cloze (UI, niet API) ──
-  // Voorkeur: bij bekende cloze_id wordt direct het profiel geopend in app.cloze.com.
-  // Anders: fallback naar Cloze's URL-scheme op email of telefoon. Werkt zolang
-  // de makelaar is ingelogd in Cloze in dezelfde browser.
-  // Documentatie: https://help.cloze.com/article/2197-cloze-url-scheme-x-callback-urls
-  function clozeProfielUrl(email, telefoon, clozeId) {
-    if (clozeId) {
-      return `https://app.cloze.com/app/#/people/${encodeURIComponent(clozeId)}`;
+  // ── MVA TALENT (recruitment Cloze) ────────────────────────────────
+  let talentContext = null;
+
+  function opentalentModal(bezId, naam, email, telefoon, adres) {
+    talentContext = { bezId, naam, email, telefoon, adres };
+    document.getElementById('talent-modal-naam').textContent = naam || 'deze persoon';
+    document.getElementById('talent-modal-toelichting').value = '';
+    document.getElementById('talent-modal-bg').classList.add('actief');
+    setTimeout(() => document.getElementById('talent-modal-toelichting').focus(), 50);
+  }
+
+  function sluitTalentModal() {
+    document.getElementById('talent-modal-bg').classList.remove('actief');
+    talentContext = null;
+  }
+
+  async function bevestigTalent() {
+    if (!talentContext) return;
+    const bevestigBtn = document.getElementById('talent-modal-bevestig');
+    const knop = document.getElementById(`btn-talent-${talentContext.bezId}`);
+    const toelichting = document.getElementById('talent-modal-toelichting').value.trim();
+
+    // Spotter = de huidig ingelogde gevende makelaar
+    const spotterNaam = huidigeMakelaar?.naam || '';
+    const spotterEmail = huidigeMakelaar?.email || '';
+
+    bevestigBtn.disabled = true;
+    bevestigBtn.textContent = '⏳ Bezig...';
+
+    try {
+      const res = await fetch('/.netlify/functions/cloze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'voeg_talent_toe',
+          data: {
+            naam: talentContext.naam,
+            email: talentContext.email || null,
+            telefoon: talentContext.telefoon || null,
+            adres: talentContext.adres || null,
+            spotter_naam: spotterNaam,
+            spotter_email: spotterEmail,
+            context: toelichting,
+          },
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || 'Fout bij toevoegen');
+
+      // Knop in card markeren als aangemeld
+      if (knop) {
+        knop.classList.add('aangemeld');
+        knop.textContent = '✅ Talent aangemeld';
+        knop.disabled = true;
+        knop.onclick = null;
+      }
+      sluitTalentModal();
+      toonToast(`🌱 ${talentContext.naam} aangemeld als MVA Talent`, 'goed');
+    } catch (err) {
+      bevestigBtn.disabled = false;
+      bevestigBtn.textContent = '🌱 Aanmelden';
+      toonToast('Aanmelden mislukt. Probeer opnieuw.', 'fout');
     }
-    if (email) {
-      return `https://www.cloze.com/in/#contact=${encodeURIComponent(email)}`;
-    }
-    if (telefoon) {
-      // Strip + en spaties — Cloze accepteert kale cijfers
-      const schoon = String(telefoon).replace(/[^0-9]/g, '');
-      return `https://www.cloze.com/in/#contact=${schoon}`;
-    }
-    return null;
   }
 
-  function clozeKnopHtml(email, telefoon, clozeId) {
-    const url = clozeProfielUrl(email, telefoon, clozeId);
-    if (!url) return '';
-    const tooltip = clozeId
-      ? 'Open dit profiel in Cloze'
-      : 'Open Cloze (profiel als bekend, anders algemeen scherm)';
-    return ` <a href="${url}" target="_blank" rel="noopener" class="btn-cloze" onclick="event.stopPropagation()" title="${tooltip}">🔗 Open Cloze</a>`;
-  }
-
-  // ── MAKELAAR EMAIL → LEESBARE NAAM ──────────────────────────────────
-  // Cloze geeft alleen een email terug als 'assignee'. We zetten die om in
-  // een leesbare naam via een vaste mapping. Een algoritmische parser (op
-  // basis van prefix + tussenvoegsels) bleek onbetrouwbaar omdat MVA-namen
-  // zonder scheiding lopen ('mauritsrodermond' bevat 'der' midden in een
-  // naam, etc.). Vandaar: hardcoded lijst. Eén regel toevoegen wanneer een
-  // collega in dienst komt.
-  const MAKELAARS_NAMEN = {
-    'toncoffeng@makelaarsvan.nl':        'Ton Coffeng',
-    'hanskoppes@makelaarsvan.nl':        'Hans Koppes',
-    'moniqueklaver@makelaarsvan.nl':     'Monique Klaver',
-    'mauritsrodermond@makelaarsvan.nl':  'Maurits Rodermond',
-    'mauritsvanleeuwen@makelaarsvan.nl': 'Maurits van Leeuwen',
-    'rogierdevries@makelaarsvan.nl':     'Rogier de Vries',
-    'mathiaselias@makelaarsvan.nl':      'Mathias Elias',
-    'jorinetiv@makelaarsvan.nl':         'Jori Netiv',
-    'pellefreijsen@makelaarsvan.nl':     'Pelle Freijsen',
-    'anthonieschilder@makelaarsvan.nl':  'Anthonie Schilder',
-    'wilmaout@makelaarsvan.nl':          'Wilma Out',
-    'janjaaptenarve@makelaarsvan.nl':    'Jan Jaap ten Arve',
-    'gertjanmulder@makelaarsvan.nl':     'Gert Jan Mulder',
-    'filipebataglia@makelaarsvan.nl':    'Filipe Bataglia',
-  };
-
-  function formatMakelaarNaam(email) {
-    if (!email || typeof email !== 'string') return null;
-    const lower = email.toLowerCase().trim();
-    return MAKELAARS_NAMEN[lower] || email;
-  }
-
-  // Eigenaar-tag HTML (alleen tonen als eigenaar ≠ huidige makelaar)
-  function eigenaarTagHtml(eigenaarEmail) {
-    if (!eigenaarEmail) return '';
-    if (huidigeMakelaar && eigenaarEmail.toLowerCase() === huidigeMakelaar.email.toLowerCase()) return '';
-    const naam = formatMakelaarNaam(eigenaarEmail) || eigenaarEmail;
-    return ` <span class="cloze-badge eigenaar" title="${eigenaarEmail}">👤 ${naam}</span>`;
-  }
+  // Maak globaal beschikbaar voor inline onclick
+  window.opentalentModal = opentalentModal;
+  window.sluitTalentModal = sluitTalentModal;
+  window.bevestigTalent = bevestigTalent;
 
   async function checkClozeBestaand() {
     for (const lead of leadsData) {
@@ -2177,102 +1701,24 @@
         const json = await res.json();
         lead.cloze_bestaand = json.bestaand;
         lead.cloze_stage = json.stage;
-        lead.cloze_id = json.id;
-        lead.cloze_eigenaar = json.eigenaar_email || null;
 
-        // Update badge in DOM zonder volledige re-render — knop blijft staan
+        // Update badge in DOM zonder volledige re-render
         const badge = document.getElementById(`cloze-badge-${lead.id}`);
         if (badge) {
-          const knop = clozeKnopHtml(lead.email, lead.telefoon, lead.cloze_id);
-          const eigenaarTag = eigenaarTagHtml(lead.cloze_eigenaar);
           if (json.bestaand) {
-            const stageLabel = (json.stage && json.stage !== 'none') ? json.stage : 'niet gekoppeld';
-            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze · ${stageLabel}</span>${eigenaarTag}${knop}`;
+            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
           } else {
-            badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>${knop}`;
+            badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`;
           }
         }
       } catch (e) { /* stille fout — badge blijft leeg */ }
     }
   }
 
-  // ── BELLIJST TOOLBAR HANDLERS ───────────────────────────────────────
-  function updateZoek() {
-    const input = document.getElementById('bellijst-zoek-input');
-    bellijstZoek = (input.value || '').trim();
-    document.getElementById('bellijst-zoek-wis').style.display = bellijstZoek ? 'block' : 'none';
-    renderLeads();
-  }
-
-  function wisZoek() {
-    const input = document.getElementById('bellijst-zoek-input');
-    input.value = '';
-    bellijstZoek = '';
-    document.getElementById('bellijst-zoek-wis').style.display = 'none';
-    renderLeads();
-    input.focus();
-  }
-
-  function toggleDropdown(welke) {
-    const sorteer = document.getElementById('dropdown-sorteer');
-    const filter  = document.getElementById('dropdown-filter');
-    if (welke === 'sorteer') {
-      filter.classList.remove('open');
-      sorteer.classList.toggle('open');
-    } else {
-      sorteer.classList.remove('open');
-      filter.classList.toggle('open');
-    }
-    markeerDropdownGekozen();
-  }
-
-  function markeerDropdownGekozen() {
-    document.querySelectorAll('#dropdown-sorteer button[data-sort]').forEach(b => {
-      b.classList.toggle('gekozen', b.dataset.sort === bellijstSortering);
-    });
-    document.querySelectorAll('#dropdown-filter button[data-filter]').forEach(b => {
-      b.classList.toggle('gekozen', b.dataset.filter === bellijstFilter);
-    });
-    const belBtn = document.querySelector('#dropdown-filter button[data-bel-filter]');
-    if (belBtn) belBtn.classList.toggle('gekozen', bellijstNogNietGebeld);
-
-    document.getElementById('btn-sorteer').classList.toggle('actief', bellijstSortering !== 'status');
-    document.getElementById('btn-filter').classList.toggle('actief',
-      bellijstFilter !== 'alles' || bellijstNogNietGebeld);
-  }
-
-  function setSortering(welke) {
-    bellijstSortering = welke;
-    document.getElementById('dropdown-sorteer').classList.remove('open');
-    markeerDropdownGekozen();
-    renderLeads();
-  }
-
-  function setFilter(welke) {
-    bellijstFilter = welke;
-    document.getElementById('dropdown-filter').classList.remove('open');
-    markeerDropdownGekozen();
-    renderLeads();
-  }
-
-  function toggleNogNietGebeld() {
-    bellijstNogNietGebeld = !bellijstNogNietGebeld;
-    markeerDropdownGekozen();
-    renderLeads();
-  }
-
-  // Sluit dropdowns bij klik buiten
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.bellijst-knop') && !e.target.closest('.bellijst-dropdown')) {
-      document.getElementById('dropdown-sorteer')?.classList.remove('open');
-      document.getElementById('dropdown-filter')?.classList.remove('open');
-    }
-  });
-
   function renderLeads() {
     const container = document.getElementById('leads-container');
 
-    // ── Sortering: status of datum ─────────────────────────────────────
+    // ── Sortering: Hot → Warm → Toegewezen → rest ──────────────────────
     const prioriteit = {
       'Hot': 1,
       'Warm': 2,
@@ -2281,79 +1727,27 @@
       'Deal': 5,
       'Lost': 6,
     };
-    let lijst = [...leadsData];
+    const sorted = [...leadsData].sort((a, b) => {
+      const pa = prioriteit[a.lead_status] || 99;
+      const pb = prioriteit[b.lead_status] || 99;
+      return pa - pb;
+    });
 
-    // 1. Status-filter
-    if (bellijstFilter !== 'alles') {
-      lijst = lijst.filter(l => (l.lead_status || 'Toegewezen') === bellijstFilter);
-    }
-
-    // 2. "Alleen nog niet gebeld"
-    if (bellijstNogNietGebeld) {
-      lijst = lijst.filter(l => (Number(l.belpogingen) || 0) === 0);
-    }
-
-    // 3. Zoekterm
-    if (bellijstZoek) {
-      const term = bellijstZoek.toLowerCase();
-      lijst = lijst.filter(l =>
-        (l.naam || '').toLowerCase().includes(term) ||
-        (l.adres || '').toLowerCase().includes(term) ||
-        (l.bij_wie || '').toLowerCase().includes(term)
-      );
-    }
-
-    // 4. Sortering
-    if (bellijstSortering === 'datum') {
-      lijst.sort((a, b) => (b.datum_bezichtiging || '').localeCompare(a.datum_bezichtiging || ''));
-    } else {
-      lijst.sort((a, b) => {
-        const pa = prioriteit[a.lead_status] || 99;
-        const pb = prioriteit[b.lead_status] || 99;
-        return pa - pb;
-      });
-    }
-
-    const sorted = lijst;
-
-    // ── Tellers in header (op volledige lijst, niet filter) ────────────
-    const openstaand = leadsData.filter(l => !['bereikt_ja','niet_geinteresseerd'].includes(l.status));
-    const afgerond = leadsData.filter(l => ['bereikt_ja','niet_geinteresseerd'].includes(l.status));
+    // ── Tellers in header ──────────────────────────────────────────────
+    const openstaand = sorted.filter(l => !['bereikt_ja','niet_geinteresseerd'].includes(l.status));
+    const afgerond = sorted.filter(l => ['bereikt_ja','niet_geinteresseerd'].includes(l.status));
 
     document.getElementById('stat-totaal').textContent = openstaand.length;
     document.getElementById('stat-vandaag').textContent = openstaand.filter(l => !l.status).length;
     document.getElementById('stat-gedaan').textContent = afgerond.length;
     document.getElementById('header-badge').textContent = openstaand.length + ' leads';
 
-    // Tab-count updaten (alleen die van de actieve bron — andere tab kennen we niet zonder extra call)
-    const countEl = document.getElementById(huidigeBron === 'eigen' ? 'count-eigen' : 'count-leadpool');
-    if (countEl) countEl.textContent = '(' + leadsData.length + ')';
-
-    // ── Filter/zoek-teller boven de lijst ──────────────────────────────
-    const teller = document.getElementById('bellijst-teller');
-    if (teller) {
-      const filterActief = bellijstZoek || bellijstFilter !== 'alles' || bellijstNogNietGebeld;
-      if (filterActief) {
-        teller.style.display = 'block';
-        teller.textContent = sorted.length + ' van ' + leadsData.length + ' leads zichtbaar';
-      } else {
-        teller.style.display = 'none';
-      }
-    }
-
     if (sorted.length === 0) {
-      const filterActief = bellijstZoek || bellijstFilter !== 'alles' || bellijstNogNietGebeld;
-      container.innerHTML = filterActief
-        ? `<div class="leeg">
-            <div class="leeg-icon">🔍</div>
-            <h3>Geen resultaten</h3>
-            <p>Geen leads die voldoen aan je zoek- of filtercriteria.</p>
-          </div>`
-        : `<div class="leeg">
-            <div class="leeg-icon">🎉</div>
-            <h3>Alles afgehandeld!</h3>
-            <p>Je hebt geen openstaande leads meer.</p>
-          </div>`;
+      container.innerHTML = `<div class="leeg">
+        <div class="leeg-icon">🎉</div>
+        <h3>Alles afgehandeld!</h3>
+        <p>Je hebt geen openstaande leads meer.</p>
+      </div>`;
       return;
     }
 
@@ -2405,15 +1799,6 @@
           <div style="display:flex;gap:8px;margin-top:6px;font-size:12px;color:var(--grijs-tekst)">
             ${lead.telefoon ? `<span>📞 ${lead.telefoon}</span>` : ''}
             ${lead.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">✉️ ${lead.email}</span>` : ''}
-          </div>
-
-          <div id="cloze-badge-${lead.id}" style="margin-top:6px;min-height:20px;display:flex;align-items:center;flex-wrap:wrap;gap:4px" onclick="event.stopPropagation()">
-            ${lead.cloze_bestaand === true
-              ? `<span class="cloze-badge bekend">📁 Bekend in Cloze · ${(lead.cloze_stage && lead.cloze_stage !== 'none') ? lead.cloze_stage : 'niet gekoppeld'}</span>${eigenaarTagHtml(lead.cloze_eigenaar)}`
-              : lead.cloze_bestaand === false
-              ? `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`
-              : `<span style="font-size:11px;color:var(--grijs-tekst)">⏳ Cloze check...</span>`}
-            ${clozeKnopHtml(lead.email, lead.telefoon, lead.cloze_id)}
           </div>
 
           ${lead.opmerkingen ? `<div style="margin-top:6px;font-size:12px;color:var(--grijs-tekst);font-style:italic">💬 ${lead.opmerkingen}</div>` : ''}
@@ -2723,5 +2108,22 @@
     });
   }
 </script>
+
+<!-- MVA TALENT MODAL (recruitment Cloze) -->
+<div class="talent-modal-bg" id="talent-modal-bg" onclick="if(event.target===this)sluitTalentModal()">
+  <div class="talent-modal" role="dialog" aria-labelledby="talent-modal-titel">
+    <h3 id="talent-modal-titel">🌱 Aanmerken als MVA Talent</h3>
+    <p id="talent-modal-omschrijving">Voeg <strong id="talent-modal-naam">deze persoon</strong> toe aan jouw recruitment-database als potentiële MVA-makelaar.</p>
+    <label for="talent-modal-toelichting">Toelichting (optioneel)</label>
+    <textarea
+      id="talent-modal-toelichting"
+      placeholder="Bv. 'Werkt nu bij makelaar X, professionele uitstraling, klikte goed' — kort is prima."></textarea>
+    <div class="talent-modal-acties">
+      <button class="annuleer" onclick="sluitTalentModal()">Annuleer</button>
+      <button class="bevestig" id="talent-modal-bevestig" onclick="bevestigTalent()">🌱 Aanmelden</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
