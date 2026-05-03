@@ -140,6 +140,23 @@
     .stat-card.oranje .stat-number { color: var(--oranje); }
     .stat-card.groen .stat-number { color: var(--groen); }
 
+    /* ── FILTER-KNOP STAAT op stat-cards ── */
+    .filter-knop {
+      cursor: pointer;
+      transition: all .15s;
+      border: 2px solid transparent;
+    }
+    .filter-knop:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    }
+    .filter-knop.actief {
+      border-color: var(--navy);
+      box-shadow: 0 2px 8px rgba(26,43,95,0.15);
+    }
+    .filter-knop.actief.oranje { border-color: var(--oranje); }
+    .filter-knop.actief.groen { border-color: var(--groen); }
+
     .section-title {
       font-size: 13px;
       font-weight: 600;
@@ -391,18 +408,21 @@
     /* ── FEEDBACK TOAST ── */
     .toast {
       position: fixed;
-      bottom: 24px;
+      top: 80px;
       left: 50%;
-      transform: translateX(-50%) translateY(100px);
+      transform: translateX(-50%) translateY(-150px);
       background: var(--navy);
       color: white;
-      padding: 12px 24px;
+      padding: 14px 26px;
       border-radius: 30px;
-      font-size: 14px;
-      font-weight: 500;
-      z-index: 300;
-      transition: transform 0.3s ease;
-      white-space: nowrap;
+      font-size: 15px;
+      font-weight: 600;
+      z-index: 9999;
+      transition: transform 0.35s ease;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+      max-width: calc(100vw - 32px);
+      text-align: center;
+      pointer-events: none;
     }
     .toast.show { transform: translateX(-50%) translateY(0); }
     .toast.succes { background: var(--groen); }
@@ -699,15 +719,15 @@
 <!-- GEVEN SCHERM -->
 <div id="geven-screen" class="hidden">
   <div class="stats-bar">
-    <div class="stat-card oranje">
+    <div class="stat-card oranje filter-knop actief" id="filter-totaal" onclick="filterBezichtigingen('alles')" title="Toon alles">
       <div class="stat-number" id="stat-geven-totaal">0</div>
       <div class="stat-label">Bezichtigingen</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card filter-knop" id="filter-open" onclick="filterBezichtigingen('open')" title="Alleen open feedback">
       <div class="stat-number" id="stat-geven-nieuw">0</div>
       <div class="stat-label">Open feedback</div>
     </div>
-    <div class="stat-card groen">
+    <div class="stat-card groen filter-knop" id="filter-pool" onclick="filterBezichtigingen('pool')" title="Alleen al doorgegeven">
       <div class="stat-number" id="stat-geven-gedeeld">0</div>
       <div class="stat-label">Naar pool</div>
     </div>
@@ -992,6 +1012,26 @@
     document.getElementById('makelaar-select').value = '';
   }
 
+  // ── FILTER BEZICHTIGINGEN (Bug 4) ─────────────────────────────────────
+  // Klik op stat-kaart filtert de lijst: 'alles' / 'open' / 'pool'
+  function filterBezichtigingen(modus) {
+    const cards = document.querySelectorAll('#geven-container .bez-card');
+    cards.forEach(card => {
+      const inPool = card.dataset.inpool === '1';
+      const isOpen = card.classList.contains('bez-open');
+      let toon = true;
+      if (modus === 'open') toon = isOpen && !inPool;
+      else if (modus === 'pool') toon = inPool;
+      card.style.display = toon ? '' : 'none';
+    });
+    // Visuele staat van filter-knoppen
+    document.querySelectorAll('.filter-knop').forEach(el => el.classList.remove('actief'));
+    const map = { alles: 'filter-totaal', open: 'filter-open', pool: 'filter-pool' };
+    const actiefEl = document.getElementById(map[modus]);
+    if (actiefEl) actiefEl.classList.add('actief');
+  }
+  window.filterBezichtigingen = filterBezichtigingen;
+
   // ── FEEDBACK BEWERKEN ────────────────────────────────────────────────
   function bewerkFeedback(bezId) {
     // Toon het grid en de opslaan knop weer
@@ -1018,7 +1058,10 @@
     const actief = Array.from(grid.querySelectorAll('.btn-feedback.actief'))
       .map(b => b.id.replace(`fb-${bezId}-`, ''));
 
-    if (actief.length === 0) return;
+    if (actief.length === 0) {
+      toonToast('Kies minimaal één feedback-knop voordat je opslaat.', 'fout');
+      return;
+    }
 
     const opmerkingEl = document.getElementById(`opmerking-${bezId}`);
     const opmerking = opmerkingEl?.value?.trim() || '';
@@ -1070,15 +1113,32 @@
         }).catch(e => console.warn('Cloze error:', e));
       }
 
-      // UI updaten
-      opslaanBtn.textContent = '✅ Opgeslagen!';
+      // ── UI updaten ──
+      // Vervang de status-balk: van "Nog geen feedback" naar "FEEDBACK GEGEVEN"
+      const statusEl = document.getElementById(`feedback-status-${bezId}`);
+      if (statusEl) {
+        statusEl.innerHTML = `
+          <div style="font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em;margin-bottom:6px">FEEDBACK GEGEVEN</div>
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;font-size:13px;color:#15803d;font-weight:500">
+            ${actief.map(k => feedbackLabels[k] || k).join(' · ')}
+          </div>
+          <button onclick="bewerkFeedback('${bezId}')" style="margin-top:8px;background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--grijs-tekst);cursor:pointer">
+            ✏️ Feedback aanpassen
+          </button>
+        `;
+      }
+
+      // Verberg het invul-gedeelte (knoppen-grid, opmerking, opslaan-knop)
+      grid.style.display = 'none';
       if (opmerkingEl) opmerkingEl.style.display = 'none';
+      opslaanBtn.style.display = 'none';
+
+      // Card-styling naar "afgerond"
       const card = document.getElementById(`bez-${bezId}`);
       card.classList.remove('bez-open');
       card.classList.add('bez-gedaan');
 
       // Open → Klaar badge
-      const badge = card.querySelector('[style*="Open"]') || card.querySelector('span');
       card.querySelectorAll('span').forEach(s => {
         if (s.textContent.includes('● Open')) {
           s.style.background = '#e8f5e9';
@@ -1090,6 +1150,14 @@
       // Stats bijwerken
       const open = document.querySelectorAll('.bez-open').length;
       document.getElementById('stat-geven-nieuw').textContent = open;
+
+      // Als er een filter actief is anders dan "alles", opnieuw toepassen
+      // zodat een net-afgehandelde kaart uit de "open" view verdwijnt
+      const actieveFilter = document.querySelector('.filter-knop.actief');
+      if (actieveFilter && actieveFilter.id !== 'filter-totaal') {
+        const modus = actieveFilter.id === 'filter-open' ? 'open' : 'pool';
+        filterBezichtigingen(modus);
+      }
 
       toonToast(`✅ Feedback opgeslagen voor ${naam}`, 'succes');
     } catch (err) {
@@ -1180,19 +1248,21 @@
 
             <!-- FEEDBACK WEERGAVE / INVOER -->
             <div style="margin-top:12px">
-              ${heeftFeedback ? `
-                <div style="font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em;margin-bottom:6px">FEEDBACK GEGEVEN</div>
-                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;font-size:13px;color:#15803d;font-weight:500">
-                  ${huidigeFeedback.map(k => feedbackMap[k] || k).join(' · ')}
-                </div>
-                <button onclick="bewerkFeedback('${b.id}')" style="margin-top:8px;background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--grijs-tekst);cursor:pointer">
-                  ✏️ Feedback aanpassen
-                </button>
-              ` : `
-                <div style="background:#fff3e0;border:1px solid #fed7aa;border-radius:8px;padding:8px 12px;font-size:12px;color:#c2410c;margin-bottom:8px">
-                  ⚠️ Nog geen feedback gegeven
-                </div>
-              `}
+              <div id="feedback-status-${b.id}">
+                ${heeftFeedback ? `
+                  <div style="font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em;margin-bottom:6px">FEEDBACK GEGEVEN</div>
+                  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;font-size:13px;color:#15803d;font-weight:500">
+                    ${huidigeFeedback.map(k => feedbackMap[k] || k).join(' · ')}
+                  </div>
+                  <button onclick="bewerkFeedback('${b.id}')" style="margin-top:8px;background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--grijs-tekst);cursor:pointer">
+                    ✏️ Feedback aanpassen
+                  </button>
+                ` : `
+                  <div style="background:#fff3e0;border:1px solid #fed7aa;border-radius:8px;padding:8px 12px;font-size:12px;color:#c2410c;margin-bottom:8px">
+                    ⚠️ Nog geen feedback gegeven
+                  </div>
+                `}
+              </div>
               <div class="feedback-grid ${heeftFeedback ? 'verborgen' : ''}" id="fg-${b.id}" style="${heeftFeedback ? 'display:none' : ''}">
                 ${feedbackOpties.map(f => `
                   <button
@@ -1217,7 +1287,7 @@
               </button>
             </div>
 
-            <div style="display:flex;gap:8px;margin-top:10px">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
               <button
                 class="btn-naar-pool ${alGedeeld ? 'gedeeld' : ''}"
                 id="btn-${b.id}"
