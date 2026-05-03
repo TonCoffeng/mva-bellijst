@@ -688,6 +688,15 @@
       background: #dcfce7;
       color: #15803d;
     }
+    /* Klikbare variant — voor link-versie van de badge */
+    a.cloze-badge.klikbaar {
+      text-decoration: none;
+      transition: all .15s;
+    }
+    a.cloze-badge.klikbaar:hover {
+      background: #bfdbfe;
+      color: #1e40af;
+    }
     /* Waarschuwing: contact staat al op naam van een andere makelaar */
     .cloze-eigenaar-warn {
       display: inline-block;
@@ -705,6 +714,24 @@
     a.cloze-eigenaar-warn:hover {
       background: #fde68a;
       color: #78350f;
+    }
+    /* Signaal: contact heeft (nog) geen eigenaar in Cloze */
+    .cloze-vrij {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+      text-decoration: none;
+      transition: all .15s;
+    }
+    a.cloze-vrij:hover {
+      background: #e2e8f0;
+      color: #334155;
     }
   </style>
 </head>
@@ -1473,15 +1500,26 @@
           // Contact bestaat al — bouw badge op
           const eigenaarEmail = (json.eigenaar_email || '').toLowerCase();
           const huidigeEmail = (huidigeMakelaar?.email || '').toLowerCase();
-          const heeftAndereEigenaar = eigenaarEmail && eigenaarEmail !== huidigeEmail;
+          const heeftEigenaar = !!eigenaarEmail;
+          const heeftAndereEigenaar = heeftEigenaar && eigenaarEmail !== huidigeEmail;
           const clozeUrl = json.id ? `https://app.cloze.com/app/#/people/${json.id}` : null;
 
-          let html = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
+          // Hoofdbadge — altijd klikbaar als we een Cloze-id hebben
+          let html = clozeUrl
+            ? `<a href="${clozeUrl}" target="_blank" rel="noopener" class="cloze-badge bekend klikbaar" title="Open in Cloze">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</a>`
+            : `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
+
+          // Waarschuwing bij andere eigenaar — amber, klikbaar
           if (heeftAndereEigenaar) {
             const eigenaarNaam = json.eigenaar_naam || eigenaarEmail.split('@')[0];
             html += clozeUrl
               ? ` <a href="${clozeUrl}" target="_blank" rel="noopener" class="cloze-eigenaar-warn" title="Open in Cloze in nieuw tabblad">🔔 Klant van ${eigenaarNaam}</a>`
               : ` <span class="cloze-eigenaar-warn">🔔 Klant van ${eigenaarNaam}</span>`;
+          } else if (!heeftEigenaar) {
+            // Geen eigenaar — grijs signaal, klant is "vrij"
+            html += clozeUrl
+              ? ` <a href="${clozeUrl}" target="_blank" rel="noopener" class="cloze-vrij" title="Open in Cloze in nieuw tabblad">👤 Geen eigenaar</a>`
+              : ` <span class="cloze-vrij">👤 Geen eigenaar</span>`;
           }
           badge.innerHTML = html;
         }).catch(() => {
@@ -1988,15 +2026,24 @@
           } else {
             const eigenaarEmail = (json.eigenaar_email || '').toLowerCase();
             const huidigeEmail = (huidigeMakelaar?.email || '').toLowerCase();
-            const heeftAndereEigenaar = eigenaarEmail && eigenaarEmail !== huidigeEmail;
+            const heeftEigenaar = !!eigenaarEmail;
+            const heeftAndereEigenaar = heeftEigenaar && eigenaarEmail !== huidigeEmail;
             const clozeUrl = json.id ? `https://app.cloze.com/app/#/people/${json.id}` : null;
 
-            let html = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
+            // Hoofdbadge — altijd klikbaar als we een Cloze-id hebben
+            let html = clozeUrl
+              ? `<a href="${clozeUrl}" target="_blank" rel="noopener" class="cloze-badge bekend klikbaar" title="Open in Cloze">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</a>`
+              : `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
+
             if (heeftAndereEigenaar) {
               const eigenaarNaam = json.eigenaar_naam || eigenaarEmail.split('@')[0];
               html += clozeUrl
                 ? ` <a href="${clozeUrl}" target="_blank" rel="noopener" class="cloze-eigenaar-warn" title="Open in Cloze in nieuw tabblad">🔔 Klant van ${eigenaarNaam}</a>`
                 : ` <span class="cloze-eigenaar-warn">🔔 Klant van ${eigenaarNaam}</span>`;
+            } else if (!heeftEigenaar) {
+              html += clozeUrl
+                ? ` <a href="${clozeUrl}" target="_blank" rel="noopener" class="cloze-vrij" title="Open in Cloze in nieuw tabblad">👤 Geen eigenaar</a>`
+                : ` <span class="cloze-vrij">👤 Geen eigenaar</span>`;
             }
             badge.innerHTML = html;
           }
