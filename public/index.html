@@ -652,6 +652,23 @@
     }
     .btn-feedback-opslaan:hover { background: #1e3a8a; }
     .btn-feedback-opslaan:disabled { background: var(--grijs-mid); color: var(--grijs-tekst); cursor: default; }
+
+    /* ── ANNULEER-KNOP (in feedback bewerk-modus) ── */
+    .btn-annuleer {
+      width: 100%;
+      padding: 10px;
+      background: #f4f5f8;
+      color: var(--grijs-tekst);
+      border: 1.5px solid var(--grijs-mid);
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: 10px;
+      transition: all .15s;
+    }
+    .btn-annuleer:hover { background: #e8eaf6; color: var(--navy); }
+    .btn-annuleer.verborgen { display: none; }
     .bez-open { border-left-color: var(--oranje) !important; }
     .bez-gedaan { border-left-color: var(--groen) !important; }
 
@@ -1034,22 +1051,52 @@
 
   // ── FEEDBACK BEWERKEN ────────────────────────────────────────────────
   function bewerkFeedback(bezId) {
-    // Toon het grid en de opslaan knop weer
+    // Toon het grid en de opslaan/annuleer knoppen weer
     document.getElementById(`fg-${bezId}`).style.display = 'grid';
     document.getElementById(`fbo-${bezId}`).style.display = 'block';
+    const annBtn = document.getElementById(`bann-${bezId}`);
+    if (annBtn) annBtn.style.display = 'block';
     const opmEl = document.getElementById(`opmerking-${bezId}`);
     if (opmEl) opmEl.style.display = 'block';
+
+    // Bewaar oorspronkelijke staat zodat we kunnen annuleren
+    const grid = document.getElementById(`fg-${bezId}`);
+    const oorspronkelijk = Array.from(grid.querySelectorAll('.btn-feedback.actief'))
+      .map(b => b.id);
+    grid.dataset.oorspronkelijk = JSON.stringify(oorspronkelijk);
+    if (opmEl) opmEl.dataset.oorspronkelijk = opmEl.value || '';
   }
+
+  // ── ANNULEER BEWERKEN — terug naar opgeslagen staat ──────────────────
+  function annuleerBewerken(bezId) {
+    const grid = document.getElementById(`fg-${bezId}`);
+    const opmEl = document.getElementById(`opmerking-${bezId}`);
+    const opslaanBtn = document.getElementById(`fbo-${bezId}`);
+    const annBtn = document.getElementById(`bann-${bezId}`);
+    const statusEl = document.getElementById(`feedback-status-${bezId}`);
+
+    // Herstel oorspronkelijke knop-staat
+    const origIds = JSON.parse(grid.dataset.oorspronkelijk || '[]');
+    grid.querySelectorAll('.btn-feedback').forEach(btn => {
+      btn.classList.toggle('actief', origIds.includes(btn.id));
+    });
+    if (opmEl) opmEl.value = opmEl.dataset.oorspronkelijk || '';
+
+    // Als er oorspronkelijk feedback was → sluit bewerk-modus en toon groene balk
+    if (origIds.length > 0) {
+      grid.style.display = 'none';
+      if (opmEl) opmEl.style.display = 'none';
+      opslaanBtn.style.display = 'none';
+      if (annBtn) annBtn.style.display = 'none';
+    }
+    // Als er geen oorspronkelijke feedback was → laat alles open (gebruiker is nooit eerder klaar geweest)
+  }
+  window.annuleerBewerken = annuleerBewerken;
 
   // ── FEEDBACK TOGGLE ──────────────────────────────────────────────────
   function toggleFeedback(bezId, key, btn) {
     btn.classList.toggle('actief');
-
-    // Tel actieve knoppen
-    const grid = document.getElementById(`fg-${bezId}`);
-    const actief = grid.querySelectorAll('.btn-feedback.actief').length;
-    const opslaanBtn = document.getElementById(`fbo-${bezId}`);
-    opslaanBtn.disabled = actief === 0;
+    // Knop blijft altijd actief — bij 0 feedback toont opslaan een bevestigings-toast
   }
 
   // ── FEEDBACK OPSLAAN ─────────────────────────────────────────────────
@@ -1059,14 +1106,17 @@
       .map(b => b.id.replace(`fb-${bezId}-`, ''));
 
     if (actief.length === 0) {
-      toonToast('Kies minimaal één feedback-knop voordat je opslaat.', 'fout');
-      return;
+      // 0 feedback = bewust wissen — bevestig en verwerk
+      if (!confirm('Geen feedback aangevinkt. Wil je deze bezichtiging terugzetten naar "open" (geen feedback)?')) {
+        return;
+      }
     }
 
     const opmerkingEl = document.getElementById(`opmerking-${bezId}`);
     const opmerking = opmerkingEl?.value?.trim() || '';
 
     const opslaanBtn = document.getElementById(`fbo-${bezId}`);
+    const annBtn = document.getElementById(`bann-${bezId}`);
     opslaanBtn.disabled = true;
     opslaanBtn.textContent = 'Opslaan...';
 
@@ -1114,36 +1164,60 @@
       }
 
       // ── UI updaten ──
-      // Vervang de status-balk: van "Nog geen feedback" naar "FEEDBACK GEGEVEN"
       const statusEl = document.getElementById(`feedback-status-${bezId}`);
-      if (statusEl) {
-        statusEl.innerHTML = `
-          <div style="font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em;margin-bottom:6px">FEEDBACK GEGEVEN</div>
-          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;font-size:13px;color:#15803d;font-weight:500">
-            ${actief.map(k => feedbackLabels[k] || k).join(' · ')}
-          </div>
-          <button onclick="bewerkFeedback('${bezId}')" style="margin-top:8px;background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--grijs-tekst);cursor:pointer">
-            ✏️ Feedback aanpassen
-          </button>
-        `;
+      const card = document.getElementById(`bez-${bezId}`);
+
+      if (actief.length > 0) {
+        // Groene "FEEDBACK GEGEVEN" balk + (optioneel) opmerking eronder
+        const opmerkingHtml = opmerking
+          ? `<div style="margin-top:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;color:var(--navy);font-style:italic">💬 ${opmerking.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`
+          : '';
+        if (statusEl) {
+          statusEl.innerHTML = `
+            <div style="font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em;margin-bottom:6px">FEEDBACK GEGEVEN</div>
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;font-size:13px;color:#15803d;font-weight:500">
+              ${actief.map(k => feedbackLabels[k] || k).join(' · ')}
+            </div>
+            ${opmerkingHtml}
+            <button onclick="bewerkFeedback('${bezId}')" style="margin-top:8px;background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--grijs-tekst);cursor:pointer">
+              ✏️ Feedback aanpassen
+            </button>
+          `;
+        }
+        // Verberg het invul-gedeelte
+        grid.style.display = 'none';
+        if (opmerkingEl) opmerkingEl.style.display = 'none';
+        opslaanBtn.style.display = 'none';
+        if (annBtn) annBtn.style.display = 'none';
+        card.classList.remove('bez-open');
+        card.classList.add('bez-gedaan');
+      } else {
+        // 0 feedback = wis-actie → terug naar "Nog geen feedback gegeven"
+        if (statusEl) {
+          statusEl.innerHTML = `
+            <div style="background:#fff3e0;border:1px solid #fed7aa;border-radius:8px;padding:8px 12px;font-size:12px;color:#c2410c;margin-bottom:8px">
+              ⚠️ Nog geen feedback gegeven
+            </div>
+          `;
+        }
+        // Reset opslaan-knop voor volgende poging
+        opslaanBtn.disabled = false;
+        opslaanBtn.textContent = '💾 Feedback opslaan';
+        // Card terug naar "open" stijl
+        card.classList.remove('bez-gedaan');
+        card.classList.add('bez-open');
       }
 
-      // Verberg het invul-gedeelte (knoppen-grid, opmerking, opslaan-knop)
-      grid.style.display = 'none';
-      if (opmerkingEl) opmerkingEl.style.display = 'none';
-      opslaanBtn.style.display = 'none';
-
-      // Card-styling naar "afgerond"
-      const card = document.getElementById(`bez-${bezId}`);
-      card.classList.remove('bez-open');
-      card.classList.add('bez-gedaan');
-
-      // Open → Klaar badge
+      // Open → Klaar badge (alleen bij feedback opslaan, niet bij wissen)
       card.querySelectorAll('span').forEach(s => {
-        if (s.textContent.includes('● Open')) {
+        if (actief.length > 0 && s.textContent.includes('● Open')) {
           s.style.background = '#e8f5e9';
           s.style.color = '#2e7d32';
           s.textContent = '✓ Klaar';
+        } else if (actief.length === 0 && s.textContent.includes('✓ Klaar')) {
+          s.style.background = '';
+          s.style.color = '';
+          s.textContent = '● Open';
         }
       });
 
@@ -1159,7 +1233,9 @@
         filterBezichtigingen(modus);
       }
 
-      toonToast(`✅ Feedback opgeslagen voor ${naam}`, 'succes');
+      toonToast(actief.length > 0
+        ? `✅ Feedback opgeslagen voor ${naam}`
+        : `Feedback gewist voor ${naam}`, 'succes');
     } catch (err) {
       opslaanBtn.disabled = false;
       opslaanBtn.textContent = '💾 Feedback opslaan';
@@ -1281,9 +1357,15 @@
                 class="btn-feedback-opslaan ${heeftFeedback ? 'verborgen' : ''}"
                 id="fbo-${b.id}"
                 style="${heeftFeedback ? 'display:none' : ''}"
-                onclick="slaFeedbackOp('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}', '${b.email || ''}', '${b.telefoon || ''}')"
-                ${huidigeFeedback.length === 0 ? 'disabled' : ''}>
+                onclick="slaFeedbackOp('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}', '${b.email || ''}', '${b.telefoon || ''}')">
                 💾 Feedback opslaan
+              </button>
+              <button
+                class="btn-annuleer ${heeftFeedback ? 'verborgen' : ''}"
+                id="bann-${b.id}"
+                style="${heeftFeedback ? 'display:none' : ''}"
+                onclick="annuleerBewerken('${b.id}')">
+                ✕ Annuleren
               </button>
             </div>
 

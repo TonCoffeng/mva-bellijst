@@ -10,15 +10,18 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 ### Gerepareerd
 
 - **Bug 1 — Mobiel: knoppen vielen buiten beeld.** Actiebalk onderaan elke bezichtigings-card (Geef door / Zelf bellen / Afgehandeld / MVA Talent) krijgt nu `flex-wrap: wrap`, zodat knoppen op smalle schermen netjes naar een tweede regel breken in plaats van rechts buiten beeld te vallen.
-- **Bug 2 — Feedback opslaan zonder keuze deed niks.** `slaFeedbackOp` returnde stilletjes als geen feedback-knop was aangeklikt (regel 921). Nu toont het een toast: *"Kies minimaal één feedback-knop voordat je opslaat."*
-- **Bug 3 — Toast was niet zichtbaar.** Toast verplaatst van `bottom: 24px` naar `top: 80px`, z-index verhoogd naar 9999, `white-space: nowrap` weggehaald (mocht teksten afkappen op smalle schermen), tekst groter en duidelijker. Komt nu prominent in beeld onder de header.
-- **Bug 4 — "Open feedback" stat-kaart was niet klikbaar.** Alle drie de stat-kaarten (Bezichtigingen / Open feedback / Naar pool) zijn nu klikbare filters. Klik op "Open feedback" toont alleen kaarten zonder feedback en niet in pool. Klik op "Naar pool" toont alleen al doorgegeven kaarten. Klik op "Bezichtigingen" toont alles. Actieve filter krijgt visuele border-markering.
-- **Bug 7 — "Nog geen feedback gegeven" balk verdween niet na opslaan.** De oranje waarschuwingsbalk bovenaan elke bezichtigings-card werd na succesvol opslaan niet vervangen. Nu wordt 'ie meteen omgezet naar de groene "FEEDBACK GEGEVEN"-balk met de gekozen labels en een "✏️ Feedback aanpassen" knop. Ingebouwd via stabiele container `feedback-status-${bezId}`.
+- **Bug 2 — Feedback opslaan zonder keuze.** Eerst gebeurde er stilletjes niks; daarna een rode toast. Nu: opslaan met 0 feedback toont een bevestigings-dialoog *"Wil je deze bezichtiging terugzetten naar 'open'?"*. Bevestig = balk gaat terug naar oranje "Nog geen feedback gegeven" + status van de kaart wordt teruggezet.
+- **Bug 3 — Toast was niet zichtbaar.** Toast verplaatst van `bottom: 24px` naar `top: 80px`, z-index 9999, `white-space: nowrap` weg, prominenter formaat en kleur. Komt nu onder de header in beeld.
+- **Bug 4 — "Open feedback" stat-kaart was niet klikbaar.** Alle drie de stat-kaarten (Bezichtigingen / Open feedback / Naar pool) zijn nu klikbare filters. Klik op "Open feedback" toont alleen kaarten zonder feedback en niet in pool. Klik op "Naar pool" toont alleen al doorgegeven kaarten. Klik op "Bezichtigingen" toont alles. Actieve filter krijgt visuele border-markering. Na opslaan re-applyt de actieve filter automatisch.
+- **Bug 7 — "Nog geen feedback gegeven" balk verdween niet na opslaan.** De oranje waarschuwingsbalk wordt na succesvol opslaan direct vervangen door de groene "FEEDBACK GEGEVEN"-balk met de gekozen labels en een "✏️ Feedback aanpassen" knop.
+- **Annuleer-knop** in feedback-bewerken modus. Naast "Feedback opslaan" staat nu "✕ Annuleren" — klik herstelt de oorspronkelijke staat (welke knoppen actief waren, welke opmerking) en sluit de bewerk-modus weer.
+- **Opmerking zichtbaar in beginscherm.** Opmerking die bij feedback-opslaan is ingetypt wordt nu ook getoond onder de groene "FEEDBACK GEGEVEN" balk (als grijs cursief blokje met 💬 prefix). Bij volgende page-load alleen zichtbaar als monday `opmerking` teruggeeft — apart traject.
 
 ### Bekend / nog open
 
 - **Bug 5 — Terug-navigatie:** scope onduidelijk, opnieuw bekijken.
 - **Bug 6 — Stage-override Cloze:** verkoopklant ten onrechte. Wordt opgedeeld in deelstappen, niet in deze release.
+- **Opmerking in monday-data:** monday-fetch geeft geen `opmerking` veld terug, dus bij page reload is opmerking weg. Apart op te lossen.
 
 ---
 
