@@ -348,7 +348,9 @@ exports.handler = async (event) => {
 
     // ── ARCHIVEREN: zet 'Archiefstatus' boolean op true voor bezichtiging ─────
     if (action === "archiveer_bezichtiging") {
-      const { item_id } = data;
+      const { item_id, archiveer } = data;
+      // archiveer: true (default) = naar archief, false = herstel uit archief
+      const naarArchief = archiveer !== false;
       const BOARD_ID = "5093190482"; // Bezichtigingen-board
 
       // Zoek de Archiefstatus kolom op naam (robuust tegen ID-wijzigingen)
@@ -372,6 +374,9 @@ exports.handler = async (event) => {
         };
       }
 
+      // Checkbox aan = archief, leeg = uit archief
+      const checkboxValue = naarArchief ? { checked: "true" } : {};
+
       const result = await mondayFetch(`
         mutation ($itemId: ID!, $boardId: ID!, $colId: String!, $value: JSON!) {
           change_column_value(
@@ -385,10 +390,10 @@ exports.handler = async (event) => {
         itemId: item_id,
         boardId: BOARD_ID,
         colId: archiefCol.id,
-        value: JSON.stringify({ checked: "true" }),
+        value: JSON.stringify(checkboxValue),
       });
 
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, kolom: archiefCol.id, result }) };
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, kolom: archiefCol.id, gearchiveerd: naarArchief, result }) };
     }
 
 
@@ -553,6 +558,102 @@ exports.handler = async (event) => {
         if (b.gearchiveerd) return false;       // gearchiveerde bezichtigingen verbergen
         if (b.niet_naar_pool) return false;
         if (b.doorgegeven) return false;
+        if (!isMVAMakelaar(b.makelaar)) return false;
+        if (!makelaar_naam) return true;
+        return b.makelaar?.toLowerCase().includes(makelaar_naam.split(' ')[0].toLowerCase());
+      });
+      return { statusCode: 200, headers, body: JSON.stringify({ bezichtigingen }) };
+    }
+
+    // ── GEARCHIVEERDE BEZICHTIGINGEN OPHALEN ──────────────────────────
+    // Net als get_bezichtigingen maar omgekeerde filter: ALLEEN gearchiveerde
+    // tonen voor de huidige makelaar. Voor het Archief-filter in de app.
+    if (action === "get_gearchiveerde_bezichtigingen") {
+      const { makelaar_naam } = data;
+      const BOARD_ID = "5093190482";
+
+      // Archiefstatus kolom-ID vinden
+      const colResult = await mondayFetch(`
+        query { boards(ids: [${BOARD_ID}]) { columns { id title type } } }
+      `);
+      const colsAll = colResult?.data?.boards?.[0]?.columns || [];
+      const archiefCol = colsAll.find(c =>
+        (c.title || '').toLowerCase().includes('archief') &&
+        (c.type === 'checkbox' || c.type === 'boolean')
+      );
+      const archiefColId = archiefCol?.id || null;
+
+      const result = await mondayFetch(`
+        query {
+          boards(ids: [${BOARD_ID}]) {
+            items_page(limit: 200) {
+              items { id name column_values { id text value } }
+            }
+          }
+        }
+      `);
+      const items = result?.data?.boards?.[0]?.items_page?.items || [];
+      const bezichtigingen = items.map(item => {
+        const cols = item.column_values || [];
+        const get = (id) => cols.find(c => c.id === id)?.text || '';
+        const getVal = (id) => {
+          const raw = cols.find(c => c.id === id)?.value;
+          try { return raw ? JSON.parse(raw) : null; } catch { return null; }
+        };
+
+        const datumVal = getVal('date_mm1fn58e');
+        const datum = datumVal?.date || get('date_mm1fn58e');
+        let tijdstip = null;
+        if (datumVal?.time && datumVal?.date) {
+          try {
+            const utcDate = new Date(`${datumVal.date}T${datumVal.time}Z`);
+            tijdstip = utcDate.toLocaleTimeString('nl-NL', {
+              timeZone: 'Europe/Amsterdam',
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+          } catch {
+            tijdstip = datumVal.time.substring(0, 5);
+          }
+        }
+
+        const gearchiveerd = archiefColId
+          ? (get(archiefColId) === 'true' || get(archiefColId) === 'v')
+          : false;
+
+        // Feedback parsen (zelfde als get_bezichtigingen)
+        const feedbackRaw = get('text_mm1fy05p');
+        let feedbackKeys = '';
+        let feedbackOpmerking = '';
+        if (feedbackRaw) {
+          try {
+            const parsed = JSON.parse(feedbackRaw);
+            if (parsed && typeof parsed === 'object' && 'k' in parsed) {
+              feedbackKeys      = parsed.k || '';
+              feedbackOpmerking = parsed.o || '';
+            } else {
+              feedbackOpmerking = feedbackRaw;
+            }
+          } catch {
+            feedbackOpmerking = feedbackRaw;
+          }
+        }
+
+        return {
+          id:       item.id,
+          naam:     item.name,
+          adres:    get('text_mm1ff7f1'),
+          makelaar: get('text_mm1f3x0n'),
+          datum,
+          tijdstip,
+          telefoon: get('phone_mm1fjavy'),
+          email:    get('email_mm1fm8b7'),
+          gearchiveerd,
+          feedback:  feedbackKeys,
+          opmerking: feedbackOpmerking,
+        };
+      }).filter(b => {
+        if (!b.gearchiveerd) return false;     // ALLEEN gearchiveerd
         if (!isMVAMakelaar(b.makelaar)) return false;
         if (!makelaar_naam) return true;
         return b.makelaar?.toLowerCase().includes(makelaar_naam.split(' ')[0].toLowerCase());
