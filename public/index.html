@@ -124,19 +124,23 @@
 
     .stats-bar {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
       margin-bottom: 20px;
+    }
+    /* Op smalle schermen 3+3 layout zodat alles past */
+    @media (max-width: 700px) {
+      .stats-bar { grid-template-columns: repeat(3, 1fr); gap: 8px; }
     }
     .stat-card {
       background: white;
       border-radius: 12px;
-      padding: 14px 12px;
+      padding: 10px 6px;
       text-align: center;
       box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     }
-    .stat-number { font-size: 24px; font-weight: 700; color: var(--navy); }
-    .stat-label { font-size: 11px; color: var(--grijs-tekst); margin-top: 2px; }
+    .stat-number { font-size: 20px; font-weight: 700; color: var(--navy); line-height: 1.2; }
+    .stat-label { font-size: 10px; color: var(--grijs-tekst); margin-top: 2px; line-height: 1.2; }
     .stat-card.oranje .stat-number { color: var(--oranje); }
     .stat-card.groen .stat-number { color: var(--groen); }
 
@@ -828,7 +832,7 @@
   <div class="stats-bar">
     <div class="stat-card oranje filter-knop actief" id="filter-totaal" onclick="filterBezichtigingen('alles')" title="Toon alles">
       <div class="stat-number" id="stat-geven-totaal">0</div>
-      <div class="stat-label">Bezichtigingen</div>
+      <div class="stat-label">Alles</div>
     </div>
     <div class="stat-card filter-knop" id="filter-open" onclick="filterBezichtigingen('open')" title="Alleen open feedback">
       <div class="stat-number" id="stat-geven-nieuw">0</div>
@@ -837,6 +841,18 @@
     <div class="stat-card groen filter-knop" id="filter-pool" onclick="filterBezichtigingen('pool')" title="Alleen al doorgegeven">
       <div class="stat-number" id="stat-geven-gedeeld">0</div>
       <div class="stat-label">Naar pool</div>
+    </div>
+    <div class="stat-card filter-knop" id="filter-zelf" onclick="filterBezichtigingen('zelf')" title="Alleen 'zelf bellen'">
+      <div class="stat-number" id="stat-geven-zelf">0</div>
+      <div class="stat-label">Zelf bellen</div>
+    </div>
+    <div class="stat-card filter-knop" id="filter-afgehandeld" onclick="filterBezichtigingen('afgehandeld')" title="Alleen afgehandeld">
+      <div class="stat-number" id="stat-geven-afgehandeld">0</div>
+      <div class="stat-label">Afgehandeld</div>
+    </div>
+    <div class="stat-card filter-knop" id="filter-archief" onclick="filterBezichtigingen('archief')" title="Toon archief">
+      <div class="stat-number" id="stat-geven-archief">0</div>
+      <div class="stat-label">📦 Archief</div>
     </div>
   </div>
   <div style="padding:0 16px 8px;display:flex;justify-content:space-between;align-items:center;gap:10px">
@@ -858,14 +874,19 @@
     <div id="filter-teller" style="display:none;font-size:11px;color:var(--grijs-tekst);margin-top:6px;padding-left:4px"></div>
   </div>
   <div id="geven-container"></div>
-  <div id="bulk-actiebalk" style="display:none;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--navy);color:white;padding:12px 18px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.25);z-index:90;gap:14px;align-items:center;min-width:280px;max-width:92vw">
-    <div style="flex:1">
+  <div id="bulk-actiebalk" style="display:none;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--navy);color:white;padding:12px 18px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.25);z-index:90;gap:10px;align-items:center;min-width:280px;max-width:92vw;flex-wrap:wrap">
+    <div style="flex:1;min-width:120px">
       <div style="font-size:11px;opacity:0.8;letter-spacing:.05em">GESELECTEERD</div>
       <div id="bulk-count" style="font-size:18px;font-weight:700">0 bezichtigingen</div>
     </div>
     <button onclick="openBulkModal()" id="btn-bulk-start" disabled
-      style="background:var(--oranje);color:white;border:none;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">
+      style="background:var(--oranje);color:white;border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">
       Doorzetten
+    </button>
+    <button onclick="archiveerSelectie()" id="btn-bulk-archiveer" disabled
+      style="background:#475569;color:white;border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap"
+      title="Archiveer geselecteerde leads (alleen leads met actie)">
+      📦 Archiveer
     </button>
   </div>
 </div>
@@ -1191,25 +1212,228 @@
     }
   }
 
-  // ── FILTER BEZICHTIGINGEN (Bug 4) ─────────────────────────────────────
-  // Klik op stat-kaart filtert de lijst: 'alles' / 'open' / 'pool'
+  // ── FILTER BEZICHTIGINGEN ─────────────────────────────────────────────
+  // Klik op stat-kaart filtert de lijst: 'alles' / 'open' / 'pool' / 'zelf' / 'afgehandeld' / 'archief'
   function filterBezichtigingen(modus) {
+    // Als geen modus opgegeven, herken de huidige actieve filter (voor zoek-input)
+    if (!modus) {
+      const actiefEl = document.querySelector('.filter-knop.actief');
+      const map = { 'filter-totaal': 'alles', 'filter-open': 'open', 'filter-pool': 'pool',
+                    'filter-zelf': 'zelf', 'filter-afgehandeld': 'afgehandeld', 'filter-archief': 'archief' };
+      modus = map[actiefEl?.id] || 'alles';
+    }
+
+    // Visuele staat van filter-knoppen alvast updaten
+    document.querySelectorAll('.filter-knop').forEach(el => el.classList.remove('actief'));
+    const map = { alles: 'filter-totaal', open: 'filter-open', pool: 'filter-pool',
+                  zelf: 'filter-zelf', afgehandeld: 'filter-afgehandeld', archief: 'filter-archief' };
+    const actiefEl = document.getElementById(map[modus]);
+    if (actiefEl) actiefEl.classList.add('actief');
+
+    // Archief-modus: laad gearchiveerde leads apart (uit Monday, niet uit DOM)
+    if (modus === 'archief') {
+      laadArchief();
+      return;
+    }
+
+    // Live (niet-archief) modi: herstel zichtbaarheid van actuele kaarten
+    // en verberg een eventuele archief-weergave
+    document.getElementById('archief-container')?.remove();
+    document.getElementById('geven-container').style.display = '';
+
+    const zoekTerm = (document.getElementById('filter-adres')?.value || '').toLowerCase().trim();
     const cards = document.querySelectorAll('#geven-container .bez-card');
     cards.forEach(card => {
       const inPool = card.dataset.inpool === '1';
       const isOpen = card.classList.contains('bez-open');
+      const actie  = card.dataset.actie || ''; // 'pool' / 'zelf' / 'afgehandeld' / ''
       let toon = true;
-      if (modus === 'open') toon = isOpen && !inPool;
-      else if (modus === 'pool') toon = inPool;
+      if (modus === 'open')              toon = isOpen && !inPool;
+      else if (modus === 'pool')         toon = actie === 'pool';
+      else if (modus === 'zelf')         toon = actie === 'zelf';
+      else if (modus === 'afgehandeld')  toon = actie === 'afgehandeld';
+      // Pas zoekterm-filter toe over de modus-filter heen
+      if (toon && zoekTerm) {
+        const adres = card.dataset.adres || '';
+        const naam  = card.dataset.naam  || '';
+        const datum = card.dataset.datum || '';
+        toon = adres.includes(zoekTerm) || naam.includes(zoekTerm) || datum.includes(zoekTerm);
+      }
       card.style.display = toon ? '' : 'none';
     });
-    // Visuele staat van filter-knoppen
-    document.querySelectorAll('.filter-knop').forEach(el => el.classList.remove('actief'));
-    const map = { alles: 'filter-totaal', open: 'filter-open', pool: 'filter-pool' };
-    const actiefEl = document.getElementById(map[modus]);
-    if (actiefEl) actiefEl.classList.add('actief');
   }
   window.filterBezichtigingen = filterBezichtigingen;
+
+  // ── ARCHIVEREN ────────────────────────────────────────────────────────
+  // Archiveer alle geselecteerde leads in één keer (alleen leads met actie)
+  async function archiveerSelectie() {
+    const checked = Array.from(document.querySelectorAll('.bulk-checkbox:checked'));
+    const ids = checked.map(cb => cb.dataset.bezId);
+    if (ids.length === 0) return;
+
+    const ok = await mvaConfirm({
+      titel: 'Archiveren?',
+      tekst: `Wil je ${ids.length} bezichtiging${ids.length===1?'':'en'} archiveren? Ze verdwijnen uit de actieve lijst maar blijven vindbaar in het Archief-filter.`,
+      okTekst: '📦 Archiveer',
+      okStijl: 'destructief',
+    });
+    if (!ok) return;
+
+    const archiefBtn = document.getElementById('btn-bulk-archiveer');
+    const oudeTekst = archiefBtn?.textContent;
+    if (archiefBtn) { archiefBtn.disabled = true; archiefBtn.textContent = 'Bezig...'; }
+
+    let gelukt = 0, mislukt = 0;
+    for (const id of ids) {
+      try {
+        const res = await fetch('/.netlify/functions/monday', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'archiveer_bezichtiging', data: { item_id: id, archiveer: true } })
+        });
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
+        // Verwijder kaart uit actieve lijst
+        document.getElementById('bez-' + id)?.remove();
+        gelukt++;
+      } catch (err) {
+        console.warn('Archiveren mislukt voor', id, err);
+        mislukt++;
+      }
+    }
+
+    // Stop selectiemodus + ververs tellers
+    if (selectieModusActief) toggleSelectiemodus();
+    werkArchiefTellerBij(+gelukt);
+
+    if (mislukt === 0) {
+      toonToast(`📦 ${gelukt} bezichtiging${gelukt===1?'':'en'} gearchiveerd`, 'succes');
+    } else {
+      toonToast(`${gelukt} gearchiveerd, ${mislukt} mislukt`, 'fout');
+    }
+    if (archiefBtn) { archiefBtn.disabled = false; archiefBtn.textContent = oudeTekst || '📦 Archiveer'; }
+  }
+  window.archiveerSelectie = archiveerSelectie;
+
+  // Helper: werk de archief-teller in de stats-bar bij met +n of -n
+  function werkArchiefTellerBij(delta) {
+    const el = document.getElementById('stat-geven-archief');
+    if (!el) return;
+    const huidig = parseInt(el.textContent || '0', 10);
+    el.textContent = Math.max(0, huidig + delta);
+  }
+
+  // Helper: vraag archief-aantal op (lichte query) zonder de UI te blokkeren
+  async function laadArchiefTeller() {
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get_gearchiveerde_bezichtigingen',
+          data: { makelaar_naam: huidigeMakelaar?.naam || '' }
+        })
+      });
+      const json = await res.json();
+      const aantal = (json.bezichtigingen || []).length;
+      const el = document.getElementById('stat-geven-archief');
+      if (el) el.textContent = aantal;
+    } catch (e) { /* stille fout — teller blijft 0 */ }
+  }
+
+  // ── ARCHIEF LADEN EN TONEN ────────────────────────────────────────────
+  async function laadArchief() {
+    // Verberg de actuele lijst, toon archief-container
+    document.getElementById('geven-container').style.display = 'none';
+    let archiefContainer = document.getElementById('archief-container');
+    if (!archiefContainer) {
+      archiefContainer = document.createElement('div');
+      archiefContainer.id = 'archief-container';
+      archiefContainer.style.padding = '0 16px';
+      document.getElementById('geven-container').parentNode.insertBefore(
+        archiefContainer,
+        document.getElementById('geven-container').nextSibling
+      );
+    }
+    archiefContainer.innerHTML = '<div style="padding:30px;text-align:center;color:var(--grijs-tekst)">📦 Archief laden...</div>';
+
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get_gearchiveerde_bezichtigingen',
+          data: { makelaar_naam: huidigeMakelaar?.naam || '' }
+        })
+      });
+      const json = await res.json();
+      const items = json.bezichtigingen || [];
+
+      // Update teller
+      const telEl = document.getElementById('stat-geven-archief');
+      if (telEl) telEl.textContent = items.length;
+
+      if (items.length === 0) {
+        archiefContainer.innerHTML = `
+          <div style="padding:40px 20px;text-align:center;color:var(--grijs-tekst);background:white;border-radius:12px;margin-top:10px">
+            <div style="font-size:32px;margin-bottom:10px">📦</div>
+            <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Archief is leeg</div>
+            <div style="font-size:13px">Gearchiveerde bezichtigingen verschijnen hier.</div>
+          </div>`;
+        return;
+      }
+
+      const esc = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      archiefContainer.innerHTML = items.map(b => `
+        <div class="bez-card al-gedeeld" id="archief-${b.id}" style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+            <div style="flex:1;min-width:0">
+              <div class="bez-naam" style="font-weight:600;color:var(--navy);margin-bottom:4px">${esc(b.naam)}</div>
+              <div class="bez-adres" style="font-size:13px;color:var(--grijs-tekst);margin-bottom:6px">📍 ${esc(b.adres)}</div>
+              <div style="font-size:12px;color:var(--grijs-tekst)">
+                📅 ${esc(b.datum||'')}${b.tijdstip ? ' om ' + esc(b.tijdstip) : ''}
+                ${b.feedback ? ' &middot; <span style="color:var(--navy);font-weight:500">' + esc(b.feedback.replace(/,/g,', ')) + '</span>' : ''}
+              </div>
+            </div>
+            <button onclick="herstelUitArchief('${b.id}')"
+              style="background:none;border:1px solid var(--grijs-mid);color:var(--navy);padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap"
+              title="Terug naar actieve lijst">
+              ♻️ Herstel
+            </button>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      archiefContainer.innerHTML = `<div style="padding:30px;text-align:center;color:var(--rood)">⚠️ Kon archief niet laden: ${err.message}</div>`;
+    }
+  }
+
+  async function herstelUitArchief(itemId) {
+    const card = document.getElementById('archief-' + itemId);
+    const naam = card?.querySelector('.bez-naam')?.textContent || 'lead';
+    const ok = await mvaConfirm({
+      titel: 'Herstellen uit archief?',
+      tekst: `"${naam}" terugzetten in de actieve lijst?`,
+      okTekst: '♻️ Herstel',
+    });
+    if (!ok) return;
+
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'archiveer_bezichtiging', data: { item_id: itemId, archiveer: false } })
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      card?.remove();
+      werkArchiefTellerBij(-1);
+      toonToast(`♻️ ${naam} hersteld — herlaad de pagina om in de actieve lijst te zien`, 'succes');
+    } catch (err) {
+      toonToast('Herstellen mislukt: ' + err.message, 'fout');
+    }
+  }
+  window.herstelUitArchief = herstelUitArchief;
 
   // ── FEEDBACK BEWERKEN ────────────────────────────────────────────────
   function bewerkFeedback(bezId) {
@@ -1441,6 +1665,9 @@
       document.getElementById('stat-geven-gedeeld').textContent = gedeeld;
       document.getElementById('header-badge').textContent = totaal + ' bezichtigingen';
 
+      // Haal archief-teller op de achtergrond op (blokkeert hoofdlaad niet)
+      laadArchiefTeller();
+
       if (totaal === 0) {
         container.innerHTML = `<div style="text-align:center;padding:60px 20px;color:var(--grijs-tekst)">
           <div style="font-size:40px;margin-bottom:12px">🏠</div>
@@ -1471,10 +1698,10 @@
         const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\n/g,'<br>');
 
         return `
-          <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''} ${heeftFeedback ? 'bez-gedaan' : 'bez-open'}" id="bez-${b.id}" data-adres="${(b.adres||'').toLowerCase().replace(/"/g,'&quot;')}" data-naam="${b.naam.toLowerCase().replace(/"/g,'&quot;')}" data-datum="${(b.datum||'').toLowerCase()}" data-inpool="${alGedeeld?'1':'0'}">
+          <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''} ${heeftFeedback ? 'bez-gedaan' : 'bez-open'}" id="bez-${b.id}" data-adres="${(b.adres||'').toLowerCase().replace(/"/g,'&quot;')}" data-naam="${b.naam.toLowerCase().replace(/"/g,'&quot;')}" data-datum="${(b.datum||'').toLowerCase()}" data-inpool="${alGedeeld?'1':'0'}" data-actie="">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
               <label class="bulk-checkbox-wrap" style="display:none;padding-top:2px;cursor:pointer">
-                <input type="checkbox" class="bulk-checkbox" data-bez-id="${b.id}" ${alGedeeld?'disabled':''}
+                <input type="checkbox" class="bulk-checkbox" data-bez-id="${b.id}"
                   onchange="updateBulkTeller()"
                   style="width:20px;height:20px;cursor:pointer;accent-color:var(--oranje)" />
               </label>
@@ -1716,11 +1943,45 @@
   }
 
   function updateBulkTeller() {
-    const geselecteerd = document.querySelectorAll('.bulk-checkbox:checked').length;
+    const checked = Array.from(document.querySelectorAll('.bulk-checkbox:checked'));
+    const geselecteerd = checked.length;
     const countEl = document.getElementById('bulk-count');
     const btnStart = document.getElementById('btn-bulk-start');
+    const btnArchief = document.getElementById('btn-bulk-archiveer');
+
     if (countEl) countEl.textContent = geselecteerd + ' bezichtiging' + (geselecteerd===1?'':'en');
-    if (btnStart) btnStart.disabled = geselecteerd === 0;
+
+    // Bepaal types van geselecteerde kaarten:
+    // - 'open' kaarten (geen actie) → kunnen doorgezet worden, niet gearchiveerd
+    // - 'afgesloten' kaarten (pool/zelf/afgehandeld) → kunnen gearchiveerd worden, niet doorgezet
+    let openAantal = 0, afgeslotenAantal = 0;
+    checked.forEach(cb => {
+      const card = document.getElementById('bez-' + cb.dataset.bezId);
+      const actie = card?.dataset.actie || '';
+      const alGedeeld = card?.classList.contains('al-gedeeld');
+      if (actie || alGedeeld) afgeslotenAantal++;
+      else openAantal++;
+    });
+
+    // "Doorzetten" alleen actief als alle geselecteerde kaarten open zijn
+    if (btnStart) {
+      btnStart.disabled = geselecteerd === 0 || afgeslotenAantal > 0;
+      btnStart.style.opacity = btnStart.disabled ? '0.45' : '1';
+      btnStart.style.cursor = btnStart.disabled ? 'not-allowed' : 'pointer';
+      btnStart.title = afgeslotenAantal > 0
+        ? 'Doorzetten kan alleen voor open leads (geen actie ondernomen)'
+        : 'Doorzetten naar feedback-flow';
+    }
+
+    // "Archiveer" alleen actief als alle geselecteerde kaarten afgesloten zijn
+    if (btnArchief) {
+      btnArchief.disabled = geselecteerd === 0 || openAantal > 0;
+      btnArchief.style.opacity = btnArchief.disabled ? '0.45' : '1';
+      btnArchief.style.cursor = btnArchief.disabled ? 'not-allowed' : 'pointer';
+      btnArchief.title = openAantal > 0
+        ? 'Archiveren kan alleen voor leads met actie (pool/zelf/afgehandeld)'
+        : 'Archiveer geselecteerde leads';
+    }
   }
 
   function openBulkModal() {
@@ -1851,6 +2112,38 @@
     });
   }
 
+  // Helper: markeer een kaart als 'afgesloten' (pool/zelf/afgehandeld) zodat
+  // de "Open feedback" filter 'm verbergt. Kaart blijft in "Alles" zichtbaar
+  // en duikt op in de eigen filter (Naar pool / Zelf bellen / Afgehandeld).
+  function markeerKaartAfgesloten(itemId, actie) {
+    const card = document.getElementById(`bez-${itemId}`);
+    if (!card) return;
+    card.classList.add('al-gedeeld');     // grijs/transparante styling
+    card.classList.remove('bez-open');    // niet meer 'open feedback'
+    card.dataset.inpool = '1';            // wordt verborgen door 'open' filter
+    card.dataset.actie = actie || '';     // 'pool' / 'zelf' / 'afgehandeld'
+
+    // Tellers bijwerken — open -1, gekozen actie +1
+    const tel = (id) => parseInt(document.getElementById(id)?.textContent || '0', 10);
+    const set = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = Math.max(0, n); };
+    set('stat-geven-nieuw', tel('stat-geven-nieuw') - 1);
+    if (actie === 'pool')        set('stat-geven-gedeeld', tel('stat-geven-gedeeld') + 1);
+    if (actie === 'zelf')        set('stat-geven-zelf', tel('stat-geven-zelf') + 1);
+    if (actie === 'afgehandeld') set('stat-geven-afgehandeld', tel('stat-geven-afgehandeld') + 1);
+
+    // Pas huidige filter opnieuw toe — als gebruiker op "Open feedback" staat
+    // verdwijnt de kaart nu visueel; op "Alles" blijft 'ie zichtbaar.
+    const actiefFilter = document.querySelector('.filter-knop.actief');
+    if (actiefFilter) {
+      const modus = actiefFilter.id === 'filter-open' ? 'open'
+                  : actiefFilter.id === 'filter-pool' ? 'pool'
+                  : actiefFilter.id === 'filter-zelf' ? 'zelf'
+                  : actiefFilter.id === 'filter-afgehandeld' ? 'afgehandeld'
+                  : 'alles';
+      filterBezichtigingen(modus);
+    }
+  }
+
   // ── ZELF BELLEN — lead direct aan zichzelf toewijzen ─────────────────
   async function geefAanZichzelf(itemId, naam, adres) {
     const btn = document.getElementById(`btn-zelf-${itemId}`);
@@ -1879,7 +2172,7 @@
       btn.style.background = '#2e7d32';
       if (poolBtn) { poolBtn.disabled = true; poolBtn.textContent = '✅ Al toegewezen'; poolBtn.classList.add('gedeeld'); }
       vergrendelAndereActies(itemId, 'zelf');
-      document.getElementById(`bez-${itemId}`).classList.add('al-gedeeld');
+      markeerKaartAfgesloten(itemId, "zelf");
 
       toonToast(`✅ ${naam} staat op jouw bellijst!`, 'succes');
     } catch (err) {
@@ -1911,13 +2204,7 @@
       btn.textContent = '✅ In de pool!';
       btn.classList.add('gedeeld');
       vergrendelAndereActies(itemId, 'pool');
-      document.getElementById(`bez-${itemId}`).classList.add('al-gedeeld');
-
-      // Stats bijwerken
-      const gedeeld = parseInt(document.getElementById('stat-geven-gedeeld').textContent) + 1;
-      const nieuw = parseInt(document.getElementById('stat-geven-nieuw').textContent) - 1;
-      document.getElementById('stat-geven-gedeeld').textContent = gedeeld;
-      document.getElementById('stat-geven-nieuw').textContent = Math.max(0, nieuw);
+      markeerKaartAfgesloten(itemId, "pool");
 
       toonToast(`✅ ${naam} staat in de pool!`, 'succes');
     } catch (err) {
@@ -2019,10 +2306,15 @@
       });
 
       vergrendelAndereActies(itemId, 'afgehandeld');
+      // Kaart niet meer verwijderen — blijft zichtbaar in "Alles" filter
+      // maar verdwijnt uit "Open feedback" zodat je lijst schoon blijft
+      if (btn) {
+        btn.textContent = '✅ Afgehandeld';
+        btn.disabled = true;
+        btn.style.background = '#2e7d32';
+      }
+      markeerKaartAfgesloten(itemId, "afgehandeld");
       toonToast(`✅ ${naam} afgehandeld${stage_override ? ' (Cloze: ' + stage_override + ')' : ''}`, 'succes');
-      // Verwijder de kaart uit de UI
-      const card = document.getElementById(`bez-${itemId}`);
-      if (card) card.remove();
     } catch (err) {
       if (btn) { btn.disabled = false; btn.textContent = '✅ Afgehandeld'; }
       toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');

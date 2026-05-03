@@ -7,7 +7,23 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ## 2026-05-03 (avond)
 
+### Toegevoegd
+
+- **Archivering van bezichtigingen — handmatig per pand of in bulk via selectie.** Een lead gaat pas naar het archief wanneer jij dat zelf kiest. Veiligheid eerst:
+  - **Alleen leads met actie** (pool / zelf / afgehandeld) kunnen worden gearchiveerd. Open leads blokkeren — je mag geen werk vergeten.
+  - **Selectiemodus** uitgebreid: knop "📦 Archiveer" naast bestaande "Doorzetten" in bulk-balk. Beide knoppen worden slim ge-(de)activeerd op basis van wat je hebt geselecteerd:
+    - Alleen open kaarten geselecteerd → "Doorzetten" actief, "Archiveer" disabled
+    - Alleen afgesloten kaarten → "Archiveer" actief, "Doorzetten" disabled
+    - Mix → beide disabled met uitleg in tooltip
+  - **Eén bevestigingsmodal** voor de hele selectie: "Wil je 3 bezichtigingen archiveren?"
+- **Zesde filter "📦 Archief"** in de stats-bar. Toont alle gearchiveerde bezichtigingen voor de ingelogde makelaar (uit Monday's Archiefstatus-checkbox).
+- **"♻️ Herstel"-knop per gearchiveerde lead** zet de bezichtiging terug in de actieve lijst (met bevestiging).
+- **Backend uitgebreid**: `archiveer_bezichtiging` accepteert nu een optionele `archiveer: false` parameter voor herstel. Nieuwe action `get_gearchiveerde_bezichtigingen` voor het Archief-filter (alleen kaarten met `Archiefstatus = true` voor de huidige makelaar).
+- **Archief-teller** wordt automatisch geladen bij elke bezichtigingen-laad én live bijgewerkt bij archiveren/herstellen.
+
 ### Gerepareerd
+
+- **Bug 15 — Lead bleef in "Open feedback" lijst staan na actie.** Wanneer je een lead naar de pool stuurde, zelf ging bellen, of afhandelde, bleef de kaart in de "Open feedback" filter staan. Nu wordt de kaart bij elke actie automatisch gemarkeerd als "afgesloten" (`data-inpool="1"` + `al-gedeeld` styling). Effect: kaart verdwijnt uit de **Open feedback** filter (lijst blijft schoon) maar blijft zichtbaar in **Alles** en in **In de pool** — zo houd je zicht op wat je hebt gedaan zonder dat je open lijst vervuilt. Helper `markeerKaartAfgesloten(itemId)` voegt klassen toe en triggert het huidige filter opnieuw zodat de kaart visueel direct verdwijnt waar nodig.
 
 - **Bug 13 — Drie eind-acties tegelijk klikbaar.** Op een bezichtigings-kaart konden "📤 Geef door aan pool", "👤 Zelf bellen" en "✅ Afgehandeld" alledrie tegelijk geklikt worden, waardoor je een lead die al naar de pool was gestuurd alsnog kon "afhandelen". Helper `vergrendelAndereActies(itemId, gekozen)` toegevoegd die zodra je één actie kiest, de andere twee uitgegrijst zet (opacity 0.45, disabled, cursor not-allowed). Toegepast in alle drie de actie-functies: `geefAanZichzelf`, `geefNaarPool`, `verwerkAfhandeling`.
 
