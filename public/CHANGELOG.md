@@ -7,6 +7,12 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ## 2026-05-03 (avond)
 
+### Gerepareerd
+
+- **Bug 13 — Drie eind-acties tegelijk klikbaar.** Op een bezichtigings-kaart konden "📤 Geef door aan pool", "👤 Zelf bellen" en "✅ Afgehandeld" alledrie tegelijk geklikt worden, waardoor je een lead die al naar de pool was gestuurd alsnog kon "afhandelen". Helper `vergrendelAndereActies(itemId, gekozen)` toegevoegd die zodra je één actie kiest, de andere twee uitgegrijst zet (opacity 0.45, disabled, cursor not-allowed). Toegepast in alle drie de actie-functies: `geefAanZichzelf`, `geefNaarPool`, `verwerkAfhandeling`.
+
+- **Bug 14 — Lelijke browser-prompt voor Cloze stage bij afhandelen.** De ouderwetse "Typ 1, 2 of 3" popup vervangen door een nette MVA-stijl modal met drie grote, duidelijke keuze-knoppen ("🔥 Lead", "🚫 Out", "⏸️ Status niet wijzigen") elk met korte uitleg. Plus een aparte textarea voor de opmerking ipv tweede prompt. Bevestig-knop blijft uitgegrijst tot je een keuze maakt — voorkomt per-ongeluk doorklikken zonder stage te kiezen.
+
 ### Toegevoegd
 
 - **Filipe Bataglia & Gert-Jan ('t Gooi-makelaars) volledig uitgefilterd uit de app.** In `netlify/functions/monday.js` één centrale helper `isMVAMakelaar(naam)` toegevoegd die wordt gebruikt in 4 plekken:

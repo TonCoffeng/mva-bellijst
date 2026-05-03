@@ -609,6 +609,32 @@
       cursor: default;
     }
 
+    /* Afhandel-modal: stage keuze knoppen */
+    .afhandel-stage-knop {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: white;
+      border: 2px solid var(--grijs-mid);
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--navy);
+      cursor: pointer;
+      text-align: left;
+      transition: all .15s;
+    }
+    .afhandel-stage-knop:hover {
+      border-color: var(--navy);
+      background: #f8fafc;
+    }
+    .afhandel-stage-knop.geselecteerd {
+      border-color: var(--navy);
+      background: #eff6ff;
+      box-shadow: 0 0 0 1px var(--navy) inset;
+    }
+
     .hidden { display: none !important; }
 
     /* ── FEEDBACK KNOPPEN ── */
@@ -1809,6 +1835,22 @@
   }
 
   // ── LEAD NAAR POOL STUREN ────────────────────────────────────────────
+  // Helper: zet andere actie-knoppen uitgegrijsd zodra je er één hebt gekozen.
+  // Een lead kan maar één van drie statussen hebben: pool / zelf / afgehandeld.
+  function vergrendelAndereActies(itemId, gekozen) {
+    const poolBtn      = document.getElementById(`btn-${itemId}`);
+    const zelfBtn      = document.getElementById(`btn-zelf-${itemId}`);
+    const afgeBtn      = document.getElementById(`btn-afgehandeld-${itemId}`);
+    const knoppen = { pool: poolBtn, zelf: zelfBtn, afgehandeld: afgeBtn };
+    Object.entries(knoppen).forEach(([sleutel, b]) => {
+      if (!b) return;
+      if (sleutel === gekozen) return; // gekozen knop houden we zoals 'ie is
+      b.disabled = true;
+      b.style.opacity = '0.45';
+      b.style.cursor = 'not-allowed';
+    });
+  }
+
   // ── ZELF BELLEN — lead direct aan zichzelf toewijzen ─────────────────
   async function geefAanZichzelf(itemId, naam, adres) {
     const btn = document.getElementById(`btn-zelf-${itemId}`);
@@ -1836,6 +1878,7 @@
       btn.textContent = '✅ Staat bij jou!';
       btn.style.background = '#2e7d32';
       if (poolBtn) { poolBtn.disabled = true; poolBtn.textContent = '✅ Al toegewezen'; poolBtn.classList.add('gedeeld'); }
+      vergrendelAndereActies(itemId, 'zelf');
       document.getElementById(`bez-${itemId}`).classList.add('al-gedeeld');
 
       toonToast(`✅ ${naam} staat op jouw bellijst!`, 'succes');
@@ -1867,6 +1910,7 @@
 
       btn.textContent = '✅ In de pool!';
       btn.classList.add('gedeeld');
+      vergrendelAndereActies(itemId, 'pool');
       document.getElementById(`bez-${itemId}`).classList.add('al-gedeeld');
 
       // Stats bijwerken
@@ -1883,28 +1927,57 @@
     }
   }
   // == AFGEHANDELD (niet doorsturen) ====================================
+  // Toont een nette MVA-modal voor stage-keuze en opmerking ipv browser prompt()
+  let afhandelContext = null; // { itemId, naam, adres }
+
+  function openAfhandelModal(itemId, naam, adres) {
+    afhandelContext = { itemId, naam, adres };
+    // Reset modal staat
+    document.getElementById('afhandel-modal-titel').textContent = `Lead afhandelen: ${naam}`;
+    document.getElementById('afhandel-opmerking').value = '';
+    document.querySelectorAll('.afhandel-stage-knop').forEach(b => b.classList.remove('geselecteerd'));
+    const okBtn = document.getElementById('afhandel-modal-ok');
+    okBtn.disabled = true;
+    okBtn.style.opacity = '0.45';
+    okBtn.style.cursor = 'not-allowed';
+    okBtn.dataset.gekozenStage = '';
+    document.getElementById('afhandel-modal-bg').classList.add('actief');
+  }
+
+  function sluitAfhandelModal(bevestigd) {
+    document.getElementById('afhandel-modal-bg').classList.remove('actief');
+    if (bevestigd && afhandelContext) {
+      const stageWaarde = document.getElementById('afhandel-modal-ok').dataset.gekozenStage;
+      const opmerking = document.getElementById('afhandel-opmerking').value.trim();
+      verwerkAfhandeling(afhandelContext.itemId, afhandelContext.naam, stageWaarde || null, opmerking);
+    }
+    afhandelContext = null;
+  }
+  window.sluitAfhandelModal = sluitAfhandelModal;
+
+  // Stage-knop kiezen in modal — selecteert visueel + activeert bevestig-knop
+  document.addEventListener('click', (ev) => {
+    const knop = ev.target.closest('.afhandel-stage-knop');
+    if (knop) {
+      document.querySelectorAll('.afhandel-stage-knop').forEach(b => b.classList.remove('geselecteerd'));
+      knop.classList.add('geselecteerd');
+      const okBtn = document.getElementById('afhandel-modal-ok');
+      okBtn.disabled = false;
+      okBtn.style.opacity = '1';
+      okBtn.style.cursor = 'pointer';
+      okBtn.dataset.gekozenStage = knop.dataset.stage;
+    } else if (ev.target.id === 'afhandel-modal-ok') {
+      sluitAfhandelModal(true);
+    }
+  });
+
+  // Entry point vanuit de "Afgehandeld" knop op de bezichtigings-kaart
   async function markeerAfgehandeld(itemId, naam, adres) {
-    // Stap 1: stage kiezen via simpele prompt
-    const stageKeuze = prompt(
-      `Lead "${naam}" afhandelen voor Cloze.\n\n` +
-      `Kies status:\n` +
-      `  1 = Lead (potentiële klant)\n` +
-      `  2 = Out (geen vervolg)\n` +
-      `  3 = Status niet wijzigen\n\n` +
-      `Typ 1, 2 of 3:`,
-      '3'
-    );
-    if (stageKeuze === null) return; // geannuleerd
-    let stage_override;
-    if (stageKeuze.trim() === '1') stage_override = 'lead';
-    else if (stageKeuze.trim() === '2') stage_override = 'out';
-    else if (stageKeuze.trim() === '3') stage_override = null;
-    else { toonToast('Ongeldige keuze. Kies 1, 2 of 3.', 'fout'); return; }
+    openAfhandelModal(itemId, naam, adres);
+  }
 
-    // Stap 2: opmerking (optioneel)
-    const opmerking = prompt(`Opmerking meegeven aan Cloze (optioneel):`, '') || '';
-
-    // Vind de lead-data
+  // Daadwerkelijke verwerking — wordt aangeroepen vanuit sluitAfhandelModal(true)
+  async function verwerkAfhandeling(itemId, naam, stage_override, opmerking) {
     const lead = leadsData.find(l => String(l.id) === String(itemId));
     if (!lead) { toonToast('Lead niet gevonden.', 'fout'); return; }
 
@@ -1945,6 +2018,7 @@
         })
       });
 
+      vergrendelAndereActies(itemId, 'afgehandeld');
       toonToast(`✅ ${naam} afgehandeld${stage_override ? ' (Cloze: ' + stage_override + ')' : ''}`, 'succes');
       // Verwijder de kaart uit de UI
       const card = document.getElementById(`bez-${itemId}`);
@@ -2561,6 +2635,52 @@
     <div class="talent-modal-acties">
       <button class="annuleer" data-confirm-action="cancel">Annuleren</button>
       <button class="bevestig" id="confirm-modal-ok" data-confirm-action="ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- AFHANDEL-MODAL — voor "Afgehandeld" knop, kiest Cloze-stage + opmerking -->
+<div class="talent-modal-bg" id="afhandel-modal-bg" onclick="if(event.target===this)sluitAfhandelModal(false)">
+  <div class="talent-modal" role="dialog" aria-labelledby="afhandel-modal-titel">
+    <h3 id="afhandel-modal-titel">Lead afhandelen</h3>
+    <p id="afhandel-modal-tekst">Wat is de status van deze lead in Cloze?</p>
+
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      <button class="afhandel-stage-knop" data-stage="lead" type="button">
+        <span style="font-size:18px">🔥</span>
+        <span>
+          <strong>Lead</strong>
+          <small style="display:block;font-weight:400;opacity:0.8">Potentiële klant — bewaren in Cloze</small>
+        </span>
+      </button>
+      <button class="afhandel-stage-knop" data-stage="out" type="button">
+        <span style="font-size:18px">🚫</span>
+        <span>
+          <strong>Out</strong>
+          <small style="display:block;font-weight:400;opacity:0.8">Geen vervolg — afsluiten</small>
+        </span>
+      </button>
+      <button class="afhandel-stage-knop" data-stage="" type="button">
+        <span style="font-size:18px">⏸️</span>
+        <span>
+          <strong>Status niet wijzigen</strong>
+          <small style="display:block;font-weight:400;opacity:0.8">Cloze-status laten zoals 'ie is</small>
+        </span>
+      </button>
+    </div>
+
+    <label style="font-size:13px;font-weight:500;color:var(--navy);display:block;margin-bottom:6px">
+      Opmerking voor Cloze (optioneel)
+    </label>
+    <textarea id="afhandel-opmerking" placeholder="Bijv: 'wil over een half jaar terug komen'"
+              style="width:100%;padding:10px;border:1px solid var(--grijs-mid);border-radius:8px;font-family:inherit;font-size:14px;min-height:60px;margin-bottom:14px;box-sizing:border-box;resize:vertical"></textarea>
+
+    <div class="talent-modal-acties">
+      <button class="annuleer" type="button" onclick="sluitAfhandelModal(false)">Annuleren</button>
+      <button class="bevestig" id="afhandel-modal-ok" type="button" disabled
+              style="opacity:0.45;cursor:not-allowed">
+        ✅ Afhandelen
+      </button>
     </div>
   </div>
 </div>
