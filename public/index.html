@@ -1111,9 +1111,13 @@
 
     if (actief.length === 0) {
       // 0 feedback = bewust wissen — bevestig en verwerk
-      if (!confirm('Geen feedback aangevinkt. Wil je deze bezichtiging terugzetten naar "open" (geen feedback)?')) {
-        return;
-      }
+      const ok = await mvaConfirm({
+        titel: 'Feedback verwijderen?',
+        tekst: 'Geen feedback meer aangevinkt. Wil je deze bezichtiging terugzetten naar "open" (geen feedback)?',
+        okTekst: '🗑️ Verwijder feedback',
+        okStijl: 'destructief',
+      });
+      if (!ok) return;
     }
 
     const opmerkingEl = document.getElementById(`opmerking-${bezId}`);
@@ -1855,6 +1859,46 @@
     }
   }
 
+  // ── MVA CONFIRM MODAL (vervangt browser confirm() met MVA-stijl) ─────
+  // Gebruik: const ok = await mvaConfirm({ titel, tekst, okTekst, okStijl });
+  // Returns: Promise<boolean> — true bij OK, false bij Annuleren / overlay-klik
+  function mvaConfirm({ titel = 'Even bevestigen', tekst = 'Weet je het zeker?', okTekst = 'OK', okStijl = '' } = {}) {
+    return new Promise((resolve) => {
+      document.getElementById('confirm-modal-titel').textContent = titel;
+      document.getElementById('confirm-modal-tekst').textContent = tekst;
+      const okBtn = document.getElementById('confirm-modal-ok');
+      okBtn.textContent = okTekst;
+      // Optionele kleur-variant voor 'destructief' (wis/delete)
+      okBtn.style.background = okStijl === 'destructief' ? '#c2410c' : '';
+      const bg = document.getElementById('confirm-modal-bg');
+
+      const handler = (ev) => {
+        const actie = ev.target.dataset?.confirmAction;
+        if (!actie) return;
+        bg.classList.remove('actief');
+        bg.removeEventListener('click', handler);
+        resolve(actie === 'ok');
+      };
+      bg.addEventListener('click', handler);
+      // Ook overlay-klik = annuleren (sluitConfirmModal hieronder roept resolve(false))
+      window._confirmResolver = resolve;
+      window._confirmHandler = handler;
+      bg.classList.add('actief');
+    });
+  }
+  function sluitConfirmModal(ok) {
+    const bg = document.getElementById('confirm-modal-bg');
+    bg.classList.remove('actief');
+    if (window._confirmHandler) bg.removeEventListener('click', window._confirmHandler);
+    if (window._confirmResolver) {
+      window._confirmResolver(!!ok);
+      window._confirmResolver = null;
+      window._confirmHandler = null;
+    }
+  }
+  window.mvaConfirm = mvaConfirm;
+  window.sluitConfirmModal = sluitConfirmModal;
+
   // Maak globaal beschikbaar voor inline onclick (legacy, mag blijven)
   window.opentalentModal = opentalentModal;
   window.bewerkFeedback = bewerkFeedback;
@@ -2320,6 +2364,18 @@
     <div class="talent-modal-acties">
       <button class="annuleer" onclick="sluitTalentModal()">Annuleer</button>
       <button class="bevestig" id="talent-modal-bevestig" onclick="bevestigTalent()">🌱 Aanmelden</button>
+    </div>
+  </div>
+</div>
+
+<!-- MVA CONFIRM MODAL (generieke bevestiging in MVA-stijl ipv browser confirm) -->
+<div class="talent-modal-bg" id="confirm-modal-bg" onclick="if(event.target===this)sluitConfirmModal(false)">
+  <div class="talent-modal" role="dialog" aria-labelledby="confirm-modal-titel">
+    <h3 id="confirm-modal-titel">Even bevestigen</h3>
+    <p id="confirm-modal-tekst">Weet je het zeker?</p>
+    <div class="talent-modal-acties">
+      <button class="annuleer" data-confirm-action="cancel">Annuleren</button>
+      <button class="bevestig" id="confirm-modal-ok" data-confirm-action="ok">OK</button>
     </div>
   </div>
 </div>

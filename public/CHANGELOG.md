@@ -11,6 +11,7 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 - **Bug 8b — "Feedback aanpassen" knop deed nog steeds niets in praktijk.** De `window.bewerkFeedback = ...` aanpak van eerder vandaag was theoretisch correct maar werkte niet betrouwbaar in alle browsers/scenarios. Vervangen door **event-delegation patroon**: alle inline `onclick="..."` handlers vervangen door `data-actie="..."` attributen + één centrale `document.addEventListener('click', ...)` listener bovenaan. Dit werkt altijd, ongeacht scope-issues. Vijf inline handlers gewijzigd: `bewerk-feedback`, `toggle-feedback`, `sla-feedback-op`, `annuleer-bewerken`, `open-talent-modal`.
 - **Bug 11 — Opslaan-knop blijft op "Opslaan..." na heropenen bewerk-modus.** Bij succesvol opslaan werd de knop op `display:none` gezet maar niet gereset (textContent bleef "Opslaan...", disabled bleef true). Bij klik op "✏️ Feedback aanpassen" werd de knop opnieuw zichtbaar, maar in disabled-staat met oude tekst. Nu wordt in `bewerkFeedback` de knop expliciet gereset naar `disabled=false` + tekst "💾 Feedback opslaan".
+- **Bug 12 — Browser confirm-popup zag er amateuristisch uit.** De gele/donkere "mvaleadpool.netlify.app meldt het volgende" popup vervangen door een nette MVA-stijl modal (zelfde patroon als de MVA Talent modal). Generieke `mvaConfirm()` functie toegevoegd — Promise-based drop-in voor browser `confirm()`, herbruikbaar voor toekomstige bevestigingen. Eerste gebruik: feedback verwijderen.
 
 ---
 
