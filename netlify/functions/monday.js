@@ -13,8 +13,7 @@ const BELLIJST_LABELS = {
   'Bellijst_Anthonie':  '5095568346',
   'Bellijst_Wilma':     '5095568404',
   'Bellijst_Pelle':     '5095568419',
-  'Bellijst_Filipe':    '5095568453',
-  'Bellijst_GertJan':   '5095568495',
+  // Filipe en Gert-Jan ('t Gooi-makelaars) verwijderd — zie isMVAMakelaar() filter
   'Bellijst_Jan-Jaap':  '5095568639',
 };
 
@@ -32,6 +31,16 @@ exports.handler = async (event) => {
   }
 
   const { action, data } = JSON.parse(event.body || "{}");
+
+  // Filter: alleen MVA Amsterdam-makelaars. 't Gooi-makelaars (Filipe Bataglia,
+  // Gert-Jan) worden uitgesloten — die werken in dezelfde Monday maar hun
+  // bezichtigingen zijn voor MVA Bellijst niet relevant.
+  const isMVAMakelaar = (naam) => {
+    const n = (naam || '').toLowerCase();
+    if (n.includes('filipe') || n.includes('bataglia')) return false;
+    if (n.includes('gert-jan') || n.includes('gertjan') || n.includes('gert jan')) return false;
+    return true;
+  };
 
   const token = MONDAY_TOKEN.startsWith('Bearer ')
     ? MONDAY_TOKEN
@@ -404,6 +413,7 @@ exports.handler = async (event) => {
           board:  item.column_values.find(c => c.id === "text_mm1gbj3q")?.text || "",
         }))
         .filter(m => m.email) // alleen makelaars met een emailadres
+        .filter(m => isMVAMakelaar(m.naam))
         .sort((a, b) => a.naam.localeCompare(b.naam));
       return { statusCode: 200, headers, body: JSON.stringify({ makelaars }) };
     }
@@ -435,7 +445,8 @@ exports.handler = async (event) => {
           return { naam: item.name, email, meedoen, vakantie, board };
         })
         // Alleen actieve makelaars (meedoen = true, niet op vakantie)
-        .filter(m => m.meedoen === 'true' || m.meedoen === 'v');
+        .filter(m => m.meedoen === 'true' || m.meedoen === 'v')
+        .filter(m => isMVAMakelaar(m.naam));
 
       return { statusCode: 200, headers, body: JSON.stringify({ makelaars }) };
     }
@@ -542,6 +553,7 @@ exports.handler = async (event) => {
         if (b.gearchiveerd) return false;       // gearchiveerde bezichtigingen verbergen
         if (b.niet_naar_pool) return false;
         if (b.doorgegeven) return false;
+        if (!isMVAMakelaar(b.makelaar)) return false;
         if (!makelaar_naam) return true;
         return b.makelaar?.toLowerCase().includes(makelaar_naam.split(' ')[0].toLowerCase());
       });
@@ -574,7 +586,8 @@ exports.handler = async (event) => {
           meedoen: item.column_values.find(c => c.id === 'boolean_mm1g4fwm')?.text || '',
           vakantie: item.column_values.find(c => c.id === 'timerange_mm1gj38w')?.text || '',
         }))
-        .filter(m => (m.meedoen === 'true' || m.meedoen === 'v') && m.email);
+        .filter(m => (m.meedoen === 'true' || m.meedoen === 'v') && m.email)
+        .filter(m => isMVAMakelaar(m.naam));
 
       if (makelaars.length === 0) {
         return { statusCode: 200, headers, body: JSON.stringify({ ok: false, reden: "Geen aangevinkte makelaars" }) };
