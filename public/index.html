@@ -942,11 +942,11 @@
   // ── SUPABASE AUTH ─────────────────────────────────────────────────
   const SUPABASE_URL = 'https://ehqtyhoeubchcwfavdzr.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_OqTL874jsDEMKg9LomfrmQ_nwIo6Wet';
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   // Bij opstart: check of er al een sessie is
   (async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await sb.auth.getSession();
     if (session) {
       // Sessie bestaat — haal user-info op uit gebruikers tabel
       const ok = await ladenIngelogdeMakelaar(session.user.email);
@@ -962,7 +962,7 @@
 
   // Haal makelaar-info op uit gebruikers tabel op basis van email
   async function ladenIngelogdeMakelaar(email) {
-    const { data, error } = await supabase
+    const { data, error } = await sb
       .from('gebruikers')
       .select('naam, email, level, actief')
       .eq('email', email)
@@ -973,7 +973,7 @@
     }
     if (!data.actief) {
       toonLoginFout('Account is gedeactiveerd. Neem contact op met Ton.');
-      await supabase.auth.signOut();
+      await sb.auth.signOut();
       return false;
     }
     huidigeMakelaar = {
@@ -998,7 +998,7 @@
     btn.querySelector('.rol-titel').textContent = '⏳ Bezig...';
     verbergLoginFout();
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
     if (error) {
       toonLoginFout(error.message === 'Invalid login credentials'
         ? 'Email of wachtwoord klopt niet.'
@@ -1035,7 +1035,7 @@
   }
 
   async function uitloggen() {
-    await supabase.auth.signOut();
+    await sb.auth.signOut();
     location.reload();
   }
   window.uitloggen = uitloggen;
