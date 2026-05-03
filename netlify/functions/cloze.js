@@ -277,6 +277,7 @@ exports.handler = async (event) => {
         headers,
         body: JSON.stringify({
           bestaand: !!gevonden,
+          id: gevonden?.id || null,
           naam: gevonden?.name || null,
           stage: gevonden?.stage || null,
           // Hoeveel interacties er al zijn (geeft inschatting van relatiediepte)
