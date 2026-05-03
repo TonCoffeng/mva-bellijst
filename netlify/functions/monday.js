@@ -501,6 +501,27 @@ exports.handler = async (event) => {
           ? (get(archiefColId) === 'true' || get(archiefColId) === 'v')
           : false;
 
+        // Feedback parsen — nieuw formaat is JSON {k,o,t}, oud formaat is losse tekst
+        const feedbackRaw = get('text_mm1fy05p');
+        let feedbackKeys = '';
+        let feedbackOpmerking = '';
+        if (feedbackRaw) {
+          try {
+            const parsed = JSON.parse(feedbackRaw);
+            if (parsed && typeof parsed === 'object' && 'k' in parsed) {
+              feedbackKeys      = parsed.k || '';
+              feedbackOpmerking = parsed.o || '';
+            } else {
+              // Onbekende JSON-structuur — laat staan in opmerking als info
+              feedbackOpmerking = feedbackRaw;
+            }
+          } catch {
+            // Oud formaat: losse tekst zonder JSON
+            // We weten geen keys, dus alleen tekst tonen als opmerking
+            feedbackOpmerking = feedbackRaw;
+          }
+        }
+
         return {
           id:       item.id,
           naam:     item.name,
@@ -513,7 +534,8 @@ exports.handler = async (event) => {
           niet_naar_pool: get('boolean_mm1s4qcy') === 'true',
           doorgegeven:    get('boolean_mm2q35j3') === 'true',
           gearchiveerd,
-          feedback: get('text_mm1fy05p'), // Adres klant kolom hergebruiken voor feedback
+          feedback:  feedbackKeys,           // comma-separated keys, bv. "serieus,verkoop"
+          opmerking: feedbackOpmerking,      // ruwe opmerking-tekst
           in_pool:  false,
         };
       }).filter(b => {
@@ -795,7 +817,16 @@ exports.handler = async (event) => {
       };
     }
     if (action === "sla_feedback_op") {
-      const { item_id, feedback_tekst } = data;
+      const { item_id, feedback, feedback_tekst, opmerking } = data;
+      // Sla op als JSON zodat we bij teruglezen zowel keys als opmerking apart hebben.
+      // Voor leesbaarheid in Monday-UI: structureer als
+      //   {"k":"serieus,verkoop","o":"klant zoekt 4-kamer","t":"🔥 ... — ..."}
+      // Achterwaarts compatibel: oude data zonder JSON-structuur wordt als losse tekst gelezen.
+      const payload = JSON.stringify({
+        k: feedback || '',                    // keys, bv. "serieus,verkoop"
+        o: opmerking || '',                   // ruwe opmerking
+        t: feedback_tekst || '',              // leesbare tekst (voor Monday-UI gebruikers)
+      });
       const result = await mondayFetch(`
         mutation ($itemId: ID!, $value: JSON!) {
           change_column_value(
@@ -807,7 +838,7 @@ exports.handler = async (event) => {
         }
       `, {
         itemId: item_id,
-        value: JSON.stringify(feedback_tekst),
+        value: JSON.stringify(payload),
       });
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
     }
