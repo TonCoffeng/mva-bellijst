@@ -1053,7 +1053,11 @@
   function bewerkFeedback(bezId) {
     // Toon het grid en de opslaan/annuleer knoppen weer
     document.getElementById(`fg-${bezId}`).style.display = 'grid';
-    document.getElementById(`fbo-${bezId}`).style.display = 'block';
+    const opslaanBtn = document.getElementById(`fbo-${bezId}`);
+    opslaanBtn.style.display = 'block';
+    // Reset opslaan-knop naar verse staat (was mogelijk 'Opslaan...' van vorige keer)
+    opslaanBtn.disabled = false;
+    opslaanBtn.textContent = '💾 Feedback opslaan';
     const annBtn = document.getElementById(`bann-${bezId}`);
     if (annBtn) annBtn.style.display = 'block';
     const opmEl = document.getElementById(`opmerking-${bezId}`);
@@ -1179,7 +1183,7 @@
               ${actief.map(k => feedbackLabels[k] || k).join(' · ')}
             </div>
             ${opmerkingHtml}
-            <button onclick="bewerkFeedback('${bezId}')" style="margin-top:8px;background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--grijs-tekst);cursor:pointer">
+            <button data-actie="bewerk-feedback" data-bezid="${bezId}" style="margin-top:8px;background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--grijs-tekst);cursor:pointer">
               ✏️ Feedback aanpassen
             </button>
           `;
@@ -1340,7 +1344,7 @@
                   ${huidigeOpmerking ? `
                   <div style="margin-top:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;color:var(--navy);font-style:italic">💬 ${esc(huidigeOpmerking)}</div>
                   ` : ''}
-                  <button onclick="bewerkFeedback('${b.id}')" style="margin-top:8px;background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--grijs-tekst);cursor:pointer">
+                  <button data-actie="bewerk-feedback" data-bezid="${b.id}" style="margin-top:8px;background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--grijs-tekst);cursor:pointer">
                     ✏️ Feedback aanpassen
                   </button>
                 ` : `
@@ -1354,7 +1358,9 @@
                   <button
                     class="btn-feedback ${huidigeFeedback.includes(f.key) ? 'actief' : ''}"
                     id="fb-${b.id}-${f.key}"
-                    onclick="toggleFeedback('${b.id}', '${f.key}', this)">
+                    data-actie="toggle-feedback"
+                    data-bezid="${b.id}"
+                    data-key="${f.key}">
                     ${f.emoji} ${f.label}
                   </button>`).join('')}
               </div>
@@ -1367,14 +1373,20 @@
                 class="btn-feedback-opslaan ${heeftFeedback ? 'verborgen' : ''}"
                 id="fbo-${b.id}"
                 style="${heeftFeedback ? 'display:none' : ''}"
-                onclick="slaFeedbackOp('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}', '${b.email || ''}', '${b.telefoon || ''}')">
+                data-actie="sla-feedback-op"
+                data-bezid="${b.id}"
+                data-naam="${(b.naam || '').replace(/"/g,'&quot;')}"
+                data-adres="${(b.adres || '').replace(/"/g,'&quot;')}"
+                data-email="${(b.email || '').replace(/"/g,'&quot;')}"
+                data-telefoon="${(b.telefoon || '').replace(/"/g,'&quot;')}">
                 💾 Feedback opslaan
               </button>
               <button
                 class="btn-annuleer ${heeftFeedback ? 'verborgen' : ''}"
                 id="bann-${b.id}"
                 style="${heeftFeedback ? 'display:none' : ''}"
-                onclick="annuleerBewerken('${b.id}')">
+                data-actie="annuleer-bewerken"
+                data-bezid="${b.id}">
                 ✕ Annuleren
               </button>
             </div>
@@ -1843,7 +1855,7 @@
     }
   }
 
-  // Maak globaal beschikbaar voor inline onclick
+  // Maak globaal beschikbaar voor inline onclick (legacy, mag blijven)
   window.opentalentModal = opentalentModal;
   window.bewerkFeedback = bewerkFeedback;
   window.toggleFeedback = toggleFeedback;
@@ -1851,6 +1863,27 @@
   window.annuleerBewerken = annuleerBewerken;
   window.sluitTalentModal = sluitTalentModal;
   window.bevestigTalent = bevestigTalent;
+
+  // ── EVENT DELEGATION voor feedback-acties ────────────────────────────
+  // Vangt klikken op elementen met data-actie="..." attribuut. Werkt voor
+  // alle dynamisch ingevoegde HTML, geen scope-issues.
+  document.addEventListener('click', function(ev) {
+    const el = ev.target.closest('[data-actie]');
+    if (!el) return;
+    const actie = el.dataset.actie;
+    const bezId = el.dataset.bezid;
+    if (actie === 'bewerk-feedback') {
+      bewerkFeedback(bezId);
+    } else if (actie === 'toggle-feedback') {
+      toggleFeedback(bezId, el.dataset.key, el);
+    } else if (actie === 'sla-feedback-op') {
+      slaFeedbackOp(bezId, el.dataset.naam || '', el.dataset.adres || '', el.dataset.email || '', el.dataset.telefoon || '');
+    } else if (actie === 'annuleer-bewerken') {
+      annuleerBewerken(bezId);
+    } else if (actie === 'open-talent-modal') {
+      opentalentModal(bezId, el.dataset.naam || '', el.dataset.email || '', el.dataset.telefoon || '', el.dataset.adres || '');
+    }
+  });
 
   async function checkClozeBestaand() {
     for (const lead of leadsData) {
