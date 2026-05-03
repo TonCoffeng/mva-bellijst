@@ -5,6 +5,31 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-03 (avond)
+
+### Toegevoegd
+
+- **Login per gebruiker met Supabase Auth.** Dropdown "Wie ben jij?" volledig vervangen door echte authenticatie. Workflow:
+  1. App opent → check Supabase-sessie → bij sessie: direct rol-keuze, anders login-formulier
+  2. Login-formulier: e-mailadres + wachtwoord → Supabase Auth API
+  3. Bij succes: makelaar-info opgehaald uit `gebruikers` tabel (naam, level, actief-status)
+  4. Inactieve accounts (`actief = false`) worden geweigerd met melding
+  5. Sessie blijft 30 dagen bewaard (Supabase default)
+  6. Logout-knop in rol-keuze scherm
+  7. "← Terug" gaat nu terug naar rol-keuze (gebruiker blijft ingelogd) ipv volledig uitloggen
+- **Supabase JS library** toegevoegd via CDN (`@supabase/supabase-js@2`).
+- **Roemer Koppes verwijderd** uit `gebruikers` tabel (consultant, geen vaste rol meer).
+- **Jan Jaap ten Arve toegevoegd** aan `gebruikers` tabel als makelaar.
+- **11 Auth-accounts aangemaakt** in Supabase: Anthonie, Hans, Jan Jaap, Jori, Mathias, Maurits PR, Maurits vL, Monique, Rogier, Ton, Wilma. Standaard wachtwoord: `MVA2026!` — gebruikers wijzigen dit zelf.
+
+### Bekend
+
+- **Filipe en Gert-Jan** zaten niet in `gebruikers` tabel (alleen in oude makelaars.json) — verwijdering van makelaars.json volgt.
+- **Per-gebruiker Cloze API-key** nog niet geregeld — alle Cloze-acties blijven voorlopig op `toncoffeng@`.
+- **Email-verificatie** uitgeschakeld — geen welkomst-mail bij eerste login.
+
+---
+
 ## 2026-05-03 (later)
 
 ### Toegevoegd

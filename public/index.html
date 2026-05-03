@@ -734,6 +734,8 @@
       color: #334155;
     }
   </style>
+  <!-- Supabase JS client (voor authenticatie) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -755,24 +757,41 @@
 <!-- LOGIN SCHERM -->
 <div id="login-screen">
   <div class="login-card">
-    <h2>Goedemorgen 👋</h2>
-    <p>Selecteer jouw naam om verder te gaan.</p>
-    <div class="form-group">
-      <label>Wie ben jij?</label>
-      <select id="makelaar-select">
-        <option value="">— Laden... —</option>
-      </select>
-    </div>
-    <div class="rol-keuze">
-      <button class="btn-rol btn-rol-geven" onclick="login('geven')">
-        <span class="rol-icon">📤</span>
-        <span class="rol-titel">Lead doorgeven</span>
-        <span class="rol-sub">Bezichtiging naar pool</span>
+    <h2 id="login-titel">Welkom 👋</h2>
+    <p id="login-subtitel">Log in om verder te gaan.</p>
+
+    <!-- STAP 1: Email + wachtwoord -->
+    <div id="login-stap-auth">
+      <div class="form-group">
+        <label for="login-email">E-mailadres</label>
+        <input type="email" id="login-email" placeholder="naam@makelaarsvan.nl" autocomplete="username" inputmode="email" />
+      </div>
+      <div class="form-group">
+        <label for="login-wachtwoord">Wachtwoord</label>
+        <input type="password" id="login-wachtwoord" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <div id="login-fout" style="display:none;color:#c2410c;font-size:13px;margin-bottom:10px"></div>
+      <button class="btn-rol btn-rol-geven" style="width:100%" onclick="probeerInloggen()" id="login-btn">
+        <span class="rol-titel">🔐 Inloggen</span>
       </button>
-      <button class="btn-rol" onclick="login('ontvangen')">
-        <span class="rol-icon">📥</span>
-        <span class="rol-titel">Leads bellen</span>
-        <span class="rol-sub">Jouw bellijst bekijken</span>
+    </div>
+
+    <!-- STAP 2: Rol kiezen (verschijnt na login) -->
+    <div id="login-stap-rol" style="display:none">
+      <div class="rol-keuze">
+        <button class="btn-rol btn-rol-geven" onclick="login('geven')">
+          <span class="rol-icon">📤</span>
+          <span class="rol-titel">Lead doorgeven</span>
+          <span class="rol-sub">Bezichtiging naar pool</span>
+        </button>
+        <button class="btn-rol" onclick="login('ontvangen')">
+          <span class="rol-icon">📥</span>
+          <span class="rol-titel">Leads bellen</span>
+          <span class="rol-sub">Jouw bellijst bekijken</span>
+        </button>
+      </div>
+      <button onclick="uitloggen()" style="width:100%;margin-top:14px;padding:10px;background:none;border:1px solid var(--grijs-mid);border-radius:10px;color:var(--grijs-tekst);font-size:13px;cursor:pointer">
+        Uitloggen
       </button>
     </div>
   </div>
@@ -920,51 +939,118 @@
   let gekozenStatus = null;
   let leadsData = [];
 
-  // ── MAKELAARS DYNAMISCH LADEN UIT MONDAY ────────────────────────────
-  async function laadMakelaars() {
-    const select = document.getElementById('makelaar-select');
-    try {
-      const res = await fetch('/.netlify/functions/monday', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get_alle_makelaars' })
-      });
-      const json = await res.json();
-      const makelaars = json?.makelaars || [];
+  // ── SUPABASE AUTH ─────────────────────────────────────────────────
+  const SUPABASE_URL = 'https://ehqtyhoeubchcwfavdzr.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_OqTL874jsDEMKg9LomfrmQ_nwIo6Wet';
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-      if (makelaars.length === 0) {
-        select.innerHTML = `
-          <option value="">— Kies jouw naam —</option>
-          <option value="toncoffeng@makelaarsvan.nl" data-naam="Ton Coffeng" data-board="5093190545">Ton Coffeng</option>
-          <option value="mauritsrodermond@makelaarsvan.nl" data-naam="Maurits Rodermond" data-board="5093190545">Maurits Rodermond</option>
-          <option value="matthiasmakdsi@makelaarsvan.nl" data-naam="Matthias Makdsi" data-board="5093190545">Matthias Makdsi</option>
-        `;
-        return;
+  // Bij opstart: check of er al een sessie is
+  (async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      // Sessie bestaat — haal user-info op uit gebruikers tabel
+      const ok = await ladenIngelogdeMakelaar(session.user.email);
+      if (ok) {
+        // Toon stap-2 (rol-keuze)
+        document.getElementById('login-stap-auth').style.display = 'none';
+        document.getElementById('login-stap-rol').style.display = 'block';
+        document.getElementById('login-titel').textContent = `Welkom terug, ${huidigeMakelaar.naam.split(' ')[0]}`;
+        document.getElementById('login-subtitel').textContent = 'Wat wil je vandaag doen?';
       }
-
-      select.innerHTML = '<option value="">— Kies jouw naam —</option>' +
-        makelaars.map(m =>
-          `<option value="${m.email}" data-naam="${m.naam}" data-board="5093190545">${m.naam}</option>`
-        ).join('');
-    } catch (err) {
-      select.innerHTML = `<option value="">— Kies jouw naam —</option>`;
     }
+  })();
+
+  // Haal makelaar-info op uit gebruikers tabel op basis van email
+  async function ladenIngelogdeMakelaar(email) {
+    const { data, error } = await supabase
+      .from('gebruikers')
+      .select('naam, email, level, actief')
+      .eq('email', email)
+      .single();
+    if (error || !data) {
+      console.warn('Gebruiker niet gevonden in gebruikers tabel:', email, error);
+      return false;
+    }
+    if (!data.actief) {
+      toonLoginFout('Account is gedeactiveerd. Neem contact op met Ton.');
+      await supabase.auth.signOut();
+      return false;
+    }
+    huidigeMakelaar = {
+      email: data.email,
+      naam: data.naam,
+      level: data.level,
+      boardId: '5093190545',
+    };
+    return true;
   }
 
-  // Laad makelaars direct bij opstarten
-  laadMakelaars();
+  // Probeer in te loggen met email + wachtwoord
+  async function probeerInloggen() {
+    const emailEl = document.getElementById('login-email');
+    const pwEl    = document.getElementById('login-wachtwoord');
+    const btn     = document.getElementById('login-btn');
+    const email = emailEl.value.trim().toLowerCase();
+    const pw    = pwEl.value;
+    if (!email || !pw) { toonLoginFout('Vul email en wachtwoord in.'); return; }
 
-  // ── LOGIN ───────────────────────────────────────────────────────────
+    btn.disabled = true;
+    btn.querySelector('.rol-titel').textContent = '⏳ Bezig...';
+    verbergLoginFout();
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });
+    if (error) {
+      toonLoginFout(error.message === 'Invalid login credentials'
+        ? 'Email of wachtwoord klopt niet.'
+        : 'Inloggen mislukt: ' + error.message);
+      btn.disabled = false;
+      btn.querySelector('.rol-titel').textContent = '🔐 Inloggen';
+      return;
+    }
+
+    const ok = await ladenIngelogdeMakelaar(data.user.email);
+    if (!ok) {
+      btn.disabled = false;
+      btn.querySelector('.rol-titel').textContent = '🔐 Inloggen';
+      return;
+    }
+
+    // Success — ga naar stap 2 (rol kiezen)
+    pwEl.value = '';
+    document.getElementById('login-stap-auth').style.display = 'none';
+    document.getElementById('login-stap-rol').style.display = 'block';
+    document.getElementById('login-titel').textContent = `Welkom, ${huidigeMakelaar.naam.split(' ')[0]}`;
+    document.getElementById('login-subtitel').textContent = 'Wat wil je vandaag doen?';
+    btn.disabled = false;
+    btn.querySelector('.rol-titel').textContent = '🔐 Inloggen';
+  }
+
+  function toonLoginFout(tekst) {
+    const el = document.getElementById('login-fout');
+    el.textContent = tekst;
+    el.style.display = 'block';
+  }
+  function verbergLoginFout() {
+    document.getElementById('login-fout').style.display = 'none';
+  }
+
+  async function uitloggen() {
+    await supabase.auth.signOut();
+    location.reload();
+  }
+  window.uitloggen = uitloggen;
+  window.probeerInloggen = probeerInloggen;
+
+  // Enter-toets in login-velden = inloggen
+  document.addEventListener('DOMContentLoaded', () => {
+    const handleEnter = (ev) => { if (ev.key === 'Enter') probeerInloggen(); };
+    document.getElementById('login-email')?.addEventListener('keydown', handleEnter);
+    document.getElementById('login-wachtwoord')?.addEventListener('keydown', handleEnter);
+  });
+
+  // ── LOGIN (rol-keuze, na succesvolle auth) ──────────────────────────
   function login(rol) {
-    const select = document.getElementById('makelaar-select');
-    const opt = select.options[select.selectedIndex];
-    if (!opt.value) { toonToast('Kies eerst jouw naam', 'fout'); return; }
-
-    huidigeMakelaar = {
-      email: opt.value,
-      naam: opt.dataset.naam || opt.text,
-      boardId: opt.dataset.board || '5093190545',
-    };
+    if (!huidigeMakelaar) { toonToast('Log eerst in', 'fout'); return; }
 
     document.getElementById('header-naam').textContent = huidigeMakelaar.naam;
     document.getElementById('login-screen').classList.add('hidden');
@@ -1061,9 +1147,8 @@
     ];
   }
 
-  // ── TERUG NAAR LOGIN ─────────────────────────────────────────────────
+  // ── TERUG NAAR ROL-KEUZE (gebruiker blijft ingelogd) ─────────────────
   function gaNaarLogin() {
-    huidigeMakelaar = null;
     leadsData = [];
     document.getElementById('geven-screen').classList.add('hidden');
     document.getElementById('overzicht-screen').classList.add('hidden');
@@ -1071,7 +1156,13 @@
     document.getElementById('btn-terug').classList.add('hidden');
     document.getElementById('header-naam').textContent = 'Welkom';
     document.getElementById('header-badge').textContent = '0 leads';
-    document.getElementById('makelaar-select').value = '';
+    // Toon rol-keuze (niet auth-stap), gebruiker is nog ingelogd
+    document.getElementById('login-stap-auth').style.display = 'none';
+    document.getElementById('login-stap-rol').style.display = 'block';
+    if (huidigeMakelaar) {
+      document.getElementById('login-titel').textContent = `Welkom, ${huidigeMakelaar.naam.split(' ')[0]}`;
+      document.getElementById('login-subtitel').textContent = 'Wat wil je vandaag doen?';
+    }
   }
 
   // ── FILTER BEZICHTIGINGEN (Bug 4) ─────────────────────────────────────
