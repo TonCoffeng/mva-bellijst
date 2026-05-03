@@ -1137,7 +1137,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'sla_feedback_op',
-          data: { item_id: bezId, feedback: actief.join(','), feedback_tekst: feedbackTekst }
+          data: { item_id: bezId, feedback: actief.join(','), feedback_tekst: feedbackTekst, opmerking }
         })
       });
 
@@ -1184,9 +1184,12 @@
             </button>
           `;
         }
-        // Verberg het invul-gedeelte
+        // Verberg het invul-gedeelte; behoud de opmerking in de textarea voor latere edits
         grid.style.display = 'none';
-        if (opmerkingEl) opmerkingEl.style.display = 'none';
+        if (opmerkingEl) {
+          opmerkingEl.value = opmerking; // bewaar getypte tekst zodat bewerken werkt
+          opmerkingEl.style.display = 'none';
+        }
         opslaanBtn.style.display = 'none';
         if (annBtn) annBtn.style.display = 'none';
         card.classList.remove('bez-open');
@@ -1289,9 +1292,13 @@
         ];
         const huidigeFeedback = b.feedback ? b.feedback.split(',').filter(Boolean) : [];
         const heeftFeedback = huidigeFeedback.length > 0;
+        const huidigeOpmerking = b.opmerking || '';
 
         // Feedback labels voor weergave
         const feedbackMap = Object.fromEntries(feedbackOpties.map(f => [f.key, f.emoji + ' ' + f.label]));
+
+        // HTML-escape helper voor user-content (XSS-safe)
+        const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\n/g,'<br>');
 
         return `
           <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''} ${heeftFeedback ? 'bez-gedaan' : 'bez-open'}" id="bez-${b.id}" data-adres="${(b.adres||'').toLowerCase().replace(/"/g,'&quot;')}" data-naam="${b.naam.toLowerCase().replace(/"/g,'&quot;')}" data-datum="${(b.datum||'').toLowerCase()}" data-inpool="${alGedeeld?'1':'0'}">
@@ -1330,6 +1337,9 @@
                   <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;font-size:13px;color:#15803d;font-weight:500">
                     ${huidigeFeedback.map(k => feedbackMap[k] || k).join(' · ')}
                   </div>
+                  ${huidigeOpmerking ? `
+                  <div style="margin-top:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;color:var(--navy);font-style:italic">💬 ${esc(huidigeOpmerking)}</div>
+                  ` : ''}
                   <button onclick="bewerkFeedback('${b.id}')" style="margin-top:8px;background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--grijs-tekst);cursor:pointer">
                     ✏️ Feedback aanpassen
                   </button>
@@ -1352,7 +1362,7 @@
                 id="opmerking-${b.id}"
                 placeholder="Opmerking (optioneel)..."
                 style="${heeftFeedback ? 'display:none' : ''};width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--grijs-mid);border-radius:10px;font-size:13px;font-family:inherit;color:var(--navy);resize:none;height:60px;margin-bottom:8px;background:var(--wit)"
-                rows="2"></textarea>
+                rows="2">${huidigeOpmerking.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
               <button
                 class="btn-feedback-opslaan ${heeftFeedback ? 'verborgen' : ''}"
                 id="fbo-${b.id}"
@@ -1596,7 +1606,7 @@
         await fetch('/.netlify/functions/monday', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'sla_feedback_op', data: { item_id: t.id, feedback: t.feedback.join(','), feedback_tekst: feedbackTekst } })
+          body: JSON.stringify({ action: 'sla_feedback_op', data: { item_id: t.id, feedback: t.feedback.join(','), feedback_tekst: feedbackTekst, opmerking: t.opmerking || '' } })
         });
         const poolRes = await fetch('/.netlify/functions/monday', {
           method: 'POST',
@@ -1835,6 +1845,10 @@
 
   // Maak globaal beschikbaar voor inline onclick
   window.opentalentModal = opentalentModal;
+  window.bewerkFeedback = bewerkFeedback;
+  window.toggleFeedback = toggleFeedback;
+  window.slaFeedbackOp = slaFeedbackOp;
+  window.annuleerBewerken = annuleerBewerken;
   window.sluitTalentModal = sluitTalentModal;
   window.bevestigTalent = bevestigTalent;
 

@@ -14,14 +14,16 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 - **Bug 3 — Toast was niet zichtbaar.** Toast verplaatst van `bottom: 24px` naar `top: 80px`, z-index 9999, `white-space: nowrap` weg, prominenter formaat en kleur. Komt nu onder de header in beeld.
 - **Bug 4 — "Open feedback" stat-kaart was niet klikbaar.** Alle drie de stat-kaarten (Bezichtigingen / Open feedback / Naar pool) zijn nu klikbare filters. Klik op "Open feedback" toont alleen kaarten zonder feedback en niet in pool. Klik op "Naar pool" toont alleen al doorgegeven kaarten. Klik op "Bezichtigingen" toont alles. Actieve filter krijgt visuele border-markering. Na opslaan re-applyt de actieve filter automatisch.
 - **Bug 7 — "Nog geen feedback gegeven" balk verdween niet na opslaan.** De oranje waarschuwingsbalk wordt na succesvol opslaan direct vervangen door de groene "FEEDBACK GEGEVEN"-balk met de gekozen labels en een "✏️ Feedback aanpassen" knop.
+- **Bug 8 — "Feedback aanpassen" knop deed niets.** De inline `onclick="bewerkFeedback(...)"` in de dynamisch geïnjecteerde innerHTML kon de functie niet bereiken door scope-isolatie. Functies `bewerkFeedback`, `toggleFeedback`, `slaFeedbackOp` en `annuleerBewerken` nu expliciet op `window` gezet.
+- **Bug 9 — Opmerking weg na opslaan.** Bij heropenen via "Feedback aanpassen" was het opmerkingenveld leeg ondanks dat de opmerking wel in de groene balk getoond werd. De opmerking wordt nu actief in de textarea bewaard zodat hij bij heropenen direct zichtbaar én bewerkbaar is.
+- **Bug 10 — Opmerking weg na page-reload.** Monday slaat feedback nu op als JSON `{k,o,t}` waarbij `k` = keys (zoals `serieus,verkoop`), `o` = ruwe opmerking, `t` = leesbare tekst voor Monday-UI. Bij ophalen wordt JSON gesplitst in `b.feedback` (keys) en `b.opmerking` (tekst). Achterwaarts compatibel: oude data zonder JSON-structuur wordt als losse tekst in opmerking gelezen. Drie bestanden gewijzigd: `netlify/functions/monday.js` (schrijven + lezen), `public/index.html` (opmerking meesturen + tonen).
 - **Annuleer-knop** in feedback-bewerken modus. Naast "Feedback opslaan" staat nu "✕ Annuleren" — klik herstelt de oorspronkelijke staat (welke knoppen actief waren, welke opmerking) en sluit de bewerk-modus weer.
-- **Opmerking zichtbaar in beginscherm.** Opmerking die bij feedback-opslaan is ingetypt wordt nu ook getoond onder de groene "FEEDBACK GEGEVEN" balk (als grijs cursief blokje met 💬 prefix). Bij volgende page-load alleen zichtbaar als monday `opmerking` teruggeeft — apart traject.
+- **Opmerking zichtbaar in beginscherm.** Opmerking die bij feedback-opslaan is ingetypt wordt nu ook getoond onder de groene "FEEDBACK GEGEVEN" balk (als grijs cursief blokje met 💬 prefix).
 
 ### Bekend / nog open
 
 - **Bug 5 — Terug-navigatie:** scope onduidelijk, opnieuw bekijken.
 - **Bug 6 — Stage-override Cloze:** verkoopklant ten onrechte. Wordt opgedeeld in deelstappen, niet in deze release.
-- **Opmerking in monday-data:** monday-fetch geeft geen `opmerking` veld terug, dus bij page reload is opmerking weg. Apart op te lossen.
 
 ---
 
