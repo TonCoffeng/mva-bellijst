@@ -9,6 +9,14 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ### Toegevoegd
 
+- **Filipe Bataglia & Gert-Jan ('t Gooi-makelaars) volledig uitgefilterd uit de app.** In `netlify/functions/monday.js` één centrale helper `isMVAMakelaar(naam)` toegevoegd die wordt gebruikt in 4 plekken:
+  1. `get_bezichtigingen` — geen 't Gooi-bezichtigingen meer in de feedback-lijst
+  2. `get_alle_makelaars` — niet zichtbaar in eventuele dropdowns/lijsten
+  3. `get_makelaars` — niet meer in de actieve pool-deelnemers
+  4. `assign_makelaar` — krijgen geen leads meer toegewezen via round-robin
+  
+  Plus: hardcoded board-mapping voor `Bellijst_Filipe` en `Bellijst_GertJan` verwijderd uit de top van het bestand.
+
 - **Login per gebruiker met Supabase Auth.** Dropdown "Wie ben jij?" volledig vervangen door echte authenticatie. Workflow:
   1. App opent → check Supabase-sessie → bij sessie: direct rol-keuze, anders login-formulier
   2. Login-formulier: e-mailadres + wachtwoord → Supabase Auth API
