@@ -7,6 +7,10 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ## 2026-05-03 (later)
 
+### Toegevoegd
+
+- **Bug 6 — Stap A: "Bekend bij" signaal** (eerste stap van het stage-override traject). Bij elke bezichtiging waar het Cloze-contact al op naam van een **andere makelaar** staat (niet de huidige), verschijnt naast de bekende "📁 Bekend in Cloze" badge een amberkleurig waarschuwings-knopje **"🔔 Klant van [naam]"**. Klik = opent het Cloze-contact direct in een nieuw tabblad. Geen automatische toewijzing, geen overschrijving — pure informatie zodat de gevende makelaar zelf kan beslissen of hij de andere makelaar wil informeren of het zelf afhandelt. Werkt zowel in de gevende-makelaar view (bezichtigingen) als in de bellijst-view. Twee bestanden gewijzigd: `cloze.js` (geeft nu ook `id` van Cloze-contact terug bij `check_bestaand`), `index.html` (nieuwe CSS + check op `eigenaar_email !== huidigeMakelaar.email`).
+
 ### Gerepareerd
 
 - **Bug 8b — "Feedback aanpassen" knop deed nog steeds niets in praktijk.** De `window.bewerkFeedback = ...` aanpak van eerder vandaag was theoretisch correct maar werkte niet betrouwbaar in alle browsers/scenarios. Vervangen door **event-delegation patroon**: alle inline `onclick="..."` handlers vervangen door `data-actie="..."` attributen + één centrale `document.addEventListener('click', ...)` listener bovenaan. Dit werkt altijd, ongeacht scope-issues. Vijf inline handlers gewijzigd: `bewerk-feedback`, `toggle-feedback`, `sla-feedback-op`, `annuleer-bewerken`, `open-talent-modal`.

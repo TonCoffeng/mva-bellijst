@@ -688,6 +688,24 @@
       background: #dcfce7;
       color: #15803d;
     }
+    /* Waarschuwing: contact staat al op naam van een andere makelaar */
+    .cloze-eigenaar-warn {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
+      text-decoration: none;
+      transition: all .15s;
+    }
+    a.cloze-eigenaar-warn:hover {
+      background: #fde68a;
+      color: #78350f;
+    }
   </style>
 </head>
 <body>
@@ -1447,11 +1465,25 @@
         }).then(r => r.json()).then(json => {
           const badge = document.getElementById(`cloze-badge-${b.id}`);
           if (!badge) return;
-          if (json.bestaand) {
-            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
-          } else {
+          if (!json.bestaand) {
             badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`;
+            return;
           }
+
+          // Contact bestaat al — bouw badge op
+          const eigenaarEmail = (json.eigenaar_email || '').toLowerCase();
+          const huidigeEmail = (huidigeMakelaar?.email || '').toLowerCase();
+          const heeftAndereEigenaar = eigenaarEmail && eigenaarEmail !== huidigeEmail;
+          const clozeUrl = json.id ? `https://app.cloze.com/app/#/people/${json.id}` : null;
+
+          let html = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
+          if (heeftAndereEigenaar) {
+            const eigenaarNaam = json.eigenaar_naam || eigenaarEmail.split('@')[0];
+            html += clozeUrl
+              ? ` <a href="${clozeUrl}" target="_blank" rel="noopener" class="cloze-eigenaar-warn" title="Open in Cloze in nieuw tabblad">🔔 Klant van ${eigenaarNaam}</a>`
+              : ` <span class="cloze-eigenaar-warn">🔔 Klant van ${eigenaarNaam}</span>`;
+          }
+          badge.innerHTML = html;
         }).catch(() => {
           const badge = document.getElementById(`cloze-badge-${b.id}`);
           if (badge) badge.innerHTML = '';
@@ -1944,14 +1976,29 @@
         const json = await res.json();
         lead.cloze_bestaand = json.bestaand;
         lead.cloze_stage = json.stage;
+        lead.cloze_id = json.id;
+        lead.cloze_eigenaar_email = json.eigenaar_email;
+        lead.cloze_eigenaar_naam = json.eigenaar_naam;
 
         // Update badge in DOM zonder volledige re-render
         const badge = document.getElementById(`cloze-badge-${lead.id}`);
         if (badge) {
-          if (json.bestaand) {
-            badge.innerHTML = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
-          } else {
+          if (!json.bestaand) {
             badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`;
+          } else {
+            const eigenaarEmail = (json.eigenaar_email || '').toLowerCase();
+            const huidigeEmail = (huidigeMakelaar?.email || '').toLowerCase();
+            const heeftAndereEigenaar = eigenaarEmail && eigenaarEmail !== huidigeEmail;
+            const clozeUrl = json.id ? `https://app.cloze.com/app/#/people/${json.id}` : null;
+
+            let html = `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
+            if (heeftAndereEigenaar) {
+              const eigenaarNaam = json.eigenaar_naam || eigenaarEmail.split('@')[0];
+              html += clozeUrl
+                ? ` <a href="${clozeUrl}" target="_blank" rel="noopener" class="cloze-eigenaar-warn" title="Open in Cloze in nieuw tabblad">🔔 Klant van ${eigenaarNaam}</a>`
+                : ` <span class="cloze-eigenaar-warn">🔔 Klant van ${eigenaarNaam}</span>`;
+            }
+            badge.innerHTML = html;
           }
         }
       } catch (e) { /* stille fout — badge blijft leeg */ }
