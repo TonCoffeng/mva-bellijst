@@ -346,9 +346,26 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify(result) };
     }
 
+    // ── MARKEER ALS AFGEHANDELD: zet niet_naar_pool=true op bezichtigingen-board ─────
+    // Persistente status zodat de kaart na refresh uit de actieve gevende
+    // lijst verdwijnt en in 'Zelf bellen'/'Afgehandeld' filter terugkomt.
+    if (action === "markeer_afgehandeld") {
+      const { item_id } = data;
+      const result = await mondayFetch(`
+        mutation ($itemId: ID!) {
+          change_column_value(
+            item_id: $itemId
+            board_id: 5093190482
+            column_id: "boolean_mm1s4qcy"
+            value: "{\"checked\":\"true\"}"
+          ) { id }
+        }
+      `, { itemId: item_id });
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, result }) };
+    }
+
     // ── ARCHIVEREN: zet 'Archiefstatus' boolean op true voor bezichtiging ─────
-    if (action === "archiveer_bezichtiging") {
-      const { item_id, archiveer } = data;
+    if (action === "archiveer_bezichtiging") {      const { item_id, archiveer } = data;
       // archiveer: true (default) = naar archief, false = herstel uit archief
       const naarArchief = archiveer !== false;
       const BOARD_ID = "5093190482"; // Bezichtigingen-board
@@ -917,14 +934,16 @@ exports.handler = async (event) => {
         columnValues: JSON.stringify(opgeschoond),
       });
 
-      // 5. Markeer de bezichtiging als doorgegeven (zelfde als push_naar_pool)
-      // → verdwijnt uit de gevende lijst.
+      // 5. Markeer de bezichtiging als 'niet_naar_pool' (= zelf bellen).
+      // Dit onderscheidt 'zelf bellen' van 'naar pool' — beide verbergen de
+      // bezichtiging van de gevende makelaar, maar de status verschilt zodat
+      // de app weet welke filter ('Naar pool' / 'Zelf bellen') ze moet tonen.
       await mondayFetch(`
         mutation ($itemId: ID!) {
           change_column_value(
             item_id: $itemId
             board_id: 5093190482
-            column_id: "boolean_mm2q35j3"
+            column_id: "boolean_mm1s4qcy"
             value: "{\"checked\":\"true\"}"
           ) { id }
         }
