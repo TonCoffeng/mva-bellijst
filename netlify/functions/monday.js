@@ -564,8 +564,8 @@ exports.handler = async (event) => {
           tijdstip,
           telefoon: get('phone_mm1fjavy'),
           email:    get('email_mm1fm8b7'),
-          niet_naar_pool: get('boolean_mm1s4qcy') === 'true',
-          doorgegeven:    get('boolean_mm2q35j3') === 'true',
+          niet_naar_pool: (get('boolean_mm1s4qcy') === 'true' || get('boolean_mm1s4qcy') === 'v'),
+          doorgegeven:    (get('boolean_mm2q35j3') === 'true' || get('boolean_mm2q35j3') === 'v'),
           gearchiveerd,
           feedback:  feedbackKeys,           // comma-separated keys, bv. "serieus,verkoop"
           opmerking: feedbackOpmerking,      // ruwe opmerking-tekst
