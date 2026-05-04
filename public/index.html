@@ -2161,16 +2161,16 @@
     btn.textContent = 'Bezig...';
 
     try {
-      // Push naar pool maar met board_afkomstig = eigen bellijst
+      // 'Zelf bellen' = lead direct in eigen bellijst, NIET naar pool round-robin
       const res = await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'push_naar_pool',
+          action: 'push_naar_eigen_bellijst',
           data: {
             item_id: itemId,
             makelaar_naam: huidigeMakelaar.naam,
-            board_afkomstig: `Bellijst_${huidigeMakelaar.naam.split(' ')[0]}`,
+            makelaar_email: huidigeMakelaar.email,
           }
         })
       });
@@ -2300,7 +2300,9 @@
         })
       });
 
-      // 2. Monday: status op "afgehandeld" (niet naar pool)
+      // 2. Monday: status op "afgehandeld" op de bellijst (color label) +
+      //    niet_naar_pool=true op het bezichtigingen-board zodat de kaart na
+      //    refresh uit de actieve gevende lijst verdwijnt.
       await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2311,6 +2313,15 @@
             board_id: huidigeMakelaar?.boardId,
             status: 'afgehandeld'
           }
+        })
+      });
+      // Persistente status — markeer als 'niet naar pool' op bezichtigingen-board
+      await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'markeer_afgehandeld',
+          data: { item_id: itemId }
         })
       });
 

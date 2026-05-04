@@ -5,6 +5,18 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-04 (vroeg)
+
+### Gerepareerd
+
+- **Bug 18 — "Zelf bellen" gebruikte verkeerde Monday-action.** `geefAanZichzelf` riep `push_naar_pool` aan in plaats van `push_naar_eigen_bellijst`. Effect: de lead werd wel als "doorgegeven" naar pool gestuurd in plaats van direct in eigen bellijst, en de Monday-status werd verkeerd geregistreerd. Nu correct: lead gaat direct in eigen bellijst-board, `niet_naar_pool=true` wordt gezet op het bezichtigingen-board.
+
+- **Bug 19 — `push_naar_eigen_bellijst` zette de verkeerde checkbox.** De action zette `doorgegeven=true` ipv `niet_naar_pool=true`. Effect: de app kon niet onderscheiden tussen 'naar pool' en 'zelf bellen' bij refresh. Beide toonden als "pool". Nu correct: 'pool' = `doorgegeven=true`, 'zelf' = `niet_naar_pool=true`.
+
+- **Bug 20 — "Afgehandeld" liet geen permanente status achter in Monday.** `verwerkAfhandeling` schreef alleen een color-label op de bellijst-board, niet op het bezichtigingen-board. Effect: kaart kwam terug als "open" na refresh. Nieuwe backend action `markeer_afgehandeld` toegevoegd die `niet_naar_pool=true` zet (zelfde als zelf bellen). Beperking: bij refresh kan afgehandeld nog niet onderscheiden worden van zelf bellen. Echte fix vereist aparte Monday-checkbox (later).
+
+---
+
 ## 2026-05-03 (avond)
 
 ### Gerepareerd
