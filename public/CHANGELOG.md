@@ -9,6 +9,8 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ### Gerepareerd
 
+- **Bug 21 — GraphQL syntax-error in checkbox-mutations zorgde voor stille faal.** Drie Monday-mutations gebruikten een inline JSON-string (`value: "{\"checked\":\"true\"}"`) ipv GraphQL variabelen. Monday's GraphQL parser klaagde met `"input:7:31: Expected :, found String"` — maar de Netlify-functie gaf gewoon `ok: true` terug zonder de error door te geven. Resultaat: de app dacht dat doorgeven/zelf-bellen/afgehandeld gelukt was, maar Monday had niets opgeslagen. **Drie locaties gefixt** door GraphQL-variabelen te gebruiken (zoals het werkende `archiveer_bezichtiging` patroon): `push_naar_pool` (doorgegeven=true), `push_naar_eigen_bellijst` (niet_naar_pool=true), `markeer_afgehandeld` (niet_naar_pool=true).
+
 - **Bug 18 — "Zelf bellen" gebruikte verkeerde Monday-action.** `geefAanZichzelf` riep `push_naar_pool` aan in plaats van `push_naar_eigen_bellijst`. Effect: de lead werd wel als "doorgegeven" naar pool gestuurd in plaats van direct in eigen bellijst, en de Monday-status werd verkeerd geregistreerd. Nu correct: lead gaat direct in eigen bellijst-board, `niet_naar_pool=true` wordt gezet op het bezichtigingen-board.
 
 - **Bug 19 — `push_naar_eigen_bellijst` zette de verkeerde checkbox.** De action zette `doorgegeven=true` ipv `niet_naar_pool=true`. Effect: de app kon niet onderscheiden tussen 'naar pool' en 'zelf bellen' bij refresh. Beide toonden als "pool". Nu correct: 'pool' = `doorgegeven=true`, 'zelf' = `niet_naar_pool=true`.
