@@ -867,7 +867,7 @@
   <div style="padding:0 16px 10px">
     <div style="position:relative">
       <input id="filter-adres" type="search" autocomplete="off" placeholder="Zoek op pandadres, naam of datum..."
-        oninput="filterBezichtigingen()"
+        oninput="zoekFilter()"
         style="width:100%;padding:10px 36px 10px 14px;border:1px solid var(--grijs-mid);border-radius:10px;font-size:13px;font-family:inherit;color:var(--navy);background:var(--wit);box-sizing:border-box" />
       <button id="filter-wissen" onclick="wisFilter()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;cursor:pointer;color:var(--grijs-tekst);padding:4px 8px">&#10005;</button>
     </div>
@@ -1893,34 +1893,37 @@
     if (filterInput && filterInput.value) filterBezichtigingen();
   }
 
-  function filterBezichtigingen() {
+  // Zoek-input filter — wordt aangeroepen vanuit de zoekbalk (oninput)
+  // De stat-card filter heet ook filterBezichtigingen (modus-versie hierboven).
+  // Deze functie roept de stat-card versie aan zodat zoekterm + modus combineren.
+  function zoekFilter() {
     const input = document.getElementById('filter-adres');
     const term = (input.value || '').trim().toLowerCase();
     const wisBtn = document.getElementById('filter-wissen');
     const teller = document.getElementById('filter-teller');
-    wisBtn.style.display = term ? 'block' : 'none';
+    if (wisBtn) wisBtn.style.display = term ? 'block' : 'none';
+    // Roep de stat-card filter zonder modus aan — die leest de actieve filter en
+    // combineert met de zoekterm uit het input-veld.
+    filterBezichtigingen();
+    // Update teller op basis van zichtbare kaarten na filtering
     const cards = document.querySelectorAll('#geven-container .bez-card');
-    let zichtbaar = 0;
-    cards.forEach(card => {
-      if (!term) { card.style.display = ''; zichtbaar++; return; }
-      const adres = card.dataset.adres || '';
-      const naam  = card.dataset.naam || '';
-      const datum = card.dataset.datum || '';
-      const match = adres.includes(term) || naam.includes(term) || datum.includes(term);
-      card.style.display = match ? '' : 'none';
-      if (match) zichtbaar++;
-    });
-    if (term) {
-      teller.style.display = 'block';
-      teller.textContent = zichtbaar + ' van ' + cards.length + ' bezichtigingen zichtbaar';
-    } else { teller.style.display = 'none'; }
+    const zichtbaar = Array.from(cards).filter(c => c.style.display !== 'none').length;
+    if (teller) {
+      if (term) {
+        teller.style.display = 'block';
+        teller.textContent = zichtbaar + ' van ' + cards.length + ' bezichtigingen zichtbaar';
+      } else {
+        teller.style.display = 'none';
+      }
+    }
     updateBulkTeller();
   }
+  window.zoekFilter = zoekFilter;
 
   function wisFilter() {
     const input = document.getElementById('filter-adres');
     input.value = '';
-    filterBezichtigingen();
+    zoekFilter();
     input.focus();
   }
 
