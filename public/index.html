@@ -1658,11 +1658,15 @@
            items.sort((a, b) => (b.datum || '').localeCompare(a.datum || ''));
 
       const totaal = items.length;
-      const gedeeld = items.filter(b => b.in_pool).length;
-      const openFeedback = items.filter(b => !b.feedback).length;
+      const gedeeld = items.filter(b => b.actie_status === 'pool').length;
+      const zelf = items.filter(b => b.actie_status === 'zelf').length;
+      const openFeedback = items.filter(b => !b.actie_status).length;
       document.getElementById('stat-geven-totaal').textContent = totaal;
       document.getElementById('stat-geven-nieuw').textContent = openFeedback;
       document.getElementById('stat-geven-gedeeld').textContent = gedeeld;
+      document.getElementById('stat-geven-zelf').textContent = zelf;
+      // Afgehandeld kunnen we (nog) niet onderscheiden van Zelf bellen op Monday-niveau,
+      // dus die teller blijft op de session-state staan en wordt door markeerKaartAfgesloten bijgewerkt.
       document.getElementById('header-badge').textContent = totaal + ' bezichtigingen';
 
       // Haal archief-teller op de achtergrond op (blokkeert hoofdlaad niet)
@@ -1678,7 +1682,10 @@
       }
 
       container.innerHTML = items.map(b => {
-        const alGedeeld = b.in_pool;
+        // Persistente actie-status uit backend (overleeft refresh)
+        // 'pool' = naar pool gestuurd, 'zelf' = niet-naar-pool (zelf bellen of afgehandeld), '' = open
+        const actieStatus = b.actie_status || '';
+        const alGedeeld = !!actieStatus;  // elke status anders dan '' = afgesloten
         const feedbackOpties = [
           { key: 'serieus',    emoji: '🔥', label: 'Serieuze koper' },
           { key: 'verkoop',    emoji: '💰', label: 'Verkoopprospect' },
@@ -1698,7 +1705,7 @@
         const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\n/g,'<br>');
 
         return `
-          <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''} ${heeftFeedback ? 'bez-gedaan' : 'bez-open'}" id="bez-${b.id}" data-adres="${(b.adres||'').toLowerCase().replace(/"/g,'&quot;')}" data-naam="${b.naam.toLowerCase().replace(/"/g,'&quot;')}" data-datum="${(b.datum||'').toLowerCase()}" data-inpool="${alGedeeld?'1':'0'}" data-actie="">
+          <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''} ${heeftFeedback ? 'bez-gedaan' : 'bez-open'}" id="bez-${b.id}" data-adres="${(b.adres||'').toLowerCase().replace(/"/g,'&quot;')}" data-naam="${b.naam.toLowerCase().replace(/"/g,'&quot;')}" data-datum="${(b.datum||'').toLowerCase()}" data-inpool="${alGedeeld?'1':'0'}" data-actie="${actieStatus}">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
               <label class="bulk-checkbox-wrap" style="display:none;padding-top:2px;cursor:pointer">
                 <input type="checkbox" class="bulk-checkbox" data-bez-id="${b.id}"
@@ -1786,26 +1793,28 @@
 
             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
               <button
-                class="btn-naar-pool ${alGedeeld ? 'gedeeld' : ''}"
+                class="btn-naar-pool ${actieStatus==='pool' ? 'gedeeld' : ''}"
                 id="btn-${b.id}"
                 onclick="geefNaarPool('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
-                ${alGedeeld ? 'disabled' : ''}
-                style="flex:1">
-                ${alGedeeld ? '✅ Al in de pool' : '📤 Geef door aan pool'}
+                ${actieStatus==='pool' ? 'disabled' : ''}
+                ${alGedeeld && actieStatus !== 'pool' ? 'style="flex:1;opacity:0.45;cursor:not-allowed" disabled' : 'style="flex:1"'}>
+                ${actieStatus==='pool' ? '✅ Al in de pool' : '📤 Geef door aan pool'}
               </button>
-              ${!alGedeeld ? `
               <button
-                class="btn-zichzelf"
+                class="btn-zichzelf ${actieStatus==='zelf' ? 'gedeeld' : ''}"
                 id="btn-zelf-${b.id}"
                 onclick="geefAanZichzelf('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
-                style="flex:0 0 auto;padding:12px 14px;background:var(--navy);color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
-                👤 Zelf bellen
-              </button>` : ''}
+                ${actieStatus==='zelf' ? 'disabled' : ''}
+                style="flex:0 0 auto;padding:12px 14px;background:${actieStatus==='zelf' ? '#2e7d32' : 'var(--navy)'};color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:${alGedeeld && actieStatus !== 'zelf' ? 'not-allowed' : 'pointer'};white-space:nowrap;opacity:${alGedeeld && actieStatus !== 'zelf' ? '0.45' : '1'}"
+                ${alGedeeld && actieStatus !== 'zelf' ? 'disabled' : ''}>
+                ${actieStatus==='zelf' ? '✅ Staat bij jou!' : '👤 Zelf bellen'}
+              </button>
               <button
                 class="btn-afgehandeld"
                 id="btn-afgehandeld-${b.id}"
                 onclick="markeerAfgehandeld('${b.id}', '${b.naam.replace(/'/g, "\'")}', '${b.adres?.replace(/'/g, "\'") || ''}')"
-                style="flex:0 0 auto;padding:12px 14px;background:#2E7D32;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
+                style="flex:0 0 auto;padding:12px 14px;background:#2E7D32;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:${alGedeeld ? 'not-allowed' : 'pointer'};white-space:nowrap;opacity:${alGedeeld ? '0.45' : '1'}"
+                ${alGedeeld ? 'disabled' : ''}>
                 ✅ Afgehandeld
               </button>
               <button

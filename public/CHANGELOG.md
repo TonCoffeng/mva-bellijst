@@ -7,6 +7,14 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ## 2026-05-03 (avond)
 
+### Gerepareerd
+
+- **Bug 17 — Status van leads verdween na refresh + filter "Naar pool" werkte niet.** Twee bugs met dezelfde oorzaak: de actie-status (pool/zelf) werd alleen in browser-geheugen bijgehouden, niet uit Monday gelezen. Bij refresh kwam Nicole de Ridder bijvoorbeeld weer terug in de "Open" lijst, en het filter "Naar pool" toonde niets.
+  - **Backend (`monday.js`)**: `get_bezichtigingen` filtert niet meer op `doorgegeven`/`niet_naar_pool`, geeft ze allemaal terug. Per lead wordt een `actie_status` veld afgeleid op basis van de Monday-checkboxes: `'pool'` (doorgegeven=true), `'zelf'` (niet_naar_pool=true zonder pool), of `''` (open).
+  - **Frontend**: `data-actie` op elke kaart wordt nu gevuld vanuit de backend-status, dus persistente filtering. Knoppen "Geef door aan pool" en "Zelf bellen" tonen automatisch de juiste eindstatus na refresh ("✅ Al in de pool" / "✅ Staat bij jou!"). De andere actie-knoppen worden uitgegrijst voor leads die al een status hebben.
+  - **Stats-tellers** voor Open feedback / Naar pool / Zelf bellen worden nu uit de Monday-data berekend in plaats van session-state.
+  - **Beperking**: 'Afgehandeld' kan momenteel niet onderscheiden worden van 'Zelf bellen' in Monday (beide zetten `niet_naar_pool=true`). Bij refresh lijken afgehandelde leads als "Zelf bellen" gemarkeerd. Verbetering voor later: aparte Monday-checkbox voor afgehandeld.
+
 ### Toegevoegd
 
 - **Archivering van bezichtigingen — handmatig per pand of in bulk via selectie.** Een lead gaat pas naar het archief wanneer jij dat zelf kiest. Veiligheid eerst:
