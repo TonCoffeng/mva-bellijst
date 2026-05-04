@@ -556,11 +556,23 @@ exports.handler = async (event) => {
         };
       }).filter(b => {
         if (b.gearchiveerd) return false;       // gearchiveerde bezichtigingen verbergen
-        if (b.niet_naar_pool) return false;
-        if (b.doorgegeven) return false;
         if (!isMVAMakelaar(b.makelaar)) return false;
         if (!makelaar_naam) return true;
         return b.makelaar?.toLowerCase().includes(makelaar_naam.split(' ')[0].toLowerCase());
+      }).map(b => {
+        // Persistente actie-status afleiden uit Monday-velden zodat de app na
+        // refresh weet of een lead naar pool is gestuurd, zelf belt of afgehandeld.
+        // 'doorgegeven=true' betekent: lead is naar de pool gestuurd
+        // 'niet_naar_pool=true' (zonder doorgegeven) betekent: zelf bellen of afgehandeld
+        let actie_status = '';
+        if (b.doorgegeven)         actie_status = 'pool';
+        else if (b.niet_naar_pool) actie_status = 'zelf'; // best-guess: niet-naar-pool zonder pool = zelf
+        // 'afgehandeld' kan momenteel niet onderscheiden worden van 'zelf' op basis van Monday-velden;
+        // daar gebruiken we momenteel ook niet_naar_pool. Verbetering voor later.
+        b.actie_status = actie_status;
+        // in_pool blijft true voor backwards compat met bestaande UI-code
+        b.in_pool = (actie_status === 'pool');
+        return b;
       });
       return { statusCode: 200, headers, body: JSON.stringify({ bezichtigingen }) };
     }
