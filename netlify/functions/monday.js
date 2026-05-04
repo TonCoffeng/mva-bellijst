@@ -352,15 +352,15 @@ exports.handler = async (event) => {
     if (action === "markeer_afgehandeld") {
       const { item_id } = data;
       const result = await mondayFetch(`
-        mutation ($itemId: ID!) {
+        mutation ($itemId: ID!, $value: JSON!) {
           change_column_value(
             item_id: $itemId
             board_id: 5093190482
             column_id: "boolean_mm1s4qcy"
-            value: "{\"checked\":\"true\"}"
+            value: $value
           ) { id }
         }
-      `, { itemId: item_id });
+      `, { itemId: item_id, value: JSON.stringify({ checked: "true" }) });
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, result }) };
     }
 
@@ -793,15 +793,15 @@ exports.handler = async (event) => {
       `, { itemId: item_id });
       // Stap 2: markeer als doorgegeven zodat hij uit de lijst van gevende makelaar verdwijnt
       await mondayFetch(`
-        mutation ($itemId: ID!) {
+        mutation ($itemId: ID!, $value: JSON!) {
           change_column_value(
             item_id: $itemId
             board_id: 5093190482
             column_id: "boolean_mm2q35j3"
-            value: "{\"checked\":\"true\"}"
+            value: $value
           ) { id }
         }
-      `, { itemId: item_id });
+      `, { itemId: item_id, value: JSON.stringify({ checked: "true" }) });
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, result }) };
     }
 
@@ -939,15 +939,15 @@ exports.handler = async (event) => {
       // bezichtiging van de gevende makelaar, maar de status verschilt zodat
       // de app weet welke filter ('Naar pool' / 'Zelf bellen') ze moet tonen.
       await mondayFetch(`
-        mutation ($itemId: ID!) {
+        mutation ($itemId: ID!, $value: JSON!) {
           change_column_value(
             item_id: $itemId
             board_id: 5093190482
             column_id: "boolean_mm1s4qcy"
-            value: "{\"checked\":\"true\"}"
+            value: $value
           ) { id }
         }
-      `, { itemId: item_id });
+      `, { itemId: item_id, value: JSON.stringify({ checked: "true" }) });
 
       return {
         statusCode: 200,
