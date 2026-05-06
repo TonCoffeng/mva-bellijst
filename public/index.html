@@ -1011,7 +1011,7 @@
   async function ladenIngelogdeMakelaar(email) {
     const { data, error } = await sb
       .from('gebruikers')
-      .select('naam, email, level, actief')
+      .select('naam, email, rol, actief')
       .eq('email', email)
       .single();
     if (error || !data) {
@@ -1026,7 +1026,7 @@
     huidigeMakelaar = {
       email: data.email,
       naam: data.naam,
-      level: data.level,
+      level: data.rol,
       boardId: '5093190545',
     };
     return true;
