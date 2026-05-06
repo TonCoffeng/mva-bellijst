@@ -1644,12 +1644,11 @@
     container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--grijs-tekst)"><div class="spinner"></div>Bezichtigingen laden...</div>';
 
     try {
-      const res = await fetch('/.netlify/functions/monday', {
+      const res = await fetch('/.netlify/functions/bezichtigingen', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'get_bezichtigingen',
-          data: { makelaar_naam: huidigeMakelaar.naam }
+          data: { makelaar_email: huidigeMakelaar.email }
         })
       });
       const json = await res.json();
