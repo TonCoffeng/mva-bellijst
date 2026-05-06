@@ -128,6 +128,36 @@ const isMVAMakelaar = (naam) => {
   return true;
 };
 
+// ── BELLIJST: maak een nieuw bellijst-item op basis van een bezichtiging ──
+// Snapshot van bezichtiger-info wordt bevroren in het bellijst-item zodat
+// het stabiel blijft tegen latere mutaties van de bezichtiging.
+const createBellijstItem = async (bezichtiging, eigenaarId, bron) => {
+  return await sbInsert('bellijst_items', {
+    kantoor_id:           bezichtiging.kantoor_id || MVA_KANTOOR_ID,
+    bezichtiging_id:      bezichtiging.id,
+    eigenaar_id:          eigenaarId,
+    bron:                 bron, // 'zelf' of 'pool'
+    bezichtiger_naam:     bezichtiging.bezichtiger_naam,
+    bezichtiger_email:    bezichtiging.bezichtiger_email,
+    bezichtiger_telefoon: bezichtiging.bezichtiger_telefoon,
+    adres:                bezichtiging.adres,
+    datum_tijd:           bezichtiging.datum_tijd,
+    bel_status:           'nieuw',
+    belpogingen:          0,
+  });
+};
+
+// ── BEZICHTIGING: archiveer + zet actie_status tegelijk in 1 PATCH ────
+// Gebruikt voor markeer_afgehandeld, push_naar_pool, push_naar_eigen_bellijst
+// zodat een lead na uitgaan uit de gevende lijst altijd terugvindbaar is.
+const archiveerBezichtiging = async (id, actieStatus) => {
+  return await sbPatch(`bezichtigingen?id=eq.${id}`, {
+    actie_status:        actieStatus, // 'pool' | 'zelf' | 'afgehandeld'
+    gearchiveerd:        true,
+    status_gewijzigd_op: new Date().toISOString(),
+  });
+};
+
 // ── ROUND ROBIN: kies de volgende makelaar uit pool ───────────────────
 // Strategie:
 //   1. Selecteer alle gebruikers die meedoen aan RR + actief + niet op vakantie + niet de gever
@@ -289,74 +319,99 @@ exports.handler = async (event) => {
     }
 
     // ── MARKEER AFGEHANDELD ──────────────────────────────────────────
+    // Lead is afgehandeld zonder dat hij naar bellijst of pool gaat.
+    // (bv. al klant elders, no-show, irrelevant). Gaat direct naar archief.
     if (action === 'markeer_afgehandeld') {
       const { item_id } = data;
-
-      const updated = await sbPatch(`bezichtigingen?id=eq.${item_id}`, {
-        actie_status:        'afgehandeld',
-        status_gewijzigd_op: new Date().toISOString(),
-      });
-
+      const updated = await archiveerBezichtiging(item_id, 'afgehandeld');
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, item_id, updated_count: updated.length }) };
     }
 
     // ── PUSH NAAR POOL (Round Robin) ─────────────────────────────────
+    // Lead naar de leadpool: Round Robin kiest ontvanger, bezichtiging
+    // gaat naar archief, en er wordt een bellijst_item aangemaakt voor
+    // de ontvanger met bron='pool'.
     if (action === 'push_naar_pool') {
       const { item_id } = data;
 
-      // Lees bezichtiging om gevende_makelaar_id te kennen
-      const bez = await sbGet(`bezichtigingen?select=id,gevende_makelaar_id,actie_status&id=eq.${item_id}`);
-      if (!bez[0]) {
+      // Lees volledige bezichtiging (nodig voor snapshot in bellijst_item)
+      const bezRows = await sbGet(`bezichtigingen?select=*&id=eq.${item_id}`);
+      if (!bezRows[0]) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: `Bezichtiging ${item_id} niet gevonden` }) };
       }
+      const bez = bezRows[0];
 
       // Round Robin: kies ontvanger
       let rr;
       try {
-        rr = await roundRobinPick(parseInt(item_id), bez[0].gevende_makelaar_id);
+        rr = await roundRobinPick(parseInt(item_id), bez.gevende_makelaar_id);
       } catch (e) {
         return { statusCode: 500, headers, body: JSON.stringify({ error: `Round Robin faalde: ${e.message}` }) };
       }
 
-      // Markeer bezichtiging als 'pool'
-      await sbPatch(`bezichtigingen?id=eq.${item_id}`, {
-        actie_status:        'pool',
-        status_gewijzigd_op: new Date().toISOString(),
-      });
+      // Maak bellijst_item voor de gekozen ontvanger (snapshot van bezichtiger)
+      let bellijstItem;
+      try {
+        const created = await createBellijstItem(bez, rr.gekozen_id, 'pool');
+        bellijstItem = created[0];
+      } catch (e) {
+        return { statusCode: 500, headers, body: JSON.stringify({ error: `Bellijst-item aanmaken faalde: ${e.message}` }) };
+      }
+
+      // Archiveer bezichtiging (uit gevende lijst, in archief vindbaar)
+      await archiveerBezichtiging(item_id, 'pool');
 
       return {
         statusCode: 200, headers,
         body: JSON.stringify({
           ok: true,
           item_id,
-          toegewezen_aan:   rr.gekozen_naam,
-          email_toegewezen: rr.gekozen_email,
-          gekozen_id:       rr.gekozen_id,
-          pool_grootte:     rr.pool_grootte,
+          toegewezen_aan:    rr.gekozen_naam,
+          email_toegewezen:  rr.gekozen_email,
+          gekozen_id:        rr.gekozen_id,
+          pool_grootte:      rr.pool_grootte,
+          bellijst_item_id:  bellijstItem?.id,
         }),
       };
     }
 
     // ── PUSH NAAR EIGEN BELLIJST (Zelf bellen) ───────────────────────
-    // Voor nu: zet alleen de status. De échte kopie naar het bellijst-board
-    // (Monday) wordt in een latere fase gemigreerd zodra de bellijst-tabel
-    // in Supabase bestaat. De bestaande Make.com / Monday-flow voor de
-    // bellijst zelf blijft onveranderd.
+    // Lead naar eigen bellijst: bezichtiging gaat naar archief, bellijst_item
+    // wordt aangemaakt voor de gevende makelaar zelf met bron='zelf'.
     if (action === 'push_naar_eigen_bellijst') {
       const { item_id } = data;
 
-      const updated = await sbPatch(`bezichtigingen?id=eq.${item_id}`, {
-        actie_status:        'zelf',
-        status_gewijzigd_op: new Date().toISOString(),
-      });
+      // Lees volledige bezichtiging (nodig voor snapshot + gevende_makelaar_id)
+      const bezRows = await sbGet(`bezichtigingen?select=*&id=eq.${item_id}`);
+      if (!bezRows[0]) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: `Bezichtiging ${item_id} niet gevonden` }) };
+      }
+      const bez = bezRows[0];
+
+      if (!bez.gevende_makelaar_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: `Bezichtiging ${item_id} heeft geen gevende_makelaar_id` }) };
+      }
+
+      // Maak bellijst_item voor de gever zelf
+      let bellijstItem;
+      try {
+        const created = await createBellijstItem(bez, bez.gevende_makelaar_id, 'zelf');
+        bellijstItem = created[0];
+      } catch (e) {
+        return { statusCode: 500, headers, body: JSON.stringify({ error: `Bellijst-item aanmaken faalde: ${e.message}` }) };
+      }
+
+      // Archiveer bezichtiging
+      await archiveerBezichtiging(item_id, 'zelf');
 
       return {
         statusCode: 200, headers,
         body: JSON.stringify({
           ok: true,
           item_id,
-          actie_status: 'zelf',
-          note: 'Bellijst-board kopie nog niet gemigreerd (Fase 2).',
+          actie_status:     'zelf',
+          eigenaar_id:      bez.gevende_makelaar_id,
+          bellijst_item_id: bellijstItem?.id,
         }),
       };
     }
@@ -381,11 +436,142 @@ exports.handler = async (event) => {
     }
 
     // ═════════════════════════════════════════════════════════════════
-    // GROEP 2 — BELLIJST-ACTIES (nog Monday — niet aangeraakt)
+    // GROEP 2 — BELLIJST-ACTIES (Supabase)
     // ═════════════════════════════════════════════════════════════════
-    // Alle onderstaande acties praten nog naar Monday's GraphQL API. Worden
-    // in een latere migratiefase op Supabase gezet zodra er een leads/bellijst
-    // tabel is. Code 1-op-1 overgenomen uit de oude monday.js.
+    // Bellijst-items leven in tabel `bellijst_items`. Per makelaar kunnen er
+    // items zijn met bron='zelf' (zelf gepushte lead) of bron='pool' (RR).
+    //
+    // Backwards compatible: response van get_leads heeft dezelfde shape als
+    // de oude Monday-versie (id, naam, telefoon, email, adres, datum, status,
+    // belpogingen, etc.) zodat public/index.html ongewijzigd kan blijven.
+
+    // ── BELLIJST OPHALEN (ontvangende lijst voor 1 makelaar) ─────────
+    if (action === 'get_leads') {
+      const { makelaar_naam, makelaar_email, bron } = data;
+
+      // Lookup eigenaar_id via email (voorkeur) of naam
+      let eigenaarId = null;
+      if (makelaar_email) {
+        const u = await sbGet(`gebruikers?select=id&email=eq.${encodeURIComponent(makelaar_email.toLowerCase())}`);
+        if (u[0]) eigenaarId = u[0].id;
+      }
+      if (!eigenaarId && makelaar_naam) {
+        const u = await sbGet(`gebruikers?select=id&naam=eq.${encodeURIComponent(makelaar_naam)}`);
+        if (u[0]) eigenaarId = u[0].id;
+      }
+      if (!eigenaarId) {
+        return { statusCode: 200, headers, body: JSON.stringify({ leads: [] }) };
+      }
+
+      // Filter: alleen actieve bellijst-items (niet deal/lost — die zijn weg uit werklijst)
+      let path = `bellijst_items?select=*&eigenaar_id=eq.${eigenaarId}` +
+        `&bel_status=not.in.(deal,lost)&order=toegevoegd_op.desc&limit=500`;
+      // Optionele bron-filter (bv. alleen 'pool' tonen)
+      if (bron === 'pool' || bron === 'zelf') {
+        path += `&bron=eq.${bron}`;
+      }
+      const items = await sbGet(path);
+
+      // Transformeer naar Monday-stijl shape voor frontend backwards compat
+      const leads = items.map(it => ({
+        id:                 String(it.id),
+        naam:               it.bezichtiger_naam || '',
+        telefoon:           it.bezichtiger_telefoon || '',
+        email:              it.bezichtiger_email || '',
+        adres:              it.adres || '',
+        datum_bezichtiging: it.datum_tijd ? it.datum_tijd.split('T')[0] : '',
+        datum:              it.toegevoegd_op ? it.toegevoegd_op.split('T')[0] : '',
+        status:             it.bel_status || 'nieuw',
+        warme_lead:         it.warme_lead ? 'true' : '',
+        opmerkingen:        it.opmerking || '',
+        bron:               it.bron, // 'zelf' of 'pool'
+        belpogingen:        it.belpogingen || 0,
+        afspraak_op:        it.afspraak_op || '',
+        deal_op:            it.deal_op || '',
+        bezichtiging_id:    it.bezichtiging_id, // referentie terug naar origineel
+      }));
+
+      return { statusCode: 200, headers, body: JSON.stringify({ leads }) };
+    }
+
+    // ── BELLIJST STATUS UPDATEN ──────────────────────────────────────
+    // Frontend stuurt: { item_id, status } waarbij status één van de oude
+    // Monday-keys is (bereikt_ja, bereikt_later, niet_bereikbaar, ...).
+    // Vertaal naar onze interne bel_status enum.
+    if (action === 'update_status' || action === 'update_lead_status') {
+      const { item_id, status, lead_status } = data;
+      const inputStatus = status || lead_status;
+
+      // Mapping van oude Monday-keys naar nieuwe bel_status enum
+      const statusMap = {
+        bereikt_ja:          'bereikt',
+        bereikt_later:       'bel_terug',
+        niet_bereikbaar:     'niet_bereikbaar',
+        wellicht_later:      'wellicht_later',
+        niet_geinteresseerd: 'niet_geinteresseerd',
+        voicemail:           'voicemail',
+        // Lead-status keys (van leadpool flow)
+        Bereikt:             'bereikt',
+        BelTerug:            'bel_terug',
+        NietBereikt:         'niet_bereikbaar',
+        Afspraak:            'afspraak',
+        Deal:                'deal',
+        Lost:                'lost',
+      };
+      const belStatus = statusMap[inputStatus] || inputStatus;
+
+      // Bouw update body
+      const body = {
+        bel_status:          belStatus,
+        status_gewijzigd_op: new Date().toISOString(),
+      };
+
+      // Status-specifieke bijwerkingen
+      const vandaag = new Date().toISOString().split('T')[0];
+      if (belStatus === 'afspraak') body.afspraak_op = vandaag;
+      if (belStatus === 'deal')     body.deal_op = vandaag;
+
+      // Bij niet_bereikbaar / voicemail: belpogingen ophogen
+      if (belStatus === 'niet_bereikbaar' || belStatus === 'voicemail') {
+        // Lees huidige teller eerst
+        const cur = await sbGet(`bellijst_items?select=belpogingen&id=eq.${item_id}`);
+        const huidig = cur[0]?.belpogingen || 0;
+        body.belpogingen = huidig + 1;
+        body.laatst_gebeld_op = new Date().toISOString();
+      } else if (belStatus === 'bereikt') {
+        body.laatst_gebeld_op = new Date().toISOString();
+      }
+
+      const updated = await sbPatch(`bellijst_items?id=eq.${item_id}`, body);
+      return {
+        statusCode: 200, headers,
+        body: JSON.stringify({ ok: true, item_id, bel_status: belStatus, updated_count: updated.length }),
+      };
+    }
+
+    // ── EIGEN BELLIJST-BOARD (legacy: gaf Monday board ID terug) ─────
+    // Niet meer relevant — bellijst is nu in Supabase en query is via
+    // eigenaar_id, niet via een board_id. Frontend zou dit niet meer
+    // hoeven aan te roepen, maar voor backwards compat geven we 'ok=true'.
+    if (action === 'get_eigen_bellijst_board') {
+      return {
+        statusCode: 200, headers,
+        body: JSON.stringify({
+          ok: true,
+          board_id: 'supabase',
+          board_label: 'Bellijst (Supabase)',
+          info: 'Bellijst leeft nu in Supabase tabel bellijst_items. Gebruik get_leads met makelaar_email.',
+        }),
+      };
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // GROEP 3 — LEGACY MONDAY ACTIES (debug + meedoen-board)
+    // ═════════════════════════════════════════════════════════════════
+    // Het Meedoen Leadpool board op Monday is nog wel de bron-of-truth
+    // voor wie er meedoet aan RR. Op termijn: gebruikers.doet_mee_round_robin
+    // wordt al gebruikt door RR, maar get_makelaars/get_alle_makelaars
+    // queryen nog Monday omdat de frontend dropdowns daarop bouwen.
 
     const MONDAY_TOKEN = process.env.MONDAY_TOKEN;
     const token = MONDAY_TOKEN.startsWith('Bearer ') ? MONDAY_TOKEN : `Bearer ${MONDAY_TOKEN}`;
@@ -408,169 +594,15 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify(result) };
     }
 
-    // ── LEADS OPHALEN ────────────────────────────────────────────────
-    if (action === 'get_leads') {
-      const { board_id, makelaar_naam, makelaar_email, bron } = data;
-      const result = await mondayFetch(`
-        query ($boardId: ID!) {
-          boards(ids: [$boardId]) {
-            items_page(limit: 100) {
-              items { id name column_values { id text value } }
-            }
-          }
-        }
-      `, { boardId: board_id });
-
-      const items = result?.data?.boards?.[0]?.items_page?.items || [];
-      const leads = items.map(item => {
-        const cols = item.column_values || [];
-        const emailMakelaar    = cols.find(c => c.id === 'text_mm1n99ky')?.text || '';
-        const boardAfkomstig   = cols.find(c => c.id === 'text_mm1mpcr0')?.text || '';
-        const toegewezenAan    = cols.find(c => c.id === 'text_mm2rfv9v')?.text || '';
-        const emailToegewezen  = cols.find(c => c.id === 'text_mm2r2f05')?.text || '';
-        const toegewezenOp     = cols.find(c => c.id === 'date_mm2rm4mg')?.text || '';
-        const leadStatus       = cols.find(c => c.id === 'color_mm2rne17')?.text || '';
-        const afspraakOp       = cols.find(c => c.id === 'date_mm2r1yem')?.text || '';
-        const dealOp           = cols.find(c => c.id === 'date_mm2r29y4')?.text || '';
-        const belpogingen      = cols.find(c => c.id === 'numeric_mm2rxahc')?.text || '0';
-        const bronAfgeleid     = toegewezenAan ? 'leadpool' : 'eigen';
-
-        return {
-          id: item.id, naam: item.name,
-          telefoon:           cols.find(c => c.id === 'phone_mm1fzq2g')?.text || '',
-          email:              cols.find(c => c.id === 'email_mm1fnwvn')?.text || '',
-          adres:              cols.find(c => c.id === 'text_mm1frktj')?.text || '',
-          bij_wie:            cols.find(c => c.id === 'text_mm1fa4bf')?.text || '',
-          datum:              cols.find(c => c.id === 'date_mm1f1fw2')?.text || '',
-          datum_bezichtiging: cols.find(c => c.id === 'date_mm1fs4t7')?.text || '',
-          adres_klant:        cols.find(c => c.id === 'text_mm1f7fzh')?.text || '',
-          status:             cols.find(c => c.id === 'color_mm1f9atj')?.text || '',
-          warme_lead:         cols.find(c => c.id === 'boolean_mm1fnaay')?.text || '',
-          opmerkingen:        cols.find(c => c.id === 'text_mm1f4g3q')?.text || '',
-          email_makelaar:     emailMakelaar,
-          board_afkomstig:    boardAfkomstig,
-          toegewezen_aan:     toegewezenAan,
-          email_toegewezen:   emailToegewezen,
-          toegewezen_op:      toegewezenOp,
-          lead_status:        leadStatus,
-          afspraak_op:        afspraakOp,
-          deal_op:            dealOp,
-          bron:               bronAfgeleid,
-          belpogingen:        parseInt(belpogingen) || 0,
-        };
-      }).filter(lead => {
-        if (lead.lead_status === 'Lost' || lead.lead_status === 'Deal') return false;
-        if (bron === 'eigen') return true;
-        if (!makelaar_naam && !makelaar_email) return true;
-        const naam     = (makelaar_naam || '').toLowerCase();
-        const voornaam = naam.split(' ')[0];
-        const email    = (makelaar_email || '').toLowerCase();
-        if (email && lead.email_toegewezen.toLowerCase() === email) return true;
-        if (voornaam && lead.toegewezen_aan.toLowerCase().includes(voornaam)) return true;
-        const board  = lead.board_afkomstig.toLowerCase();
-        const emailM = lead.email_makelaar.toLowerCase();
-        if (board && board.includes(voornaam)) return true;
-        if (emailM && emailM.includes(voornaam)) return true;
-        return false;
-      });
-
-      return { statusCode: 200, headers, body: JSON.stringify({ leads }) };
-    }
-
-    // ── EIGEN BELLIJST-BOARD OPHALEN ─────────────────────────────────
-    if (action === 'get_eigen_bellijst_board') {
-      const { makelaar_naam, makelaar_email } = data;
-      if (!makelaar_naam && !makelaar_email) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'makelaar_naam of makelaar_email verplicht' }) };
-      }
-      const meedoenResult = await mondayFetch(`
-        query {
-          boards(ids: [5093235823]) {
-            items_page(limit: 50) { items { name column_values { id text } } }
-          }
-        }
-      `);
-      const meedoenItems = meedoenResult?.data?.boards?.[0]?.items_page?.items || [];
-      const emailLower = (makelaar_email || '').toLowerCase();
-      const naamLower  = (makelaar_naam || '').toLowerCase();
-      const voornaam   = naamLower.split(' ')[0];
-
-      let gevonden = null;
-      if (emailLower) {
-        gevonden = meedoenItems.find(m => {
-          const e = m.column_values.find(c => c.id === 'text_mm1nxwsn')?.text || '';
-          return e.toLowerCase() === emailLower;
-        });
-      }
-      if (!gevonden && naamLower) gevonden = meedoenItems.find(m => m.name.toLowerCase() === naamLower);
-      if (!gevonden && voornaam) {
-        const matches = meedoenItems.filter(m => m.name.toLowerCase().split(' ')[0] === voornaam);
-        if (matches.length === 1) gevonden = matches[0];
-      }
-      if (!gevonden) {
-        return { statusCode: 200, headers, body: JSON.stringify({ ok: false, reden: 'Makelaar niet gevonden in Meedoen-board' }) };
-      }
-      const boardLabel = gevonden.column_values.find(c => c.id === 'text_mm1gbj3q')?.text || '';
-      const boardId    = BELLIJST_LABELS[boardLabel] || null;
-      return {
-        statusCode: 200, headers,
-        body: JSON.stringify({ ok: !!boardId, board_id: boardId, board_label: boardLabel, makelaar: gevonden.name }),
-      };
-    }
-
-    // ── LEADPOOL STATUS UPDATE ───────────────────────────────────────
-    if (action === 'update_lead_status') {
-      const { item_id, lead_status } = data;
-      if (!item_id || !lead_status) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'item_id en lead_status verplicht' }) };
-      }
-      const vandaag = new Date().toISOString().split('T')[0];
-      const columnValues = { color_mm2rne17: { label: lead_status } };
-      if (lead_status === 'Afspraak') columnValues.date_mm2r1yem = { date: vandaag };
-      if (lead_status === 'Deal')     columnValues.date_mm2r29y4 = { date: vandaag };
-
-      if (lead_status === 'NietBereikt') {
-        const huidigRes = await mondayFetch(`
-          query ($itemId: ID!) {
-            items(ids: [$itemId]) { column_values(ids: ["numeric_mm2rxahc"]) { text } }
-          }
-        `, { itemId: item_id });
-        const huidigText = huidigRes?.data?.items?.[0]?.column_values?.[0]?.text || '0';
-        const nieuweTeller = (parseInt(huidigText) || 0) + 1;
-        await mondayFetch(`
-          mutation ($itemId: ID!, $columnValues: JSON!) {
-            change_multiple_column_values(item_id: $itemId, board_id: 5093190545, column_values: $columnValues) { id }
-          }
-        `, { itemId: item_id, columnValues: JSON.stringify({ numeric_mm2rxahc: String(nieuweTeller) }) });
-        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, belpogingen: nieuweTeller, lead_status: 'Toegewezen' }) };
-      }
-
-      await mondayFetch(`
-        mutation ($itemId: ID!, $columnValues: JSON!) {
-          change_multiple_column_values(item_id: $itemId, board_id: 5093190545, column_values: $columnValues) { id }
-        }
-      `, { itemId: item_id, columnValues: JSON.stringify(columnValues) });
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, lead_status }) };
-    }
-
-    // ── UPDATE BELLIJST-STATUS (op een specifiek bellijst-board) ─────
-    if (action === 'update_status') {
-      const { item_id, board_id, status } = data;
-      const statusLabels = {
-        bereikt_ja:          'Bereikt',
-        bereikt_later:       'Bel terug',
-        niet_bereikbaar:     'Niet bereikbaar',
-        wellicht_later:      'Wellicht later',
-        niet_geinteresseerd: 'Niet geïnteresseerd',
-        voicemail:           'Voicemail',
-      };
-      const result = await mondayFetch(`
-        mutation ($itemId: ID!, $boardId: ID!, $value: JSON!) {
-          change_column_value(item_id: $itemId, board_id: $boardId, column_id: "color_mm1f9atj", value: $value) { id }
-        }
-      `, { itemId: item_id, boardId: board_id, value: JSON.stringify({ label: statusLabels[status] || status }) });
-      return { statusCode: 200, headers, body: JSON.stringify(result) };
-    }
+    // ── OUDE MONDAY HANDLERS VERWIJDERD ──────────────────────────────
+    // De volgende acties zijn gemigreerd naar Supabase (zie boven):
+    //   - get_leads → leest nu uit bellijst_items
+    //   - get_eigen_bellijst_board → niet meer nodig (geen board_id)
+    //   - update_lead_status → samengevoegd met update_status
+    //   - update_status → werkt nu op bellijst_items.bel_status
+    // Code rondom Monday's bellijst-boards (5093190545 + 9x bellijst-board)
+    // is opgeruimd. BELLIJST_LABELS bovenaan blijft nog wel staan voor het
+    // geval er ergens nog een legacy referentie is.
 
     // ── ALLE MAKELAARS / GET_MAKELAARS ──────────────────────────────
     if (action === 'get_alle_makelaars' || action === 'get_makelaars') {
