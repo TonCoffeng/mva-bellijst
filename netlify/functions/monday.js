@@ -130,23 +130,36 @@ const isMVAMakelaar = (naam) => {
 
 // ── ROUND ROBIN: kies de volgende makelaar uit pool ───────────────────
 // Strategie:
-//   1. Selecteer alle gebruikers die meedoen aan RR + actief zijn + niet de gever
+//   1. Selecteer alle gebruikers die meedoen aan RR + actief + niet op vakantie + niet de gever
 //   2. Sorteer op volgnummer_laatste_toewijzing ASC, dan id ASC (deterministisch)
 //   3. Pak nummer 1 → die is langst niet aan de beurt geweest
 //   4. Update zijn volgnummer naar (max + 1)
-//   5. Schrijf record in toewijzingen tabel als audit trail
+//   5. Schrijf record in toewijzingen tabel als audit trail (status='open')
 const roundRobinPick = async (bezichtigingId, gevendeMakelaarId) => {
   // 1. Pool ophalen — alle gebruikers met doet_mee_round_robin=true en actief=true
+  // Vakantie-filter doen we lokaal (datum-vergelijking is leesbaarder dan PostgREST or-clauses)
   const pool = await sbGet(
-    `gebruikers?select=id,naam,email,volgnummer_laatste_toewijzing` +
+    `gebruikers?select=id,naam,email,volgnummer_laatste_toewijzing,vakantie_van,vakantie_tot` +
     `&doet_mee_round_robin=eq.true&actief=eq.true&kantoor_id=eq.${MVA_KANTOOR_ID}` +
     `&order=volgnummer_laatste_toewijzing.asc.nullsfirst,id.asc`
   );
 
-  // Verwijder de gevende makelaar uit de pool — die mag z'n eigen lead niet terugkrijgen
-  const candidates = pool.filter(g => g.id !== gevendeMakelaarId);
+  // Filter: niet de gever, en niet op vakantie vandaag
+  const vandaag = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const opVakantie = (g) => {
+    if (!g.vakantie_van || !g.vakantie_tot) return false;
+    return g.vakantie_van <= vandaag && vandaag <= g.vakantie_tot;
+  };
+
+  const candidates = pool.filter(g =>
+    g.id !== gevendeMakelaarId && !opVakantie(g)
+  );
+
   if (candidates.length === 0) {
-    throw new Error('Geen kandidaten beschikbaar in Round Robin pool');
+    throw new Error(
+      `Geen kandidaten beschikbaar in Round Robin pool ` +
+      `(pool=${pool.length}, op_vakantie=${pool.filter(opVakantie).length}, gever=${gevendeMakelaarId})`
+    );
   }
 
   // 2. Eerste kandidaat = volgnummer laagst → wint
@@ -162,13 +175,13 @@ const roundRobinPick = async (bezichtigingId, gevendeMakelaarId) => {
     volgnummer_laatste_toewijzing: nieuwVolgnummer,
   });
 
-  // 5. Audit trail in toewijzingen
+  // 5. Audit trail in toewijzingen (status='open' = wachtend op acceptatie)
   await sbInsert('toewijzingen', {
     kantoor_id:       MVA_KANTOOR_ID,
     bezichtiging_id:  bezichtigingId,
     gebruiker_id:     gekozen.id,
     toegewezen_op:    new Date().toISOString(),
-    status:           'toegewezen',
+    status:           'open',
   });
 
   return {
@@ -177,6 +190,7 @@ const roundRobinPick = async (bezichtigingId, gevendeMakelaarId) => {
     gekozen_email:    gekozen.email,
     nieuw_volgnummer: nieuwVolgnummer,
     pool_grootte:     candidates.length,
+    op_vakantie:      pool.filter(opVakantie).map(g => g.naam),
   };
 };
 
