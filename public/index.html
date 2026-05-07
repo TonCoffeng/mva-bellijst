@@ -1864,12 +1864,17 @@
       });
       const json = await res.json();
       const items = json?.bezichtigingen || [];
-           // Sortering: respecteer opgeslagen voorkeur (default = nieuwste eerst)
+           // Sortering: datum volgens voorkeur (nieuwste of oudste eerst),
+           // maar binnen dezelfde datum altijd chronologisch op tijd (8:00 → 18:00)
+           // zodat een dag-overzicht logisch leesbaar is.
            const sorteerRichting = localStorage.getItem('mva_sorteer') || 'desc';
            items.sort((a, b) => {
-             const cmp = (a.datum || '').localeCompare(b.datum || '')
-                      || (a.tijdstip || '').localeCompare(b.tijdstip || '');
-             return sorteerRichting === 'asc' ? cmp : -cmp;
+             const datumCmp = (a.datum || '').localeCompare(b.datum || '');
+             if (datumCmp !== 0) {
+               return sorteerRichting === 'asc' ? datumCmp : -datumCmp;
+             }
+             // Zelfde datum → altijd chronologisch op tijd (vroeg eerst)
+             return (a.tijdstip || '').localeCompare(b.tijdstip || '');
            });
            updateSorteerKnop();
 
