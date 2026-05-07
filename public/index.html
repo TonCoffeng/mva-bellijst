@@ -2079,6 +2079,19 @@
         }).then(r => r.json()).then(json => {
           const badge = document.getElementById(`cloze-badge-${b.id}`);
           if (!badge) return;
+
+          // Bewaar eigenaar-info op de kaart zelf zodat we later bij klik
+          // op "Geef door aan pool" of "Zelf bellen" weten of er een andere
+          // makelaar al eigenaar is. Wordt gebruikt voor slimme routing.
+          const card = document.getElementById(`bez-${b.id}`);
+          if (card) {
+            card.dataset.clozeBestaand = json.bestaand ? '1' : '0';
+            card.dataset.clozeEigenaarEmail = (json.eigenaar_email || '').toLowerCase();
+            card.dataset.clozeEigenaarNaam = json.eigenaar_naam || '';
+            card.dataset.clozeStage = json.stage || '';
+            card.dataset.clozeId = json.id || '';
+          }
+
           if (!json.bestaand) {
             badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`;
             return;
@@ -2390,8 +2403,40 @@
     }
   }
 
+  // ── CLOZE-EIGENAAR CHECK (voor slimme routing) ───────────────────────
+  // Leest data-attributen van de kaart. Returns null als de Cloze-check
+  // nog niet klaar is, geen eigenaar bestaat, of de eigenaar de huidige
+  // makelaar zelf is. Returns { email, naam } als er een ANDERE makelaar
+  // eigenaar is van het Cloze-contact.
+  function leesAndereEigenaar(itemId) {
+    const card = document.getElementById(`bez-${itemId}`);
+    if (!card) return null;
+    if (card.dataset.clozeBestaand !== '1') return null;
+    const eigenaarEmail = (card.dataset.clozeEigenaarEmail || '').toLowerCase();
+    if (!eigenaarEmail) return null;
+    const huidigeEmail = (huidigeMakelaar?.email || '').toLowerCase();
+    if (eigenaarEmail === huidigeEmail) return null;  // ben zelf eigenaar
+    return {
+      email: eigenaarEmail,
+      naam: card.dataset.clozeEigenaarNaam || eigenaarEmail.split('@')[0],
+    };
+  }
+
   // ── ZELF BELLEN — lead direct aan zichzelf toewijzen ─────────────────
   async function geefAanZichzelf(itemId, naam, adres) {
+    // Slimme check: als deze klant al bekend is bij een andere makelaar
+    // in Cloze, waarschuw dan voordat we 'm aan onszelf toewijzen.
+    const andereEigenaar = leesAndereEigenaar(itemId);
+    if (andereEigenaar) {
+      const ok = await mvaConfirm({
+        titel: '⚠️ Klant van een collega',
+        tekst: `${naam} is al bekend in Cloze als klant van ${andereEigenaar.naam}. Weet je zeker dat je deze lead zelf wilt bellen?`,
+        okTekst: 'Toch zelf bellen',
+        okStijl: 'destructief',
+      });
+      if (!ok) return;
+    }
+
     const btn = document.getElementById(`btn-zelf-${itemId}`);
     const poolBtn = document.getElementById(`btn-${itemId}`);
     btn.disabled = true;
@@ -2430,6 +2475,20 @@
 
   // ── NAAR POOL ────────────────────────────────────────────────────────
   async function geefNaarPool(itemId, naam, adres) {
+    // Slimme routing: als klant al een eigenaar heeft in Cloze, bypass
+    // Round Robin en wijs lead direct toe aan oorspronkelijke eigenaar.
+    const andereEigenaar = leesAndereEigenaar(itemId);
+    let directNaarEmail = null;
+    if (andereEigenaar) {
+      const ok = await mvaConfirm({
+        titel: '👤 Klant heeft al een makelaar',
+        tekst: `${naam} is in Cloze bekend als klant van ${andereEigenaar.naam}. Round Robin wordt overgeslagen — de lead gaat direct naar ${andereEigenaar.naam}.`,
+        okTekst: `Doorzetten naar ${andereEigenaar.naam}`,
+      });
+      if (!ok) return;
+      directNaarEmail = andereEigenaar.email;
+    }
+
     const btn = document.getElementById(`btn-${itemId}`);
     btn.disabled = true;
     btn.textContent = 'Bezig...'; 
@@ -2440,19 +2499,28 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'push_naar_pool',
-          data: { item_id: itemId, makelaar_naam: huidigeMakelaar.naam }
+          data: {
+            item_id: itemId,
+            makelaar_naam: huidigeMakelaar.naam,
+            // Optioneel: bypass Round Robin en wijs direct toe
+            ...(directNaarEmail && { direct_naar_email: directNaarEmail }),
+          }
         })
       });
       const json = await res.json();
 
       if (json.error) throw new Error(json.error);
 
-      btn.textContent = '✅ In de pool!';
+      btn.textContent = directNaarEmail
+        ? `✅ Naar ${andereEigenaar.naam}!`
+        : '✅ In de pool!';
       btn.classList.add('gedeeld');
       vergrendelAndereActies(itemId, 'pool');
       markeerKaartAfgesloten(itemId, "pool");
 
-      toonToast(`✅ ${naam} staat in de pool!`, 'succes');
+      toonToast(directNaarEmail
+        ? `✅ ${naam} direct doorgezet naar ${andereEigenaar.naam}!`
+        : `✅ ${naam} staat in de pool!`, 'succes');
     } catch (err) {
       btn.disabled = false;
       btn.textContent = '📤 Geef door aan pool';
