@@ -108,7 +108,8 @@ exports.handler = async (event) => {
       const inPool = (status === 'pool');
 
       return {
-        id: row.realworks_id || String(row.id),  // gebruik realworks_id als stabiele key
+        id: String(row.id),  // database primary key — matcht monday.js queries (push_naar_pool, push_naar_eigen_bellijst, etc.)
+        realworks_id: row.realworks_id || null,  // beschikbaar als referentie maar niet als hoofdkey
         naam: row.bezichtiger_naam || '',
         adres: row.adres || '',
         makelaar: user.naam,
