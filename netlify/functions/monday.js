@@ -331,8 +331,13 @@ exports.handler = async (event) => {
     // Lead naar de leadpool: Round Robin kiest ontvanger, bezichtiging
     // gaat naar archief, en er wordt een bellijst_item aangemaakt voor
     // de ontvanger met bron='pool'.
+    //
+    // Optioneel: data.direct_naar_email = '<email>' bypassed Round Robin
+    // en wijst de lead direct toe aan die makelaar. Wordt gebruikt door
+    // de "slimme routing" flow: als de bezichtiger al in Cloze bekend is
+    // bij makelaar X, gaat de lead direct naar X (niet via RR).
     if (action === 'push_naar_pool') {
-      const { item_id } = data;
+      const { item_id, direct_naar_email } = data;
 
       // Lees volledige bezichtiging (nodig voor snapshot in bellijst_item)
       const bezRows = await sbGet(`bezichtigingen?select=*&id=eq.${item_id}`);
@@ -341,18 +346,60 @@ exports.handler = async (event) => {
       }
       const bez = bezRows[0];
 
-      // Round Robin: kies ontvanger
+      // Bepaal ontvanger: direct toewijzen of via Round Robin
       let rr;
-      try {
-        rr = await roundRobinPick(parseInt(item_id), bez.gevende_makelaar_id);
-      } catch (e) {
-        return { statusCode: 500, headers, body: JSON.stringify({ error: `Round Robin faalde: ${e.message}` }) };
+      const useDirectAssign = !!direct_naar_email;
+
+      if (useDirectAssign) {
+        // ── Direct toewijzen aan opgegeven email (bypass RR) ─────────
+        const targetEmail = String(direct_naar_email).toLowerCase().trim();
+        const userRows = await sbGet(
+          `gebruikers?email=eq.${encodeURIComponent(targetEmail)}` +
+          `&actief=eq.true&select=id,naam,email,kantoor_id`
+        );
+        if (!userRows[0]) {
+          return {
+            statusCode: 400, headers,
+            body: JSON.stringify({
+              error: `Direct-toewijzing faalde: gebruiker ${targetEmail} niet gevonden of inactief`
+            }),
+          };
+        }
+        const target = userRows[0];
+
+        // Audit trail: zelfde structuur als roundRobinPick gebruikt, zodat
+        // toewijzingen-tabel consistent blijft. status='open' = wachtend op
+        // acceptatie. We loggen geen 'aanleiding' in de DB (kolom bestaat
+        // niet) — onderscheid met RR zit in de bron='cloze_direct' op
+        // bellijst_items en in via_cloze_routing in de response.
+        await sbInsert('toewijzingen', {
+          kantoor_id:      MVA_KANTOOR_ID,
+          bezichtiging_id: parseInt(item_id),
+          gebruiker_id:    target.id,
+          toegewezen_op:   new Date().toISOString(),
+          status:          'open',
+        });
+
+        rr = {
+          gekozen_id: target.id,
+          gekozen_naam: target.naam,
+          gekozen_email: target.email,
+          pool_grootte: null,  // n.v.t. — was bypass
+        };
+      } else {
+        // ── Standaard: Round Robin ───────────────────────────────────
+        try {
+          rr = await roundRobinPick(parseInt(item_id), bez.gevende_makelaar_id);
+        } catch (e) {
+          return { statusCode: 500, headers, body: JSON.stringify({ error: `Round Robin faalde: ${e.message}` }) };
+        }
       }
 
       // Maak bellijst_item voor de gekozen ontvanger (snapshot van bezichtiger)
       let bellijstItem;
       try {
-        const created = await createBellijstItem(bez, rr.gekozen_id, 'pool');
+        const bron = useDirectAssign ? 'cloze_direct' : 'pool';
+        const created = await createBellijstItem(bez, rr.gekozen_id, bron);
         bellijstItem = created[0];
       } catch (e) {
         return { statusCode: 500, headers, body: JSON.stringify({ error: `Bellijst-item aanmaken faalde: ${e.message}` }) };
@@ -371,6 +418,7 @@ exports.handler = async (event) => {
           gekozen_id:        rr.gekozen_id,
           pool_grootte:      rr.pool_grootte,
           bellijst_item_id:  bellijstItem?.id,
+          via_cloze_routing: useDirectAssign,  // true = bypass RR
         }),
       };
     }
