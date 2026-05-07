@@ -269,7 +269,16 @@ exports.handler = async (event) => {
         `&gearchiveerd=eq.false&order=datum_tijd.desc&limit=500`
       );
 
+      // Filter lege placeholder-slots eruit (Realworks Bezichtigingsplanner
+      // levert ook lege "+ Relatie koppelen" tijdslots door — geen naam, geen
+      // email, geen telefoon. Niets om feedback over te geven, dus verbergen.)
+      const isLegeSlot = (b) =>
+        !((b.bezichtiger_naam || '').trim()) &&
+        !((b.bezichtiger_email || '').trim()) &&
+        !((b.bezichtiger_telefoon || '').trim());
+
       const bezichtigingen = rows
+        .filter(r => !isLegeSlot(r))
         .map(r => rowToMondayShape(r, makelaarNaam))
         .filter(b => isMVAMakelaar(b.makelaar));
 
