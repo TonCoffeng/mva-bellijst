@@ -1404,8 +1404,9 @@
     const huidig = localStorage.getItem('mva_sorteer') || 'desc';
     const nieuw = huidig === 'desc' ? 'asc' : 'desc';
     localStorage.setItem('mva_sorteer', nieuw);
-    // Herlaad bezichtigingen zodat de nieuwe sortering doorgevoerd wordt
-    laadBezichtigingen();
+    updateSorteerKnop();
+    // Hersorteer alleen de zichtbare kaarten — geen API-call nodig
+    hersorteerZichtbareKaarten();
   }
   window.toggleSortering = toggleSortering;
 
@@ -1414,6 +1415,31 @@
     if (!btn) return;
     const richting = localStorage.getItem('mva_sorteer') || 'desc';
     btn.textContent = richting === 'desc' ? '↓ Nieuwste eerst' : '↑ Oudste eerst';
+  }
+
+  // Hersorteer alleen de ZICHTBARE kaarten in de container.
+  // Wordt aangeroepen na elke filter-actie zodat het bovenste resultaat
+  // klopt met de huidige sortering ('Nieuwste/Oudste eerst' geldt voor het
+  // gefilterde resultaat, niet voor de hele dataset).
+  function hersorteerZichtbareKaarten() {
+    const container = document.getElementById('geven-container');
+    if (!container) return;
+    const richting = localStorage.getItem('mva_sorteer') || 'desc';
+    const zichtbaar = Array.from(container.querySelectorAll('.bez-card'))
+      .filter(c => c.style.display !== 'none');
+    if (zichtbaar.length < 2) return;
+    zichtbaar.sort((a, b) => {
+      const da = a.dataset.datum || '';
+      const db = b.dataset.datum || '';
+      const datumCmp = da.localeCompare(db);
+      if (datumCmp !== 0) return richting === 'asc' ? datumCmp : -datumCmp;
+      // Binnen dezelfde datum: altijd chronologisch (vroeg → laat)
+      const ta = a.dataset.tijdstip || '';
+      const tb = b.dataset.tijdstip || '';
+      return ta.localeCompare(tb);
+    });
+    // Verplaats kaarten naar nieuwe volgorde (appendChild verplaatst, niet kopieert)
+    zichtbaar.forEach(c => container.appendChild(c));
   }
 
   // ── FILTER BEZICHTIGINGEN ─────────────────────────────────────────────
@@ -1471,6 +1497,9 @@
       }
       card.style.display = toon ? '' : 'none';
     });
+    // Na filteren: hersorteer de zichtbare kaarten zodat 'Nieuwste/Oudste eerst'
+    // klopt voor het gefilterde resultaat (bovenste = vroegste of laatste van filter)
+    hersorteerZichtbareKaarten();
     updateDatumLabel();
   }
   window.filterBezichtigingen = filterBezichtigingen;
@@ -1941,7 +1970,7 @@
         const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\n/g,'<br>');
 
         return `
-          <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''} ${heeftFeedback ? 'bez-gedaan' : 'bez-open'}" id="bez-${b.id}" data-adres="${(b.adres||'').toLowerCase().replace(/"/g,'&quot;')}" data-naam="${b.naam.toLowerCase().replace(/"/g,'&quot;')}" data-datum="${(b.datum||'').toLowerCase()}" data-inpool="${alGedeeld?'1':'0'}" data-actie="${actieStatus}">
+          <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''} ${heeftFeedback ? 'bez-gedaan' : 'bez-open'}" id="bez-${b.id}" data-adres="${(b.adres||'').toLowerCase().replace(/"/g,'&quot;')}" data-naam="${b.naam.toLowerCase().replace(/"/g,'&quot;')}" data-datum="${(b.datum||'').toLowerCase()}" data-tijdstip="${(b.tijdstip||'').toLowerCase()}" data-inpool="${alGedeeld?'1':'0'}" data-actie="${actieStatus}">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
               <label class="bulk-checkbox-wrap" style="display:none;padding-top:2px;cursor:pointer">
                 <input type="checkbox" class="bulk-checkbox" data-bez-id="${b.id}"
