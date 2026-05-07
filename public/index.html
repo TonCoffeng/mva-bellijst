@@ -565,6 +565,77 @@
       .btn-talent.actief { display: block; }
     }
 
+    /* ── DATUM-NAVIGATOR (onder stat-kaarten, boven zoekbalk) ── */
+    .datum-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 16px 10px;
+    }
+    .datum-nav-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--grijs-mid);
+      background: white;
+      color: var(--navy);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .15s;
+      flex: 0 0 auto;
+    }
+    .datum-nav-btn:hover { background: var(--grijs); border-color: var(--navy); }
+    .datum-nav-btn:active { transform: scale(0.95); }
+    .datum-nav-label {
+      flex: 1;
+      max-width: 240px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--navy);
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: white;
+      border: 1px solid var(--grijs-mid);
+      transition: all .15s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .datum-nav-label:hover { background: var(--grijs); border-color: var(--navy); }
+    .datum-nav-label.actief {
+      background: var(--navy);
+      color: white;
+      border-color: var(--navy);
+    }
+    .datum-nav-teller {
+      font-size: 11px;
+      font-weight: 400;
+      opacity: 0.75;
+      margin-left: 4px;
+    }
+
+    /* ── SORTEER-KNOP (naast Selectie) ── */
+    .btn-sorteer {
+      background: none;
+      border: 1px solid var(--grijs-mid);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--grijs-tekst);
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+      transition: all .15s;
+    }
+    .btn-sorteer:hover { background: var(--grijs); color: var(--navy); border-color: var(--navy); }
+
     /* ── MVA TALENT KNOP (recruitment) ── */
     .btn-talent {
       flex: 0 0 auto;
@@ -907,14 +978,26 @@
       <div class="stat-label">📦 Archief</div>
     </div>
   </div>
+  <!-- DATUM-NAVIGATOR — pijltjes om door dagen te bladeren -->
+  <div class="datum-nav" id="datum-nav">
+    <button class="datum-nav-btn" id="datum-vorige" onclick="datumNav(-1)" title="Vorige dag">←</button>
+    <div class="datum-nav-label" id="datum-label" onclick="datumReset()" title="Klik om alle datums te tonen">📅 Alle datums</div>
+    <button class="datum-nav-btn" id="datum-volgende" onclick="datumNav(1)" title="Volgende dag">→</button>
+  </div>
+
   <div style="padding:0 16px 8px;display:flex;justify-content:space-between;align-items:center;gap:10px">
     <div style="font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em">
       JOUW BEZICHTIGINGEN
     </div>
-    <button id="btn-selectiemodus" onclick="toggleSelectiemodus()"
-      style="background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;color:var(--grijs-tekst);cursor:pointer">
-      &#9744; Selectie
-    </button>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button id="btn-sorteer" class="btn-sorteer" onclick="toggleSortering()" title="Wissel sortering">
+        ↓ Nieuwste eerst
+      </button>
+      <button id="btn-selectiemodus" onclick="toggleSelectiemodus()"
+        style="background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;color:var(--grijs-tekst);cursor:pointer">
+        &#9744; Selectie
+      </button>
+    </div>
   </div>
   <div style="padding:0 16px 10px">
     <div style="position:relative">
@@ -1264,6 +1347,75 @@
     }
   }
 
+  // ── DATUM-NAVIGATIE ──────────────────────────────────────────────────
+  // Gebruiker kan met pijltjes door dagen bladeren. Default = alle datums tonen.
+  // window._datumFilter = null → toon alle, anders 'YYYY-MM-DD'
+  window._datumFilter = null;
+
+  function vandaagISO() {
+    const d = new Date();
+    // Lokale datum als YYYY-MM-DD (Europe/Amsterdam)
+    return d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' });
+  }
+
+  function datumNav(dagDelta) {
+    // Bepaal startpunt: huidige filter, of vandaag als geen filter actief
+    const start = window._datumFilter || vandaagISO();
+    const d = new Date(start + 'T12:00:00');
+    d.setDate(d.getDate() + dagDelta);
+    window._datumFilter = d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' });
+    filterBezichtigingen();
+  }
+  window.datumNav = datumNav;
+
+  function datumReset() {
+    window._datumFilter = null;
+    filterBezichtigingen();
+  }
+  window.datumReset = datumReset;
+
+  function updateDatumLabel() {
+    const label = document.getElementById('datum-label');
+    if (!label) return;
+    const filter = window._datumFilter;
+    if (!filter) {
+      label.textContent = '📅 Alle datums';
+      label.classList.remove('actief');
+      return;
+    }
+    label.classList.add('actief');
+    const today = vandaagISO();
+    const d = new Date(filter + 'T12:00:00');
+    const today_d = new Date(today + 'T12:00:00');
+    const diffDagen = Math.round((d - today_d) / 86400000);
+    const dagnaam = d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Amsterdam' });
+    let prefix = '';
+    if (diffDagen === 0) prefix = 'Vandaag · ';
+    else if (diffDagen === 1) prefix = 'Morgen · ';
+    else if (diffDagen === -1) prefix = 'Gisteren · ';
+    // Tel zichtbare kaarten op deze datum
+    const zichtbaar = document.querySelectorAll('#geven-container .bez-card:not([style*="display: none"])').length;
+    label.innerHTML = `📅 ${prefix}${dagnaam}<span class="datum-nav-teller">(${zichtbaar})</span>`;
+  }
+
+  // ── SORTERING TOGGLE ─────────────────────────────────────────────────
+  // Voorkeur in localStorage zodat 'ie persistent is per browser
+  function toggleSortering() {
+    const huidig = localStorage.getItem('mva_sorteer') || 'desc';
+    const nieuw = huidig === 'desc' ? 'asc' : 'desc';
+    localStorage.setItem('mva_sorteer', nieuw);
+    // Herlaad bezichtigingen zodat de nieuwe sortering doorgevoerd wordt
+    laadBezichtigingen();
+  }
+  window.toggleSortering = toggleSortering;
+
+  function updateSorteerKnop() {
+    const btn = document.getElementById('btn-sorteer');
+    if (!btn) return;
+    const richting = localStorage.getItem('mva_sorteer') || 'desc';
+    btn.textContent = richting === 'desc' ? '↓ Nieuwste eerst' : '↑ Oudste eerst';
+  }
+
   // ── FILTER BEZICHTIGINGEN ─────────────────────────────────────────────
   // Klik op stat-kaart filtert de lijst: 'alles' / 'open' / 'pool' / 'zelf' / 'afgehandeld' / 'archief'
   function filterBezichtigingen(modus) {
@@ -1294,6 +1446,7 @@
     document.getElementById('geven-container').style.display = '';
 
     const zoekTerm = (document.getElementById('filter-adres')?.value || '').toLowerCase().trim();
+    const datumFilter = window._datumFilter || null;  // YYYY-MM-DD of null = alle datums
     const cards = document.querySelectorAll('#geven-container .bez-card');
     cards.forEach(card => {
       const inPool = card.dataset.inpool === '1';
@@ -1304,6 +1457,11 @@
       else if (modus === 'pool')         toon = actie === 'pool';
       else if (modus === 'zelf')         toon = actie === 'zelf';
       else if (modus === 'afgehandeld')  toon = actie === 'afgehandeld';
+      // Datum-filter (over alle modi heen behalve archief)
+      if (toon && datumFilter) {
+        const cardDatum = card.dataset.datum || '';
+        toon = cardDatum === datumFilter;
+      }
       // Pas zoekterm-filter toe over de modus-filter heen
       if (toon && zoekTerm) {
         const adres = card.dataset.adres || '';
@@ -1313,6 +1471,7 @@
       }
       card.style.display = toon ? '' : 'none';
     });
+    updateDatumLabel();
   }
   window.filterBezichtigingen = filterBezichtigingen;
 
@@ -1705,8 +1864,14 @@
       });
       const json = await res.json();
       const items = json?.bezichtigingen || [];
-           // Nieuwste bezichtigingen eerst (Rogier's wens)
-           items.sort((a, b) => (b.datum || '').localeCompare(a.datum || ''));
+           // Sortering: respecteer opgeslagen voorkeur (default = nieuwste eerst)
+           const sorteerRichting = localStorage.getItem('mva_sorteer') || 'desc';
+           items.sort((a, b) => {
+             const cmp = (a.datum || '').localeCompare(b.datum || '')
+                      || (a.tijdstip || '').localeCompare(b.tijdstip || '');
+             return sorteerRichting === 'asc' ? cmp : -cmp;
+           });
+           updateSorteerKnop();
 
       const totaal = items.length;
       const gedeeld = items.filter(b => b.actie_status === 'pool').length;
