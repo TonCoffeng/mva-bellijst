@@ -1885,8 +1885,8 @@
                 class="btn-talent ${isWaarschijnlijkMakelaar(b.naam, b.email) ? 'actief' : ''}"
                 id="btn-talent-${b.id}"
                 onclick="opentalentModal('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${(b.email || '').replace(/'/g, "\\'")}', '${(b.telefoon || '').replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
-                title="Aanmerken als MVA Talent (recruitment)">
-                🌱 MVA Talent
+                title="Rank deze makelaar (recruitment)">
+                🌱 Rank de makelaar
               </button>
             </div>
           </div>`;
@@ -2460,12 +2460,12 @@
       // Knop in card markeren als aangemeld
       if (knop) {
         knop.classList.add('aangemeld');
-        knop.textContent = '✅ Talent aangemeld';
+        knop.textContent = '✅ Gerankt';
         knop.disabled = true;
         knop.onclick = null;
       }
       sluitTalentModal();
-      toonToast(`🌱 ${talentContext.naam} aangemeld als MVA Talent`, 'goed');
+      toonToast(`🌱 ${talentContext.naam} toegevoegd aan recruitment`, 'goed');
     } catch (err) {
       bevestigBtn.disabled = false;
       bevestigBtn.textContent = '🌱 Aanmelden';
@@ -2993,8 +2993,8 @@
 <!-- MVA TALENT MODAL (recruitment Cloze) -->
 <div class="talent-modal-bg" id="talent-modal-bg" onclick="if(event.target===this)sluitTalentModal()">
   <div class="talent-modal" role="dialog" aria-labelledby="talent-modal-titel">
-    <h3 id="talent-modal-titel">🌱 Aanmerken als MVA Talent</h3>
-    <p id="talent-modal-omschrijving">Voeg <strong id="talent-modal-naam">deze persoon</strong> toe aan jouw recruitment-database als potentiële MVA-makelaar.</p>
+    <h3 id="talent-modal-titel">🌱 Rank deze makelaar</h3>
+    <p id="talent-modal-omschrijving">Voeg <strong id="talent-modal-naam">deze persoon</strong> toe aan jouw recruitment-database — straks (volgende fase) kun je hier ook 1-5 sterren geven.</p>
     <label for="talent-modal-toelichting">Toelichting (optioneel)</label>
     <textarea
       id="talent-modal-toelichting"
