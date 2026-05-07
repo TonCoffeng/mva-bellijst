@@ -1429,14 +1429,10 @@
       .filter(c => c.style.display !== 'none');
     if (zichtbaar.length < 2) return;
     zichtbaar.sort((a, b) => {
-      const da = a.dataset.datum || '';
-      const db = b.dataset.datum || '';
-      const datumCmp = da.localeCompare(db);
-      if (datumCmp !== 0) return richting === 'asc' ? datumCmp : -datumCmp;
-      // Binnen dezelfde datum: altijd chronologisch (vroeg → laat)
-      const ta = a.dataset.tijdstip || '';
-      const tb = b.dataset.tijdstip || '';
-      return ta.localeCompare(tb);
+      const da = (a.dataset.datum || '') + ' ' + (a.dataset.tijdstip || '');
+      const db = (b.dataset.datum || '') + ' ' + (b.dataset.tijdstip || '');
+      const cmp = da.localeCompare(db);
+      return richting === 'asc' ? cmp : -cmp;
     });
     // Verplaats kaarten naar nieuwe volgorde (appendChild verplaatst, niet kopieert)
     zichtbaar.forEach(c => container.appendChild(c));
@@ -1893,17 +1889,15 @@
       });
       const json = await res.json();
       const items = json?.bezichtigingen || [];
-           // Sortering: datum volgens voorkeur (nieuwste of oudste eerst),
-           // maar binnen dezelfde datum altijd chronologisch op tijd (8:00 → 18:00)
-           // zodat een dag-overzicht logisch leesbaar is.
+           // Sortering: datum+tijd volgens voorkeur (Nieuwste = meest recent
+           // bovenaan, Oudste = vroegste bovenaan). Binnen dezelfde dag werkt
+           // de knop ook (consistent met hersorteerZichtbareKaarten).
            const sorteerRichting = localStorage.getItem('mva_sorteer') || 'desc';
            items.sort((a, b) => {
-             const datumCmp = (a.datum || '').localeCompare(b.datum || '');
-             if (datumCmp !== 0) {
-               return sorteerRichting === 'asc' ? datumCmp : -datumCmp;
-             }
-             // Zelfde datum → altijd chronologisch op tijd (vroeg eerst)
-             return (a.tijdstip || '').localeCompare(b.tijdstip || '');
+             const da = (a.datum || '') + ' ' + (a.tijdstip || '');
+             const db = (b.datum || '') + ' ' + (b.tijdstip || '');
+             const cmp = da.localeCompare(db);
+             return sorteerRichting === 'asc' ? cmp : -cmp;
            });
            updateSorteerKnop();
 
