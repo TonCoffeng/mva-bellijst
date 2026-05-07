@@ -513,6 +513,58 @@
     .btn-naar-pool:disabled { background: var(--grijs-mid); color: var(--grijs-tekst); cursor: default; }
     .btn-naar-pool.gedeeld { background: var(--groen); }
 
+    /* ── ACTIEBALK responsive (Pool / Zelf / Afgehandeld / Talent) ── */
+    /* Container: desktop = flex-rij; mobiel = pool 100% + 3-kolom grid eronder */
+    .actiebalk {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .actiebalk .btn-naar-pool { flex: 1; min-width: 200px; }
+    .actiebalk .btn-zichzelf,
+    .actiebalk .btn-afgehandeld,
+    .actiebalk .btn-talent {
+      flex: 0 0 auto;
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .actiebalk .btn-zichzelf {
+      background: var(--navy);
+      color: white;
+      border: none;
+    }
+    .actiebalk .btn-zichzelf.gedeeld { background: #2e7d32; }
+    .actiebalk .btn-afgehandeld {
+      background: #2E7D32;
+      color: white;
+      border: none;
+    }
+    /* Mobiel (≤600px): pool volledige breedte, daaronder 3-koloms grid */
+    @media (max-width: 600px) {
+      .actiebalk { gap: 6px; }
+      .actiebalk .btn-naar-pool { flex: 1 1 100%; min-width: 0; }
+      .actiebalk .btn-zichzelf,
+      .actiebalk .btn-afgehandeld,
+      .actiebalk .btn-talent {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 10px 8px;
+        font-size: 12px;
+        text-align: center;
+      }
+    }
+    /* MVA Talent: standaard verborgen — wordt zichtbaar via .actief class */
+    .btn-talent { display: none; }
+    .btn-talent.actief { display: inline-block; }
+    @media (max-width: 600px) {
+      .btn-talent.actief { display: block; }
+    }
+
     /* ── MVA TALENT KNOP (recruitment) ── */
     .btn-talent {
       flex: 0 0 auto;
@@ -1680,6 +1732,21 @@
         return;
       }
 
+      // ── DETECTIE: bezichtiger waarschijnlijk een externe makelaar? ──
+      // Gebruikt voor MVA Talent knop (alleen tonen bij externe makelaars).
+      // - sluit MVA-eigen domeinen uit (makelaarsvan.nl, teunisse.nl)
+      // - matcht email-domein op makelaars-trefwoorden
+      // - matcht naam op makelaar/makelaardij/broker (woord-grens)
+      function isWaarschijnlijkMakelaar(naam, email) {
+        const e = (email || '').toLowerCase();
+        const n = (naam || '').toLowerCase();
+        if (e.endsWith('@makelaarsvan.nl')) return false;  // MVA-eigen
+        if (e.endsWith('@teunisse.nl')) return false;       // zusterkantoor Purmerend
+        if (/(makelaar|makelaardij|vastgoed|realestate|broker)/.test(e)) return true;
+        if (/\b(makelaar|makelaardij|broker)\b/.test(n)) return true;
+        return false;
+      }
+
       container.innerHTML = items.map(b => {
         // Persistente actie-status uit backend (overleeft refresh)
         // 'pool' = naar pool gestuurd, 'zelf' = niet-naar-pool (zelf bellen of afgehandeld), '' = open
@@ -1790,13 +1857,13 @@
               </button>
             </div>
 
-            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
+            <div class="actiebalk">
               <button
                 class="btn-naar-pool ${actieStatus==='pool' ? 'gedeeld' : ''}"
                 id="btn-${b.id}"
                 onclick="geefNaarPool('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
                 ${actieStatus==='pool' ? 'disabled' : ''}
-                ${alGedeeld && actieStatus !== 'pool' ? 'style="flex:1;opacity:0.45;cursor:not-allowed" disabled' : 'style="flex:1"'}>
+                ${alGedeeld && actieStatus !== 'pool' ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
                 ${actieStatus==='pool' ? '✅ Al in de pool' : '📤 Geef door aan pool'}
               </button>
               <button
@@ -1804,20 +1871,18 @@
                 id="btn-zelf-${b.id}"
                 onclick="geefAanZichzelf('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
                 ${actieStatus==='zelf' ? 'disabled' : ''}
-                style="flex:0 0 auto;padding:12px 14px;background:${actieStatus==='zelf' ? '#2e7d32' : 'var(--navy)'};color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:${alGedeeld && actieStatus !== 'zelf' ? 'not-allowed' : 'pointer'};white-space:nowrap;opacity:${alGedeeld && actieStatus !== 'zelf' ? '0.45' : '1'}"
-                ${alGedeeld && actieStatus !== 'zelf' ? 'disabled' : ''}>
+                ${alGedeeld && actieStatus !== 'zelf' ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
                 ${actieStatus==='zelf' ? '✅ Staat bij jou!' : '👤 Zelf bellen'}
               </button>
               <button
                 class="btn-afgehandeld"
                 id="btn-afgehandeld-${b.id}"
                 onclick="markeerAfgehandeld('${b.id}', '${b.naam.replace(/'/g, "\'")}', '${b.adres?.replace(/'/g, "\'") || ''}')"
-                style="flex:0 0 auto;padding:12px 14px;background:#2E7D32;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:${alGedeeld ? 'not-allowed' : 'pointer'};white-space:nowrap;opacity:${alGedeeld ? '0.45' : '1'}"
-                ${alGedeeld ? 'disabled' : ''}>
+                ${alGedeeld ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
                 ✅ Afgehandeld
               </button>
               <button
-                class="btn-talent"
+                class="btn-talent ${isWaarschijnlijkMakelaar(b.naam, b.email) ? 'actief' : ''}"
                 id="btn-talent-${b.id}"
                 onclick="opentalentModal('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${(b.email || '').replace(/'/g, "\\'")}', '${(b.telefoon || '').replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
                 title="Aanmerken als MVA Talent (recruitment)">
