@@ -81,8 +81,18 @@ exports.handler = async (event) => {
     }
     const rows = await bezRes.json();
 
+    // Filter lege placeholder-slots eruit (Realworks Bezichtigingsplanner
+    // levert ook lege "+ Relatie koppelen" tijdslots door — geen naam, geen
+    // email, geen telefoon. Niets om feedback over te geven, dus verbergen.)
+    const isLegeSlot = (b) =>
+      !((b.bezichtiger_naam || '').trim()) &&
+      !((b.bezichtiger_email || '').trim()) &&
+      !((b.bezichtiger_telefoon || '').trim());
+
+    const gefilterdeRows = rows.filter(r => !isLegeSlot(r));
+
     // Stap 3: map naar Monday-style output (zodat frontend code ongewijzigd blijft)
-    const bezichtigingen = rows.map(row => {
+    const bezichtigingen = gefilterdeRows.map(row => {
       // Splits datum_tijd naar datum + tijdstip in Europe/Amsterdam tijdzone
       let datum = null;
       let tijdstip = null;
