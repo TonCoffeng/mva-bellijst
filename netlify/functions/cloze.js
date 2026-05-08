@@ -274,6 +274,10 @@ exports.handler = async (event) => {
       // Daarmee kunnen we altijd een klikbare link bouwen op de frontend.
       const cloze_id = gevonden?.id || gevonden?.personId || gevonden?._id || gevonden?.pid || gevonden?.contactId || null;
 
+      // Debug: alle top-level velden van Cloze response (alleen veld-namen, geen
+      // gevoelige waarden). Helpt bij ontdekken welk veld de id bevat.
+      const debug_velden = gevonden ? Object.keys(gevonden).slice(0, 30) : [];
+
       return {
         statusCode: 200,
         headers,
@@ -288,6 +292,7 @@ exports.handler = async (event) => {
           created_at,
           eigenaar_email,
           eigenaar_naam,
+          _debug_velden: debug_velden,               // tijdelijk — voor debug van id-veld
         }),
       };
     }
