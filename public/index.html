@@ -2183,7 +2183,7 @@
           }
 
           if (!json.bestaand) {
-            badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`;
+            badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Niet in Cloze</span>`;
             return;
           }
 
@@ -2192,30 +2192,39 @@
           const huidigeEmail = (huidigeMakelaar?.email || '').toLowerCase();
           const heeftEigenaar = !!eigenaarEmail;
           const heeftAndereEigenaar = heeftEigenaar && eigenaarEmail !== huidigeEmail;
+          const benIkZelfEigenaar = heeftEigenaar && eigenaarEmail === huidigeEmail;
           const clozeUrl = json.id ? `https://app.cloze.com/app/#/people/${json.id}` : null;
           const eigenaarNaam = json.eigenaar_naam || (eigenaarEmail ? eigenaarEmail.split('@')[0] : '');
+          const stage = json.stage || null;
+          const stageLabel = stage ? ` · ${stage}` : '';
           const signalenLabel = signalen.length ? ` · ${signalen.join(', ')}` : '';
 
-          // Hoofdbadge: bij sterke klant prominenter (oranje), bij zwakke klant grijzer
+          // Wrapper helper — alle Cloze-badges altijd klikbaar wanneer id bekend
           const wrap = (cls, tekst, titel) => clozeUrl
             ? `<a href="${clozeUrl}" target="_blank" rel="noopener" class="${cls} klikbaar" title="${titel}">${tekst}</a>`
-            : `<span class="${cls}">${tekst}</span>`;
+            : `<span class="${cls}" title="${titel}">${tekst}</span>`;
 
           let html = '';
           if (sterkte === 'sterk' && heeftAndereEigenaar) {
-            // Sterke klant van een collega — duidelijk signaal afgeven
+            // Sterke klant van een collega — duidelijk signaal
             html = wrap('cloze-badge sterk', `🔥 Klant van ${eigenaarNaam}${signalenLabel}`, 'Open in Cloze — bekijk relatiediepte');
+          } else if (sterkte === 'sterk' && benIkZelfEigenaar) {
+            // Sterke klant, ik ben eigenaar
+            html = wrap('cloze-badge bekend', `📁 Jouw klant${signalenLabel}`, 'Open in Cloze');
           } else if (sterkte === 'sterk') {
-            // Sterke klant van mezelf, of zonder eigenaar maar wel sterk
-            html = wrap('cloze-badge bekend', `📁 Bekend in Cloze${signalenLabel}`, 'Open in Cloze');
-            if (!heeftEigenaar) html += ' ' + wrap('cloze-vrij', '👤 Geen eigenaar', 'Open in Cloze');
+            // Sterke klant zonder eigenaar (zeldzaam, maar mogelijk)
+            html = wrap('cloze-badge bekend', `📁 Bekend in Cloze · ongekoppeld${signalenLabel}`, 'Open in Cloze — geen eigenaar gekoppeld');
+          } else if (sterkte === 'zwak' && heeftAndereEigenaar) {
+            // Zwak signaal: wel in Cloze bij collega maar geen klantmarkering
+            html = wrap('cloze-badge zwak', `📁 Op naam ${eigenaarNaam} · zwak signaal`, 'Bekend bij collega in Cloze, maar geen klantmarkering');
+          } else if (sterkte === 'zwak' && benIkZelfEigenaar) {
+            // Wel in Cloze bij mezelf, maar geen klantmarkering
+            html = wrap('cloze-badge zwak', `📁 Jouw contact · zwak signaal`, 'Bekend bij jou in Cloze, geen klantmarkering');
           } else if (sterkte === 'zwak') {
-            // Wel in Cloze, maar geen klantmarkering — gewoon doorlopen naar pool
-            const stageLabel = json.stage ? ` · ${json.stage}` : '';
-            html = wrap('cloze-badge zwak', `📁 Bekend bij ${eigenaarNaam || 'niemand'}${stageLabel}`, 'Open in Cloze — bekend maar geen klantmarkering');
+            // In Cloze maar geen eigenaar EN geen klantmarkering
+            html = wrap('cloze-badge zwak', `📁 Bekend in Cloze · zwak signaal`, 'In Cloze zonder eigenaar of klantmarkering');
           } else {
-            // sterkte === 'geen' kan niet voorkomen wanneer json.bestaand=true,
-            // maar voor de zekerheid:
+            // Fallback (zou niet mogen voorkomen als bestaand=true)
             html = wrap('cloze-badge bekend', '📁 Bekend in Cloze', 'Open in Cloze');
           }
 
@@ -3080,28 +3089,42 @@
         const badge = document.getElementById(`cloze-badge-${lead.id}`);
         if (badge) {
           if (!json.bestaand) {
-            badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Nieuw contact</span>`;
+            badge.innerHTML = `<span class="cloze-badge nieuw">🆕 Niet in Cloze</span>`;
           } else {
             const eigenaarEmail = (json.eigenaar_email || '').toLowerCase();
             const huidigeEmail = (huidigeMakelaar?.email || '').toLowerCase();
             const heeftEigenaar = !!eigenaarEmail;
             const heeftAndereEigenaar = heeftEigenaar && eigenaarEmail !== huidigeEmail;
+            const benIkZelfEigenaar = heeftEigenaar && eigenaarEmail === huidigeEmail;
             const clozeUrl = json.id ? `https://app.cloze.com/app/#/people/${json.id}` : null;
+            const eigenaarNaam = json.eigenaar_naam || (eigenaarEmail ? eigenaarEmail.split('@')[0] : '');
+            const stage = json.stage || null;
+            const stageLabel = stage ? ` · ${stage}` : '';
 
-            // Hoofdbadge — altijd klikbaar als we een Cloze-id hebben
-            let html = clozeUrl
-              ? `<a href="${clozeUrl}" target="_blank" rel="noopener" class="cloze-badge bekend klikbaar" title="Open in Cloze">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</a>`
-              : `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
+            // Klantsterkte óók aan deze kant — anders inconsistent
+            const sterkte = bepaalKlantSterkte(json);
+            const signalen = welkeSignalen(json);
+            const signalenLabel = signalen.length ? ` · ${signalen.join(', ')}` : '';
 
-            if (heeftAndereEigenaar) {
-              const eigenaarNaam = json.eigenaar_naam || eigenaarEmail.split('@')[0];
-              html += clozeUrl
-                ? ` <a href="${clozeUrl}" target="_blank" rel="noopener" class="cloze-eigenaar-warn" title="Open in Cloze in nieuw tabblad">🔔 Klant van ${eigenaarNaam}</a>`
-                : ` <span class="cloze-eigenaar-warn">🔔 Klant van ${eigenaarNaam}</span>`;
-            } else if (!heeftEigenaar) {
-              html += clozeUrl
-                ? ` <a href="${clozeUrl}" target="_blank" rel="noopener" class="cloze-vrij" title="Open in Cloze in nieuw tabblad">👤 Geen eigenaar</a>`
-                : ` <span class="cloze-vrij">👤 Geen eigenaar</span>`;
+            const wrap = (cls, tekst, titel) => clozeUrl
+              ? `<a href="${clozeUrl}" target="_blank" rel="noopener" class="${cls} klikbaar" title="${titel}">${tekst}</a>`
+              : `<span class="${cls}" title="${titel}">${tekst}</span>`;
+
+            let html = '';
+            if (sterkte === 'sterk' && heeftAndereEigenaar) {
+              html = wrap('cloze-badge sterk', `🔥 Klant van ${eigenaarNaam}${signalenLabel}`, 'Open in Cloze — bekijk relatiediepte');
+            } else if (sterkte === 'sterk' && benIkZelfEigenaar) {
+              html = wrap('cloze-badge bekend', `📁 Jouw klant${signalenLabel}`, 'Open in Cloze');
+            } else if (sterkte === 'sterk') {
+              html = wrap('cloze-badge bekend', `📁 Bekend in Cloze · ongekoppeld${signalenLabel}`, 'Open in Cloze — geen eigenaar gekoppeld');
+            } else if (sterkte === 'zwak' && heeftAndereEigenaar) {
+              html = wrap('cloze-badge zwak', `📁 Op naam ${eigenaarNaam} · zwak signaal`, 'Bekend bij collega in Cloze, maar geen klantmarkering');
+            } else if (sterkte === 'zwak' && benIkZelfEigenaar) {
+              html = wrap('cloze-badge zwak', `📁 Jouw contact · zwak signaal`, 'Bekend bij jou in Cloze, geen klantmarkering');
+            } else if (sterkte === 'zwak') {
+              html = wrap('cloze-badge zwak', `📁 Bekend in Cloze · zwak signaal`, 'In Cloze zonder eigenaar of klantmarkering');
+            } else {
+              html = wrap('cloze-badge bekend', '📁 Bekend in Cloze', 'Open in Cloze');
             }
             badge.innerHTML = html;
           }

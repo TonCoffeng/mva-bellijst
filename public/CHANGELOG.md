@@ -37,11 +37,20 @@ Niet elke Cloze-vermelding telde voorheen als klantschap — sommige makelaars z
 
 - **Frontend `bepaalKlantSterkte()` helper:** classificeert elk Cloze-contact als `'sterk'` / `'zwak'` / `'geen'`. Sterk = stage current/future, OF segment A/B/C, OF pinned, OF engagement>30, OF lead+>6mnd oud.
 
-- **Cloze-badge differentiatie:**
-  - 🔥 oranje "Klant van [naam] · [signalen]" bij sterke klant
-  - 📁 grijs "Bekend bij [naam] · stage" bij zwakke vermelding (geen klantmarkering — gaat gewoon naar Round Robin)
-  - 🆕 / 👤 zoals voorheen
-  - Alle badges blijven klikbaar en openen het Cloze-contact in nieuwe tab
+- **Cloze-badges — consistent label-systeem:** alle states uitgedacht en uniform gemaakt. Aan beide kanten (gevende makelaar én ontvangende makelaar in de bellijst) dezelfde labels. Alle badges altijd klikbaar (waar Cloze-id beschikbaar) → opent contact in Cloze in nieuwe tab.
+
+| State | Label |
+|---|---|
+| Niet in Cloze | 🆕 Niet in Cloze |
+| In Cloze, geen eigenaar, geen stage | 📁 Bekend in Cloze · ongekoppeld |
+| In Cloze, geen eigenaar, wel stage | 📁 Bekend in Cloze · ongekoppeld · [stage] |
+| Zwak signaal bij collega | 📁 Op naam [naam] · zwak signaal |
+| Sterk signaal bij collega | 🔥 Klant van [naam] · [signalen] |
+| Eigen contact, zwak | 📁 Jouw contact · zwak signaal |
+| Eigen klant, sterk | 📁 Jouw klant · [signalen] |
+| Zwak signaal zonder eigenaar | 📁 Bekend in Cloze · zwak signaal |
+
+Eerdere ambigue labels ("Bekend bij niemand · none", "Bekend bij niemand · lead") zijn vervangen — duidelijk wat het betekent. "Niet in Cloze" maakt expliciet dat afwezigheid betekent dat iemand niet bekend is bij MVA.
 
 - **Pool-knop modal aangepast:** alleen bij STERKE klant van een collega verschijnt de keuze-modal "Direct naar [naam]" / "🎲 Toch via Round Robin". Zwakke vermeldingen doorlopen direct Round Robin.
 
@@ -50,6 +59,10 @@ Niet elke Cloze-vermelding telde voorheen als klantschap — sommige makelaars z
 - **MVA Talent-knop verplaatst:** uit de actiebalk naar klein 🌱-icoontje rechtsbovenaan in de kaart (naast 🔔 push-knop). Alleen zichtbaar bij externe makelaars (`isWaarschijnlijkMakelaar` detectie). Functionaliteit ongewijzigd.
 
 - **`mvaConfirm` uitgebreid:** ondersteunt nu `annuleerTekst` parameter (voor "🎲 Toch via Round Robin"-knop) en `toonAnnuleer` om annuleer-knop te verbergen. Backwards compatible met bestaande callers.
+
+### Op de roadmap (niet in deze release)
+
+- **Hot-lead detectie:** bezichtigers met meerdere bezichtigingen in 30 dagen krijgen een 🔥-badge naast de Cloze-status. Indicatie van actieve zoeker. Telling via Supabase query op email/telefoon. Klikbaar → toont overzicht andere bezichtigingen (waar, wanneer, welke makelaar). Vereist nieuw endpoint `bezichtigingen-telling.js`.
 
 **Code-cleanup:**
 - `filterBezichtigingen()` vereenvoudigd — alleen modi `'open'` en `'alles'` blijven over. Modi `'pool'`, `'zelf'`, `'afgehandeld'`, `'archief'` weg.
