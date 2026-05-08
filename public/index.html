@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>MVA Bellijst</title>
+  <title>Makelaars van Amsterdam</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#1A2B5F" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="MVA Bellijst" />
+  <meta name="apple-mobile-web-app-title" content="Makelaars van Amsterdam" />
   <link rel="apple-touch-icon" href="/icon-192.png" />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
   <style>
@@ -53,14 +53,12 @@
     .header-logo {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 14px;
     }
-    .header-logo .dot {
-      width: 32px; height: 32px;
-      background: var(--oranje);
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700; color: white; font-size: 14px;
+    .header-logo img.logo {
+      height: 30px;
+      width: auto;
+      display: block;
     }
     .header-title { color: white; font-size: 17px; font-weight: 700; letter-spacing: 0.3px; }
     .header-sub { color: rgba(255,255,255,0.6); font-size: 12px; }
@@ -905,11 +903,8 @@
 <!-- HEADER -->
 <div class="header">
   <div class="header-logo">
-    <div class="dot">M</div>
-    <div>
-      <div class="header-title">MVA Bellijst</div>
-      <div class="header-sub" id="header-naam">Welkom</div>
-    </div>
+    <img class="logo" src="mva-logo.png" alt="Makelaars van Amsterdam" />
+    <div class="header-title" id="header-naam">Welkom</div>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <button id="btn-terug" class="hidden" onclick="gaNaarLogin()" style="background:none;border:1px solid rgba(255,255,255,0.35);color:white;padding:5px 14px;border-radius:20px;font-size:13px;cursor:pointer;font-family:inherit">← Terug</button>

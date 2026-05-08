@@ -23,6 +23,12 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 - "Afgehandeld" → "📦 Naar archief" — de oude tekst suggereerde dat het al gebeurd was. Na klik wordt het "📦 Gearchiveerd" (verleden tijd), en de toast leest "📦 [naam] gearchiveerd".
 - Icoon ✅ verdwijnt van de archief-knop (suggereerde 'klaar' vóór actie). Behouden op Zelf bellen waar ✅ wél past (= bevestiging na klik dat actie geslaagd is).
 
+**Header met MVA-logo:**
+- Oranje "M"-vakje vervangen door het MVA logo (`mva-logo.png`, 2KB) — diap-versie met witte letters + oranje "AMSTERDAM" + oranje punt, zwart→transparant gemaakt zodat het direct op de navy header zit zonder witte tegel ertussen.
+- Header-titel "MVA Bellijst" → naam van de ingelogde makelaar (bijv. "Ton Coffeng"). De oude titel dekte de lading niet meer (app doet al lang meer dan een bellijst), en "Bezichtigingen" zou dubbel zijn met de badge rechts. Naam is persoonlijker en netter.
+- Browser-tab + iPhone home screen-titel: "MVA Bellijst" → "Makelaars van Amsterdam".
+- Logo-hoogte 30px, past compact tussen de navy header en de stat-cards.
+
 **Code-cleanup:**
 - `filterBezichtigingen()` vereenvoudigd — alleen modi `'open'` en `'alles'` blijven over. Modi `'pool'`, `'zelf'`, `'afgehandeld'`, `'archief'` weg.
 - Teller-updates voor weggehaalde stat-cards weg uit `laadBezichtigingen()` en `markeerKaartAfgesloten()`.
