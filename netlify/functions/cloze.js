@@ -1,11 +1,6 @@
 exports.handler = async (event) => {
-  // Operationele Cloze (bezichtigingen, leads, bellijst)
   const CLOZE_API_KEY = process.env.CLOZE_API_KEY;
   const CLOZE_USER    = 'toncoffeng@makelaarsvan.nl';
-
-  // Recruitment Cloze (aparte omgeving voor MVA Talent)
-  const CLOZE_RECRUIT_API_KEY = process.env.CLOZE_RECRUIT_API_KEY;
-  const CLOZE_RECRUIT_USER    = process.env.CLOZE_RECRUIT_USER || 'recruiting@makelaarsvan.nl';
 
   const headers = {
     "Access-Control-Allow-Origin": "*",
@@ -19,18 +14,9 @@ exports.handler = async (event) => {
 
   const { action, data } = JSON.parse(event.body || "{}");
 
-  // Helper: Cloze API call (operationeel)
+  // Helper: Cloze API call
   const cloze = async (endpoint, body = null, method = 'POST') => {
     const url = `https://api.cloze.com/v1/${endpoint}?api_key=${CLOZE_API_KEY}&user_email=${CLOZE_USER}`;
-    const opts = { method, headers: { 'Content-Type': 'application/json' } };
-    if (body) opts.body = JSON.stringify(body);
-    const res = await fetch(url, opts);
-    return res.json();
-  };
-
-  // Helper: Cloze API call (recruitment omgeving)
-  const clozeRecruit = async (endpoint, body = null, method = 'POST') => {
-    const url = `https://api.cloze.com/v1/${endpoint}?api_key=${CLOZE_RECRUIT_API_KEY}&user_email=${CLOZE_RECRUIT_USER}`;
     const opts = { method, headers: { 'Content-Type': 'application/json' } };
     if (body) opts.body = JSON.stringify(body);
     const res = await fetch(url, opts);
@@ -272,85 +258,31 @@ exports.handler = async (event) => {
         if (!eigenaar_email && gevonden.owner) eigenaar_email = gevonden.owner;
       }
 
+      // ── KLANT-STERKTE-SIGNALEN — voor "echte klant" detectie ──────────
+      // Cloze velden om de relatiediepte te bepalen. Velden die niet bestaan
+      // zijn null, dat is OK — frontend filtert dan naar 'zwak'.
+      // - segment: 'A' / 'B' / 'C' / 'D' (priority-letter)
+      // - pinned: true/false (handmatig vinkje door eigenaar)
+      // - createdAt: ISO datum waarop contact is aangemaakt
+      // - engagement.score: 0-100
+      const segment    = gevonden?.segment || gevonden?.priority || null;
+      const pinned     = !!(gevonden?.pinned || gevonden?.priority === 'high');
+      const created_at = gevonden?.createdAt || gevonden?.created_at || null;
+
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           bestaand: !!gevonden,
-          id: gevonden?.id || null,
+          id: gevonden?.id || null,                 // expliciet — frontend gebruikt dit voor Cloze-link
           naam: gevonden?.name || null,
           stage: gevonden?.stage || null,
-          // Hoeveel interacties er al zijn (geeft inschatting van relatiediepte)
           interacties: gevonden?.engagement?.score || null,
-          // Eigenaar van het contact in Cloze (null = ongekoppeld)
+          segment,
+          pinned,
+          created_at,
           eigenaar_email,
           eigenaar_naam,
-        }),
-      };
-    }
-
-    // ── VOEG MVA TALENT TOE — naar recruitment Cloze ────────────────────
-    // Aanroepen wanneer een gevende makelaar iemand wil aanmerken als
-    // potentieel MVA-talent (bv. bezoeker bij bezichtiging blijkt zelf
-    // makelaar te zijn met DNA dat past bij MVA).
-    // Schrijft NIET naar de operationele Cloze maar naar de recruitment-omgeving.
-    if (action === "voeg_talent_toe") {
-      if (!CLOZE_RECRUIT_API_KEY) {
-        return {
-          statusCode: 500,
-          headers,
-          body: JSON.stringify({ error: "CLOZE_RECRUIT_API_KEY niet ingesteld in Netlify env vars" }),
-        };
-      }
-
-      const { naam, email, telefoon, spotter_naam, spotter_email, context, adres } = data;
-
-      // Notitie samenstellen — wie heeft hem gespot, waar, met welke toelichting
-      const datumNL = new Date().toLocaleDateString('nl-NL', {
-        day: 'numeric', month: 'long', year: 'numeric'
-      });
-      const notitieRegels = [
-        `🌱 Aangemerkt als MVA Talent op ${datumNL}`,
-        spotter_naam ? `Spotter: ${spotter_naam}` : null,
-        adres ? `Context: bezichtiging ${adres}` : null,
-        context ? `Toelichting: ${context}` : null,
-      ].filter(Boolean);
-      const notitie = notitieRegels.join('\n');
-
-      // 1. Contact aanmaken/updaten in recruitment Cloze
-      const personBody = {
-        name: naam,
-        ...(email    && { emails: [{ value: email }] }),
-        ...(telefoon && { phones: [{ value: telefoon, type: 'mobile' }] }),
-        stage: 'lead',
-        keywords: ['MVA Talent', 'Leadpool spot'],
-        segments: ['Kandidaat'],
-        assignedTo: CLOZE_RECRUIT_USER,
-        atAGlanceNotes: notitie,
-      };
-      const personResult = await clozeRecruit('people/create', personBody);
-
-      // 2. Notitie als activiteit op de tijdlijn
-      const noteBody = {
-        date: new Date().toISOString(),
-        style: 'note',
-        account: CLOZE_RECRUIT_USER,
-        subject: `🌱 MVA Talent gespot${spotter_naam ? ` door ${spotter_naam}` : ''}`,
-        body: notitie,
-        recipients: [
-          ...(email    ? [{ value: email,    name: naam }] : []),
-          ...(telefoon ? [{ value: telefoon, name: naam }] : []),
-        ],
-      };
-      const noteResult = await clozeRecruit('timeline/communication/create', noteBody);
-
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          ok: true,
-          person: personResult,
-          note: noteResult,
         }),
       };
     }
