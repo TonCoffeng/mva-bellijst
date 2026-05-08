@@ -5,7 +5,32 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
-## 2026-05-04 (vroeg)
+## 2026-05-08
+
+### Gewijzigd — Fase 1 herontwerp Geven-scherm
+
+Voorbereiding voor "Doorgegeven aan leadpool"-database-pagina (komt in fase 2). Stat-cards opgeschoond — de tellers waren grotendeels dood by design (backend zette `actie_status` én `gearchiveerd=true` tegelijk, terwijl `bezichtigingen.js` filterde op `gearchiveerd=false` → tellers altijd 0).
+
+**Stats-bar `public/index.html`:**
+- Verwijderd: stat-cards `Alles`, `Naar pool`, `Zelf bellen`, `Afgehandeld`, `📦 Archief`. De header-badge rechtsboven toont al het totaal — dubbel.
+- Behouden: stat-card `Open feedback` (filter werkt) — toggle-gedrag toegevoegd (tweede klik = uit).
+- Toegevoegd: knop `📂 Doorgegeven aan leadpool` met placeholder-pagina ("Komt eraan in fase 2"). Roept `openDoorgegevenPagina()` aan.
+
+**Code-cleanup:**
+- `filterBezichtigingen()` vereenvoudigd — alleen modi `'open'` en `'alles'` blijven over. Modi `'pool'`, `'zelf'`, `'afgehandeld'`, `'archief'` weg.
+- Teller-updates voor weggehaalde stat-cards weg uit `laadBezichtigingen()` en `markeerKaartAfgesloten()`.
+- `werkArchiefTellerBij()` call uit bulk-archiveer flow weg.
+- Archief-helpers (`laadArchief`, `herstelUitArchief`, `werkArchiefTellerBij`, `laadArchiefTeller`) blijven als dode code staan — niet meer aangeroepen, maar bewaard voor mogelijke koppeling aan de nieuwe Doorgegeven-pagina in fase 2. Roepen `getElementById('stat-geven-archief')` aan met `?.` chains, dus geen runtime errors.
+
+### Open voor fase 2
+
+- **Backend endpoint** `doorgegeven-leads.js` — leest uit `bezichtigingen` waar `actie_status='pool'` (incl. `gearchiveerd=true`), JOIN met `toewijzingen` en `bellijst_items`. Privacy: alleen leads van huidige gevende makelaar.
+- **Database-pagina UI** — datum-range filter, dropdown ontvangende makelaar, knoppen bel-status filter. Per regel: wie + datum + bel-status van ontvanger (besluit Ton: optie B uit overdracht).
+- **Cleanup oude lege records in Supabase** — staat nog open uit sessie 7 mei.
+
+---
+
+
 
 ### Gerepareerd
 

@@ -953,29 +953,13 @@
 <!-- GEVEN SCHERM -->
 <div id="geven-screen" class="hidden">
   <div class="stats-bar">
-    <div class="stat-card oranje filter-knop actief" id="filter-totaal" onclick="filterBezichtigingen('alles')" title="Toon alles">
-      <div class="stat-number" id="stat-geven-totaal">0</div>
-      <div class="stat-label">Alles</div>
-    </div>
-    <div class="stat-card filter-knop" id="filter-open" onclick="filterBezichtigingen('open')" title="Alleen open feedback">
+    <div class="stat-card filter-knop actief" id="filter-open" onclick="filterBezichtigingen('open')" title="Alleen open feedback">
       <div class="stat-number" id="stat-geven-nieuw">0</div>
       <div class="stat-label">Open feedback</div>
     </div>
-    <div class="stat-card groen filter-knop" id="filter-pool" onclick="filterBezichtigingen('pool')" title="Alleen al doorgegeven">
-      <div class="stat-number" id="stat-geven-gedeeld">0</div>
-      <div class="stat-label">Naar pool</div>
-    </div>
-    <div class="stat-card filter-knop" id="filter-zelf" onclick="filterBezichtigingen('zelf')" title="Alleen 'zelf bellen'">
-      <div class="stat-number" id="stat-geven-zelf">0</div>
-      <div class="stat-label">Zelf bellen</div>
-    </div>
-    <div class="stat-card filter-knop" id="filter-afgehandeld" onclick="filterBezichtigingen('afgehandeld')" title="Alleen afgehandeld">
-      <div class="stat-number" id="stat-geven-afgehandeld">0</div>
-      <div class="stat-label">Afgehandeld</div>
-    </div>
-    <div class="stat-card filter-knop" id="filter-archief" onclick="filterBezichtigingen('archief')" title="Toon archief">
-      <div class="stat-number" id="stat-geven-archief">0</div>
-      <div class="stat-label">📦 Archief</div>
+    <div class="stat-card filter-knop" id="filter-doorgegeven" onclick="openDoorgegevenPagina()" title="Bekijk wat je hebt doorgegeven aan de leadpool">
+      <div class="stat-number" style="font-size:22px">📂</div>
+      <div class="stat-label">Doorgegeven aan leadpool</div>
     </div>
   </div>
   <!-- DATUM-NAVIGATOR — pijltjes om door dagen te bladeren -->
@@ -1439,33 +1423,30 @@
   }
 
   // ── FILTER BEZICHTIGINGEN ─────────────────────────────────────────────
-  // Klik op stat-kaart filtert de lijst: 'alles' / 'open' / 'pool' / 'zelf' / 'afgehandeld' / 'archief'
+  // Klik op Open feedback toggle't alleen die filter; verder geen modi.
+  // 'alles' = standaard (geen filter actief), 'open' = alleen open feedback.
   function filterBezichtigingen(modus) {
     // Als geen modus opgegeven, herken de huidige actieve filter (voor zoek-input)
     if (!modus) {
       const actiefEl = document.querySelector('.filter-knop.actief');
-      const map = { 'filter-totaal': 'alles', 'filter-open': 'open', 'filter-pool': 'pool',
-                    'filter-zelf': 'zelf', 'filter-afgehandeld': 'afgehandeld', 'filter-archief': 'archief' };
-      modus = map[actiefEl?.id] || 'alles';
+      modus = (actiefEl?.id === 'filter-open') ? 'open' : 'alles';
     }
 
-    // Visuele staat van filter-knoppen alvast updaten
+    // Toggle: tweede klik op Open feedback zet 'm uit (alles tonen)
+    if (modus === 'open') {
+      const huidigActief = document.getElementById('filter-open')?.classList.contains('actief');
+      if (huidigActief) modus = 'alles';
+    }
+
+    // Visuele staat van filter-knoppen
     document.querySelectorAll('.filter-knop').forEach(el => el.classList.remove('actief'));
-    const map = { alles: 'filter-totaal', open: 'filter-open', pool: 'filter-pool',
-                  zelf: 'filter-zelf', afgehandeld: 'filter-afgehandeld', archief: 'filter-archief' };
-    const actiefEl = document.getElementById(map[modus]);
-    if (actiefEl) actiefEl.classList.add('actief');
-
-    // Archief-modus: laad gearchiveerde leads apart (uit Monday, niet uit DOM)
-    if (modus === 'archief') {
-      laadArchief();
-      return;
+    if (modus === 'open') {
+      document.getElementById('filter-open')?.classList.add('actief');
     }
 
-    // Live (niet-archief) modi: herstel zichtbaarheid van actuele kaarten
-    // en verberg een eventuele archief-weergave
-    document.getElementById('archief-container')?.remove();
+    // Zorg dat hoofd-container weer zichtbaar is (na evt. doorgegeven-pagina)
     document.getElementById('geven-container').style.display = '';
+    document.getElementById('doorgegeven-container')?.remove();
 
     const zoekTerm = (document.getElementById('filter-adres')?.value || '').toLowerCase().trim();
     const datumFilter = window._datumFilter || null;  // YYYY-MM-DD of null = alle datums
@@ -1473,18 +1454,14 @@
     cards.forEach(card => {
       const inPool = card.dataset.inpool === '1';
       const isOpen = card.classList.contains('bez-open');
-      const actie  = card.dataset.actie || ''; // 'pool' / 'zelf' / 'afgehandeld' / ''
       let toon = true;
-      if (modus === 'open')              toon = isOpen && !inPool;
-      else if (modus === 'pool')         toon = actie === 'pool';
-      else if (modus === 'zelf')         toon = actie === 'zelf';
-      else if (modus === 'afgehandeld')  toon = actie === 'afgehandeld';
-      // Datum-filter (over alle modi heen behalve archief)
+      if (modus === 'open') toon = isOpen && !inPool;
+      // Datum-filter
       if (toon && datumFilter) {
         const cardDatum = card.dataset.datum || '';
         toon = cardDatum === datumFilter;
       }
-      // Pas zoekterm-filter toe over de modus-filter heen
+      // Zoekterm-filter
       if (toon && zoekTerm) {
         const adres = card.dataset.adres || '';
         const naam  = card.dataset.naam  || '';
@@ -1493,12 +1470,51 @@
       }
       card.style.display = toon ? '' : 'none';
     });
-    // Na filteren: hersorteer de zichtbare kaarten zodat 'Nieuwste/Oudste eerst'
-    // klopt voor het gefilterde resultaat (bovenste = vroegste of laatste van filter)
+    // Na filteren: hersorteer zichtbare kaarten
     hersorteerZichtbareKaarten();
     updateDatumLabel();
   }
   window.filterBezichtigingen = filterBezichtigingen;
+
+  // ── DOORGEGEVEN AAN LEADPOOL — placeholder fase 1 ─────────────────────
+  // In fase 2 vult dit een echte database-pagina met JOIN op toewijzingen +
+  // bellijst_items. Voor nu: alleen visuele plek-houder zodat de knop werkt.
+  function openDoorgegevenPagina() {
+    document.querySelectorAll('.filter-knop').forEach(el => el.classList.remove('actief'));
+    document.getElementById('filter-doorgegeven')?.classList.add('actief');
+
+    // Verberg actuele lijst
+    const gevenContainer = document.getElementById('geven-container');
+    if (gevenContainer) gevenContainer.style.display = 'none';
+
+    // Plaats placeholder-container (of vernieuw bestaande)
+    let container = document.getElementById('doorgegeven-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'doorgegeven-container';
+      container.style.padding = '0 16px';
+      gevenContainer?.parentNode?.insertBefore(container, gevenContainer.nextSibling);
+    }
+    container.innerHTML = `
+      <div style="background:#fff;border:1px solid var(--rand);border-radius:14px;padding:30px;text-align:center;margin-top:20px">
+        <div style="font-size:48px;margin-bottom:14px">📂</div>
+        <div style="font-weight:700;color:var(--navy);font-size:18px;margin-bottom:8px">Doorgegeven aan leadpool</div>
+        <div style="color:var(--grijs-tekst);margin-bottom:20px;line-height:1.5">
+          Hier komt straks een overzicht van alle leads die je hebt doorgegeven:<br>
+          aan wie ze zijn toegewezen, wanneer, en wat de bel-status is.
+        </div>
+        <div style="display:inline-block;background:var(--licht);border-radius:8px;padding:10px 16px;color:var(--navy);font-weight:600">
+          🛠️ Komt eraan in fase 2
+        </div>
+        <div style="margin-top:24px">
+          <button onclick="filterBezichtigingen('alles')"
+                  style="background:var(--navy);color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600">
+            ← Terug naar bezichtigingen
+          </button>
+        </div>
+      </div>`;
+  }
+  window.openDoorgegevenPagina = openDoorgegevenPagina;
 
   // ── ARCHIVEREN ────────────────────────────────────────────────────────
   // Archiveer alle geselecteerde leads in één keer (alleen leads met actie)
@@ -1538,9 +1554,8 @@
       }
     }
 
-    // Stop selectiemodus + ververs tellers
+    // Stop selectiemodus
     if (selectieModusActief) toggleSelectiemodus();
-    werkArchiefTellerBij(+gelukt);
 
     if (mislukt === 0) {
       toonToast(`📦 ${gelukt} bezichtiging${gelukt===1?'':'en'} gearchiveerd`, 'succes');
@@ -1858,12 +1873,11 @@
       const open = document.querySelectorAll('.bez-open').length;
       document.getElementById('stat-geven-nieuw').textContent = open;
 
-      // Als er een filter actief is anders dan "alles", opnieuw toepassen
-      // zodat een net-afgehandelde kaart uit de "open" view verdwijnt
+      // Als "Open feedback" filter actief is, opnieuw toepassen zodat
+      // een net-afgehandelde kaart uit die view verdwijnt
       const actieveFilter = document.querySelector('.filter-knop.actief');
-      if (actieveFilter && actieveFilter.id !== 'filter-totaal') {
-        const modus = actieveFilter.id === 'filter-open' ? 'open' : 'pool';
-        filterBezichtigingen(modus);
+      if (actieveFilter && actieveFilter.id === 'filter-open') {
+        filterBezichtigingen('open');
       }
 
       toonToast(actief.length > 0
@@ -1902,19 +1916,9 @@
            updateSorteerKnop();
 
       const totaal = items.length;
-      const gedeeld = items.filter(b => b.actie_status === 'pool').length;
-      const zelf = items.filter(b => b.actie_status === 'zelf').length;
       const openFeedback = items.filter(b => !b.actie_status).length;
-      document.getElementById('stat-geven-totaal').textContent = totaal;
       document.getElementById('stat-geven-nieuw').textContent = openFeedback;
-      document.getElementById('stat-geven-gedeeld').textContent = gedeeld;
-      document.getElementById('stat-geven-zelf').textContent = zelf;
-      // Afgehandeld kunnen we (nog) niet onderscheiden van Zelf bellen op Monday-niveau,
-      // dus die teller blijft op de session-state staan en wordt door markeerKaartAfgesloten bijgewerkt.
       document.getElementById('header-badge').textContent = totaal + ' bezichtigingen';
-
-      // Haal archief-teller op de achtergrond op (blokkeert hoofdlaad niet)
-      laadArchiefTeller();
 
       if (totaal === 0) {
         container.innerHTML = `<div style="text-align:center;padding:60px 20px;color:var(--grijs-tekst)">
@@ -2405,24 +2409,16 @@
     card.dataset.inpool = '1';            // wordt verborgen door 'open' filter
     card.dataset.actie = actie || '';     // 'pool' / 'zelf' / 'afgehandeld'
 
-    // Tellers bijwerken — open -1, gekozen actie +1
+    // Tellers bijwerken — open feedback -1 (overige tellers zijn weg)
     const tel = (id) => parseInt(document.getElementById(id)?.textContent || '0', 10);
     const set = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = Math.max(0, n); };
     set('stat-geven-nieuw', tel('stat-geven-nieuw') - 1);
-    if (actie === 'pool')        set('stat-geven-gedeeld', tel('stat-geven-gedeeld') + 1);
-    if (actie === 'zelf')        set('stat-geven-zelf', tel('stat-geven-zelf') + 1);
-    if (actie === 'afgehandeld') set('stat-geven-afgehandeld', tel('stat-geven-afgehandeld') + 1);
 
     // Pas huidige filter opnieuw toe — als gebruiker op "Open feedback" staat
-    // verdwijnt de kaart nu visueel; op "Alles" blijft 'ie zichtbaar.
+    // verdwijnt de kaart nu visueel; anders blijft 'ie zichtbaar.
     const actiefFilter = document.querySelector('.filter-knop.actief');
-    if (actiefFilter) {
-      const modus = actiefFilter.id === 'filter-open' ? 'open'
-                  : actiefFilter.id === 'filter-pool' ? 'pool'
-                  : actiefFilter.id === 'filter-zelf' ? 'zelf'
-                  : actiefFilter.id === 'filter-afgehandeld' ? 'afgehandeld'
-                  : 'alles';
-      filterBezichtigingen(modus);
+    if (actiefFilter && actiefFilter.id === 'filter-open') {
+      filterBezichtigingen('open');
     }
   }
 
