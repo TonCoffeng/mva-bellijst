@@ -941,6 +941,18 @@
       background: #e2e8f0;
       color: #475569;
     }
+    /* MISMATCH waarschuwing: Cloze-match heeft afwijkende naam — opschoning gewenst */
+    .cloze-badge.mismatch {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fbbf24;
+      font-weight: 600;
+    }
+    a.cloze-badge.mismatch.klikbaar:hover {
+      background: #fde68a;
+      color: #78350f;
+      border-color: #f59e0b;
+    }
   </style>
   <!-- Supabase JS client (voor authenticatie) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2163,6 +2175,16 @@
             data: { email: b.email, telefoon: b.telefoon, naam: b.naam }
           })
         }).then(r => r.json()).then(json => {
+          // Debug: log Cloze response (tijdelijk — kan straks weg)
+          if (window._clozeDebug !== false) {
+            console.log(`[Cloze ${b.naam}]`, {
+              id: json.id,
+              eigenaar: json.eigenaar_email,
+              stage: json.stage,
+              segment: json.segment,
+              velden: json._debug_velden,
+            });
+          }
           const badge = document.getElementById(`cloze-badge-${b.id}`);
           if (!badge) return;
 
@@ -2213,8 +2235,16 @@
             ? `<a href="${clozeUrl}" target="_blank" rel="noopener" class="${cls} klikbaar" title="${titel}">${tekst}</a>`
             : `<span class="${cls}" title="${titel}">${tekst}</span>`;
 
+          // Naam-afwijking check: Cloze-match heeft een hele andere naam dan
+          // de bezichtiger. Meest voorkomende oorzaak: gedeeld emailadres
+          // (partners, makelaarsbureaus, oude klant onder dezelfde mail).
+          const naamAfwijkt = naamWijktAf(b.naam, json.naam);
+
           let html = '';
-          if (sterkte === 'sterk' && heeftAndereEigenaar) {
+          if (naamAfwijkt) {
+            // Waarschuwing voor afwijkende naam — vóór de normale Cloze-badge
+            html = wrap('cloze-badge mismatch', `⚠️ Cloze-match wijkt af: ${json.naam}`, 'Naam in Cloze wijkt af van bezichtiger — mogelijk gedeeld emailadres of opgeschoond record nodig');
+          } else if (sterkte === 'sterk' && heeftAndereEigenaar) {
             // Sterke klant van een collega — duidelijk signaal
             html = wrap('cloze-badge sterk', `🔥 Klant van ${eigenaarNaam}${signalenLabel}`, 'Open in Cloze — bekijk relatiediepte');
           } else if (sterkte === 'sterk' && benIkZelfEigenaar) {
@@ -2516,8 +2546,24 @@
   // nog niet klaar is, geen eigenaar bestaat, of de eigenaar de huidige
   // makelaar zelf is. Returns { email, naam } als er een ANDERE makelaar
   // eigenaar is van het Cloze-contact.
+  // ── NAAM-AFWIJKING DETECTIE — Cloze match vs bezichtiger ─────────────
+  // Wanneer Cloze een match geeft op email/telefoon, kan de naam afwijken.
+  // Bv: Eveline Kraan gebruikt eveline@francishelmig.nl wat in Cloze hoort
+  // bij Roos Solleveld (oude klant van Francis Helmig). Echte mismatch
+  // = niet hetzelfde achternaam-deel én niet dezelfde voornaam.
+  function naamWijktAf(bezichtigerNaam, clozeNaam) {
+    if (!bezichtigerNaam || !clozeNaam) return false;
+    const norm = (s) => s.toLowerCase().trim().split(/\s+/).filter(w => w.length > 1);
+    const bez = norm(bezichtigerNaam);
+    const cloze = norm(clozeNaam);
+    if (!bez.length || !cloze.length) return false;
+    // Match als ÉÉN woord uit beide namen overlapt (eerste/midden/achternaam)
+    // Dat dekt: "Jan de Vries" ↔ "Jan Vries", "M. Pietersen" ↔ "Marc Pietersen", etc.
+    const overlap = bez.some(w => cloze.includes(w));
+    return !overlap;
+  }
+
   // ── KLANT-STERKTE BEPALEN — wat is een 'echte klant'? ────────────────
-  // Niet elke Cloze-vermelding telt als klantschap. Sommige makelaars
   // zetten élke bezichtiger als contact in Cloze — dan zou bypass van
   // round robin oneerlijk veel leads naar die makelaar sturen.
   // 'sterk' = bypass-modal toont, 'zwak' = gewone pool-flow.
@@ -3128,8 +3174,13 @@
               ? `<a href="${clozeUrl}" target="_blank" rel="noopener" class="${cls} klikbaar" title="${titel}">${tekst}</a>`
               : `<span class="${cls}" title="${titel}">${tekst}</span>`;
 
+            // Naam-afwijking check (zelfde als geven-kant)
+            const naamAfwijkt = naamWijktAf(lead.naam, json.naam);
+
             let html = '';
-            if (sterkte === 'sterk' && heeftAndereEigenaar) {
+            if (naamAfwijkt) {
+              html = wrap('cloze-badge mismatch', `⚠️ Cloze-match wijkt af: ${json.naam}`, 'Naam in Cloze wijkt af van bezichtiger — mogelijk gedeeld emailadres of opgeschoond record nodig');
+            } else if (sterkte === 'sterk' && heeftAndereEigenaar) {
               html = wrap('cloze-badge sterk', `🔥 Klant van ${eigenaarNaam}${signalenLabel}`, 'Open in Cloze — bekijk relatiediepte');
             } else if (sterkte === 'sterk' && benIkZelfEigenaar) {
               html = wrap('cloze-badge bekend', `📁 Jouw klant${signalenLabel}`, 'Open in Cloze');

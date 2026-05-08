@@ -52,12 +52,23 @@ Niet elke Cloze-vermelding telde voorheen als klantschap — sommige makelaars z
 
 "Indicatie geen klant" is gekozen boven "zwak signaal" omdat het feitelijker is — het zegt wat het signaal **inhoudt** (er staat geen klantmarkering), niet alleen dat het zwak is.
 
-- **Cloze-link altijd klikbaar (fix):** voorheen kon de badge in de UI als niet-klikbare `<span>` renderen wanneer Cloze geen `id` retourneerde — bv. bij fuzzy name-match. Nu drie fallbacks:
-  - Backend probeert meerdere id-veldnamen (`id`, `personId`, `_id`, `pid`, `contactId`)
-  - Frontend bouwt fallback URL via `cloze.com/in/?contact={email}` (opent direct de contactkaart, géén zoekoverzicht)
-  - Telefoon-based URL als laatste optie
+- **Cloze name-mismatch waarschuwing (nieuw):** wanneer Cloze een match retourneert via email of telefoon, kan de naam toch afwijken. Voorbeeld: "Eveline Kraan" gebruikt `eveline@francishelmig.nl`, en dat email is in Cloze gekoppeld aan "Roos Solleveld" (oude klant). Frontend `naamWijktAf()` helper detecteert dit door te kijken of er enige overlap is in voornaam/achternaam-woorden. Bij een echte mismatch verschijnt amber badge `⚠️ Cloze-match wijkt af: [naam]` ipv de gewone Cloze-status. Klikbaar zodat makelaar in Cloze kan opschonen of waarom-checken.
+
+  Dit lost een echte bug op die zichtbaar werd tijdens debug: makelaars zagen vroeger "Bekend in Cloze · indicatie geen klant" terwijl ze stiekem naar het record van een ándere klant keken. Nu duidelijk gemarkeerd.
+
+- **Cloze-link altijd klikbaar (fix):** drie samenhangende bugs gefixt na live debug:
   
-  Resultaat: vrijwel altijd klikbaar én altijd direct naar de juiste kaart.
+  **Bug 1 — Fuzzy name-match leverde verkeerde contacten op.** De zoekquery viel terug op naam-search (`freeformquery=Eveline Kraan`) wanneer email/telefoon geen treffer gaven. Cloze matchte dan op een random naam-deel ("Eveline" → bv. "Eveline Pietersen") en stuurde dat contact terug. Resultaat: gevende makelaar zag info van een ander contact dan de bezichtiger.
+  
+  *Fix:* alleen nog op email + telefoon matchen, en de match wordt achteraf gevalideerd — het gevonden contact móet de gezochte email of telefoon bevatten. Anders → niet gevonden, badge wordt 🆕 Niet in Cloze.
+  
+  **Bug 2 — Cloze id-veld heet `portableId`, niet `id`.** De live response gaf `portableId` terug; mijn code zocht naar `id`/`personId`/`_id`/etc. Resultaat: `clozeUrl = null`, fallback URL viel terug op zoekoverzicht ipv contact.
+  
+  *Fix:* `portableId` toegevoegd als primaire id-bron.
+  
+  **Bug 3 — "none"-strings werden behandeld als waarden.** Cloze stuurt soms letterlijk `"none"` (string) terug voor stage/segment. Mijn `bepaalKlantSterkte` zag `segment === "none"` als geldige waarde.
+  
+  *Fix:* `"none"`-strings worden nu genormaliseerd naar `null`.
 
 Eerdere ambigue labels ("Bekend bij niemand · none", "Bekend bij niemand · lead") zijn vervangen — duidelijk wat het betekent. "Niet in Cloze" maakt expliciet dat afwezigheid betekent dat iemand niet bekend is bij MVA.
 
