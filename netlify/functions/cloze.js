@@ -272,7 +272,7 @@ exports.handler = async (event) => {
 
       // Cloze-id kan onder verschillende veldnamen voorkomen — pak de eerste valide.
       // Daarmee kunnen we altijd een klikbare link bouwen op de frontend.
-      const cloze_id = gevonden?.id || gevonden?._id || gevonden?.pid || gevonden?.contactId || null;
+      const cloze_id = gevonden?.id || gevonden?.personId || gevonden?._id || gevonden?.pid || gevonden?.contactId || null;
 
       return {
         statusCode: 200,
