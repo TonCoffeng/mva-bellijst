@@ -227,18 +227,44 @@ exports.handler = async (event) => {
     if (action === "check_bestaand") {
       const { email, telefoon, naam } = data;
 
-      // Zoek op email eerst, dan telefoon, dan naam
-      const queries = [email, telefoon, naam].filter(Boolean);
+      // Zoek alleen op email en telefoon — die zijn uniek genoeg om
+      // safe te matchen. Naam-zoek leverde fuzzy false-positives op
+      // (bv. "Eveline Kraan" → "Roos Solleveld" via naam-deel match).
+      // Naam wordt alleen gebruikt om de match te valideren als laatste check.
+      const queries = [email, telefoon].filter(Boolean);
       let gevonden = null;
 
       for (const query of queries) {
         const res = await fetch(
-          `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(query)}&pagesize=1`
+          `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(query)}&pagesize=3`
         );
         const json = await res.json();
         if (json?.people?.length > 0) {
-          gevonden = json.people[0];
-          break;
+          // Valideer match: het gevonden contact moet email of telefoon
+          // bevatten die we zochten. Zo niet, was het een fuzzy match — overslaan.
+          const valid = json.people.find(p => {
+            // Email match
+            if (email && Array.isArray(p.emails)) {
+              const heeftMatch = p.emails.some(e =>
+                (e.value || e).toLowerCase() === email.toLowerCase()
+              );
+              if (heeftMatch) return true;
+            }
+            // Telefoon match (verwijder spaties/tekens voor vergelijking)
+            if (telefoon && Array.isArray(p.phones)) {
+              const tel = telefoon.replace(/\D/g, '');
+              const heeftMatch = p.phones.some(ph => {
+                const v = (ph.value || ph || '').replace(/\D/g, '');
+                return v && (v === tel || v.endsWith(tel) || tel.endsWith(v));
+              });
+              if (heeftMatch) return true;
+            }
+            return false;
+          });
+          if (valid) {
+            gevonden = valid;
+            break;
+          }
         }
       }
 
@@ -265,17 +291,19 @@ exports.handler = async (event) => {
       // - pinned: true/false (handmatig vinkje door eigenaar)
       // - createdAt: ISO datum waarop contact is aangemaakt
       // - engagement.score: 0-100
-      // Klant-sterkte signalen
-      const segment    = gevonden?.segment || gevonden?.priority || null;
+      // Klant-sterkte signalen — let op: Cloze stuurt soms de letterlijke
+      // string "none" terug ipv null. Behandelen als leeg.
+      const norm = (v) => (!v || v === 'none' || v === 'None') ? null : v;
+      const segment    = norm(gevonden?.segment) || norm(gevonden?.priority);
+      const stage      = norm(gevonden?.stage);
       const pinned     = !!(gevonden?.pinned || gevonden?.priority === 'high');
       const created_at = gevonden?.createdAt || gevonden?.created_at || null;
 
-      // Cloze-id kan onder verschillende veldnamen voorkomen — pak de eerste valide.
-      // Daarmee kunnen we altijd een klikbare link bouwen op de frontend.
-      const cloze_id = gevonden?.id || gevonden?.personId || gevonden?._id || gevonden?.pid || gevonden?.contactId || null;
+      // Cloze-id: het echte veld is `portableId` (uit live response geconfirmeerd).
+      // De andere namen blijven als fallback voor robuustheid.
+      const cloze_id = gevonden?.portableId || gevonden?.id || gevonden?.personId || gevonden?._id || gevonden?.pid || null;
 
-      // Debug: alle top-level velden van Cloze response (alleen veld-namen, geen
-      // gevoelige waarden). Helpt bij ontdekken welk veld de id bevat.
+      // Debug: alle top-level velden van Cloze response (alleen veld-namen).
       const debug_velden = gevonden ? Object.keys(gevonden).slice(0, 30) : [];
 
       return {
@@ -283,16 +311,16 @@ exports.handler = async (event) => {
         headers,
         body: JSON.stringify({
           bestaand: !!gevonden,
-          id: cloze_id,                              // primaire id voor /people/{id} URL
+          id: cloze_id,
           naam: gevonden?.name || null,
-          stage: gevonden?.stage || null,
+          stage,
           interacties: gevonden?.engagement?.score || null,
           segment,
           pinned,
           created_at,
           eigenaar_email,
           eigenaar_naam,
-          _debug_velden: debug_velden,               // tijdelijk — voor debug van id-veld
+          _debug_velden: debug_velden,
         }),
       };
     }
