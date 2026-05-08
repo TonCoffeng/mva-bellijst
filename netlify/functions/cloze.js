@@ -265,16 +265,21 @@ exports.handler = async (event) => {
       // - pinned: true/false (handmatig vinkje door eigenaar)
       // - createdAt: ISO datum waarop contact is aangemaakt
       // - engagement.score: 0-100
+      // Klant-sterkte signalen
       const segment    = gevonden?.segment || gevonden?.priority || null;
       const pinned     = !!(gevonden?.pinned || gevonden?.priority === 'high');
       const created_at = gevonden?.createdAt || gevonden?.created_at || null;
+
+      // Cloze-id kan onder verschillende veldnamen voorkomen — pak de eerste valide.
+      // Daarmee kunnen we altijd een klikbare link bouwen op de frontend.
+      const cloze_id = gevonden?.id || gevonden?._id || gevonden?.pid || gevonden?.contactId || null;
 
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           bestaand: !!gevonden,
-          id: gevonden?.id || null,                 // expliciet — frontend gebruikt dit voor Cloze-link
+          id: cloze_id,                              // primaire id voor /people/{id} URL
           naam: gevonden?.name || null,
           stage: gevonden?.stage || null,
           interacties: gevonden?.engagement?.score || null,
