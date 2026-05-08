@@ -2242,8 +2242,10 @@
 
           let html = '';
           if (naamAfwijkt) {
-            // Waarschuwing voor afwijkende naam — vóór de normale Cloze-badge
-            html = wrap('cloze-badge mismatch', `⚠️ Cloze-match wijkt af: ${json.naam}`, 'Naam in Cloze wijkt af van bezichtiger — mogelijk gedeeld emailadres of opgeschoond record nodig');
+            // Waarschuwing voor afwijkende naam — niet de naam zelf tonen
+            // (geeft onnodige verwarring), wel klikbaar zodat makelaar
+            // in Cloze kan kijken/opschonen.
+            html = wrap('cloze-badge mismatch', `⚠️ Cloze-match wijkt af`, 'Naam in Cloze wijkt af van bezichtiger — open in Cloze om te checken/opschonen');
           } else if (sterkte === 'sterk' && heeftAndereEigenaar) {
             // Sterke klant van een collega — duidelijk signaal
             html = wrap('cloze-badge sterk', `🔥 Klant van ${eigenaarNaam}${signalenLabel}`, 'Open in Cloze — bekijk relatiediepte');
@@ -3179,7 +3181,7 @@
 
             let html = '';
             if (naamAfwijkt) {
-              html = wrap('cloze-badge mismatch', `⚠️ Cloze-match wijkt af: ${json.naam}`, 'Naam in Cloze wijkt af van bezichtiger — mogelijk gedeeld emailadres of opgeschoond record nodig');
+              html = wrap('cloze-badge mismatch', `⚠️ Cloze-match wijkt af`, 'Naam in Cloze wijkt af van bezichtiger — open in Cloze om te checken/opschonen');
             } else if (sterkte === 'sterk' && heeftAndereEigenaar) {
               html = wrap('cloze-badge sterk', `🔥 Klant van ${eigenaarNaam}${signalenLabel}`, 'Open in Cloze — bekijk relatiediepte');
             } else if (sterkte === 'sterk' && benIkZelfEigenaar) {
