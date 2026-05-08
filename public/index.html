@@ -123,26 +123,44 @@
     #overzicht-screen { padding: 16px; max-width: 600px; margin: 0 auto; }
 
     .stats-bar {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 6px;
+      display: flex;
+      gap: 8px;
       margin-bottom: 20px;
-    }
-    /* Op smalle schermen 3+3 layout zodat alles past */
-    @media (max-width: 700px) {
-      .stats-bar { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      padding: 0 16px;
+      flex-wrap: wrap;
     }
     .stat-card {
       background: white;
       border-radius: 12px;
-      padding: 10px 6px;
+      padding: 10px 16px;
       text-align: center;
       box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 0 0 auto;
     }
-    .stat-number { font-size: 20px; font-weight: 700; color: var(--navy); line-height: 1.2; }
-    .stat-label { font-size: 10px; color: var(--grijs-tekst); margin-top: 2px; line-height: 1.2; }
+    .stat-card .stat-number {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--navy);
+      line-height: 1;
+    }
+    .stat-card .stat-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--grijs-tekst);
+      line-height: 1.2;
+    }
     .stat-card.oranje .stat-number { color: var(--oranje); }
     .stat-card.groen .stat-number { color: var(--groen); }
+    /* Mobiel: cards op volle breedte naast elkaar (1 rij) */
+    @media (max-width: 600px) {
+      .stats-bar { padding: 0 12px; gap: 6px; }
+      .stat-card { flex: 1 1 0; padding: 10px 8px; justify-content: center; gap: 8px; }
+      .stat-card .stat-number { font-size: 19px; }
+      .stat-card .stat-label { font-size: 12px; }
+    }
 
     /* ── FILTER-KNOP STAAT op stat-cards ── */
     .filter-knop {
@@ -497,35 +515,29 @@
     .bez-adres { font-size: 13px; color: var(--grijs-tekst); margin-top: 3px; }
     .bez-meta { display: flex; gap: 16px; margin-top: 8px; font-size: 12px; flex-wrap: wrap; }
     .btn-naar-pool {
-      width: 100%;
-      padding: 13px;
-      margin-top: 12px;
       background: var(--oranje);
       color: white;
       border: none;
-      border-radius: 10px;
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
       transition: background .2s;
     }
     .btn-naar-pool:hover { background: var(--oranje-light); }
     .btn-naar-pool:disabled { background: var(--grijs-mid); color: var(--grijs-tekst); cursor: default; }
     .btn-naar-pool.gedeeld { background: var(--groen); }
 
-    /* ── ACTIEBALK responsive (Pool / Zelf / Afgehandeld / Talent) ── */
-    /* Container: desktop = flex-rij; mobiel = pool 100% + 3-kolom grid eronder */
+    /* ── ACTIEBALK responsive (Pool / Zelf / Naar archief / Talent) ── */
+    /* Alle 4 actie-knoppen identiek formaat, 1 rij gelijk verdeeld */
     .actiebalk {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
       margin-top: 10px;
     }
-    .actiebalk .btn-naar-pool { flex: 1; min-width: 200px; }
+    .actiebalk .btn-naar-pool,
     .actiebalk .btn-zichzelf,
     .actiebalk .btn-afgehandeld,
     .actiebalk .btn-talent {
-      flex: 0 0 auto;
+      flex: 1 1 0;
+      min-width: 0;
       padding: 12px 14px;
       border-radius: 12px;
       font-size: 13px;
@@ -544,15 +556,13 @@
       color: white;
       border: none;
     }
-    /* Mobiel (≤600px): pool volledige breedte, daaronder 3-koloms grid */
+    /* Mobiel (≤600px): alle 4 knoppen blijven op 1 rij, kleiner padding/font */
     @media (max-width: 600px) {
       .actiebalk { gap: 6px; }
-      .actiebalk .btn-naar-pool { flex: 1 1 100%; min-width: 0; }
+      .actiebalk .btn-naar-pool,
       .actiebalk .btn-zichzelf,
       .actiebalk .btn-afgehandeld,
       .actiebalk .btn-talent {
-        flex: 1 1 0;
-        min-width: 0;
         padding: 10px 8px;
         font-size: 12px;
         text-align: center;
@@ -958,7 +968,7 @@
       <div class="stat-label">Open feedback</div>
     </div>
     <div class="stat-card filter-knop" id="filter-doorgegeven" onclick="openDoorgegevenPagina()" title="Bekijk wat je hebt doorgegeven aan de leadpool">
-      <div class="stat-number" style="font-size:22px">📂</div>
+      <div class="stat-number">📂</div>
       <div class="stat-label">Doorgegeven aan leadpool</div>
     </div>
   </div>
@@ -2075,8 +2085,9 @@
                 class="btn-afgehandeld"
                 id="btn-afgehandeld-${b.id}"
                 onclick="markeerAfgehandeld('${b.id}', '${b.naam.replace(/'/g, "\'")}', '${b.adres?.replace(/'/g, "\'") || ''}')"
+                title="Naar archief — bezichtiging is afgerond, gaat uit de actieve lijst"
                 ${alGedeeld ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
-                ✅ Afgehandeld
+                📦 Naar archief
               </button>
               <button
                 class="btn-talent ${isWaarschijnlijkMakelaar(b.naam, b.email) ? 'actief' : ''}"
@@ -2653,14 +2664,14 @@
       // Kaart niet meer verwijderen — blijft zichtbaar in "Alles" filter
       // maar verdwijnt uit "Open feedback" zodat je lijst schoon blijft
       if (btn) {
-        btn.textContent = '✅ Afgehandeld';
+        btn.textContent = '📦 Gearchiveerd';
         btn.disabled = true;
         btn.style.background = '#2e7d32';
       }
       markeerKaartAfgesloten(itemId, "afgehandeld");
-      toonToast(`✅ ${naam} afgehandeld${stage_override ? ' (Cloze: ' + stage_override + ')' : ''}`, 'succes');
+      toonToast(`📦 ${naam} gearchiveerd${stage_override ? ' (Cloze: ' + stage_override + ')' : ''}`, 'succes');
     } catch (err) {
-      if (btn) { btn.disabled = false; btn.textContent = '✅ Afgehandeld'; }
+      if (btn) { btn.disabled = false; btn.textContent = '📦 Naar archief'; }
       toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
     }
   }

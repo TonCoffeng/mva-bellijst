@@ -7,14 +7,21 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ## 2026-05-08
 
-### Gewijzigd — Fase 1 herontwerp Geven-scherm
+### Gewijzigd — Fase 1 herontwerp Geven-scherm + Rogier-feedback
 
-Voorbereiding voor "Doorgegeven aan leadpool"-database-pagina (komt in fase 2). Stat-cards opgeschoond — de tellers waren grotendeels dood by design (backend zette `actie_status` én `gearchiveerd=true` tegelijk, terwijl `bezichtigingen.js` filterde op `gearchiveerd=false` → tellers altijd 0).
+**Stat-cards opgeschoond.** De tellers waren grotendeels dood by design (backend zette `actie_status` én `gearchiveerd=true` tegelijk, terwijl `bezichtigingen.js` filterde op `gearchiveerd=false` → tellers altijd 0). Voorbereiding voor "Doorgegeven aan leadpool"-database-pagina (komt in fase 2).
 
 **Stats-bar `public/index.html`:**
 - Verwijderd: stat-cards `Alles`, `Naar pool`, `Zelf bellen`, `Afgehandeld`, `📦 Archief`. De header-badge rechtsboven toont al het totaal — dubbel.
 - Behouden: stat-card `Open feedback` (filter werkt) — toggle-gedrag toegevoegd (tweede klik = uit).
 - Toegevoegd: knop `📂 Doorgegeven aan leadpool` met placeholder-pagina ("Komt eraan in fase 2"). Roept `openDoorgegevenPagina()` aan.
+- Stat-cards layout vernieuwd: van krappe grid (6 kolommen, label 10px) naar ademend flex-layout (compact links, label 13px, font-weight 500). Aansluiting bij styling van de actiebalk-knoppen.
+
+**Actiebalk vernieuwd (Rogier-feedback):**
+- Alle 4 knoppen (Pool / Zelf / Naar archief / Talent) krijgen identiek formaat — `flex: 1 1 0`, zelfde padding/border-radius/font-size. Pool-knop is niet meer oversized.
+- Kleur blijft hiërarchie aangeven: Pool oranje (primair), Zelf navy (alternatief), Naar archief groen (afsluiting), Talent wit-met-rand (zeldzaam).
+- "Afgehandeld" → "📦 Naar archief" — de oude tekst suggereerde dat het al gebeurd was. Na klik wordt het "📦 Gearchiveerd" (verleden tijd), en de toast leest "📦 [naam] gearchiveerd".
+- Icoon ✅ verdwijnt van de archief-knop (suggereerde 'klaar' vóór actie). Behouden op Zelf bellen waar ✅ wél past (= bevestiging na klik dat actie geslaagd is).
 
 **Code-cleanup:**
 - `filterBezichtigingen()` vereenvoudigd — alleen modi `'open'` en `'alles'` blijven over. Modi `'pool'`, `'zelf'`, `'afgehandeld'`, `'archief'` weg.
