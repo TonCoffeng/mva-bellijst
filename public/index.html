@@ -522,7 +522,7 @@
     .btn-naar-pool:disabled { background: var(--grijs-mid); color: var(--grijs-tekst); cursor: default; }
     .btn-naar-pool.gedeeld { background: var(--groen); }
 
-    /* ── ACTIEBALK responsive (Pool / Zelf / Naar archief / Talent) ── */
+    /* ── ACTIEBALK responsive (Pool / Zelf / Naar archief / Toewijzen) ── */
     /* Alle 4 actie-knoppen identiek formaat, 1 rij gelijk verdeeld */
     .actiebalk {
       display: flex;
@@ -533,7 +533,7 @@
     .actiebalk .btn-naar-pool,
     .actiebalk .btn-zichzelf,
     .actiebalk .btn-afgehandeld,
-    .actiebalk .btn-talent {
+    .actiebalk .btn-toewijzen {
       flex: 1 1 0;
       min-width: 0;
       padding: 12px 14px;
@@ -554,23 +554,70 @@
       color: white;
       border: none;
     }
+    .actiebalk .btn-toewijzen {
+      background: #f4f5f8;
+      color: var(--navy);
+      border: 1.5px solid var(--grijs-mid);
+    }
+    .actiebalk .btn-toewijzen:hover {
+      background: #e8eaf6;
+      border-color: var(--navy);
+    }
     /* Mobiel (≤600px): alle 4 knoppen blijven op 1 rij, kleiner padding/font */
     @media (max-width: 600px) {
       .actiebalk { gap: 6px; }
       .actiebalk .btn-naar-pool,
       .actiebalk .btn-zichzelf,
       .actiebalk .btn-afgehandeld,
-      .actiebalk .btn-talent {
+      .actiebalk .btn-toewijzen {
         padding: 10px 8px;
         font-size: 12px;
         text-align: center;
       }
     }
-    /* MVA Talent: standaard verborgen — wordt zichtbaar via .actief class */
-    .btn-talent { display: none; }
-    .btn-talent.actief { display: inline-block; }
-    @media (max-width: 600px) {
-      .btn-talent.actief { display: block; }
+    /* MVA Talent als klein icoontje rechtsboven in de kaart (vervangt
+       de oude full-width knop in de actiebalk) — alleen actief bij externe
+       makelaar gedetecteerd. Default verborgen, .actief = zichtbaar. */
+    .btn-talent-icon {
+      display: none;
+      background: #f4f5f8;
+      border: 1.5px solid var(--grijs-mid);
+      border-radius: 8px;
+      padding: 2px 8px;
+      font-size: 14px;
+      cursor: pointer;
+      color: var(--navy);
+      transition: all .15s;
+    }
+    .btn-talent-icon.actief { display: inline-block; }
+    .btn-talent-icon:hover {
+      background: #e8eaf6;
+      border-color: var(--navy);
+    }
+    .btn-talent-icon.aangemeld {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border-color: #81c784;
+      cursor: default;
+    }
+    /* ── TOEWIJZEN-MODAL: makelaar keuze-knoppen ── */
+    .toewijzen-makelaar-btn {
+      width: 100%;
+      text-align: left;
+      padding: 12px 14px;
+      background: white;
+      border: 1.5px solid var(--grijs-mid);
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--navy);
+      transition: all .15s;
+    }
+    .toewijzen-makelaar-btn:hover {
+      background: var(--licht);
+      border-color: var(--navy);
+      transform: translateY(-1px);
     }
 
     /* ── DATUM-NAVIGATOR (onder stat-kaarten, boven zoekbalk) ── */
@@ -643,28 +690,6 @@
       transition: all .15s;
     }
     .btn-sorteer:hover { background: var(--grijs); color: var(--navy); border-color: var(--navy); }
-
-    /* ── MVA TALENT KNOP (recruitment) ── */
-    .btn-talent {
-      flex: 0 0 auto;
-      padding: 12px 14px;
-      background: #f4f5f8;
-      color: var(--navy);
-      border: 1.5px solid var(--grijs-mid);
-      border-radius: 12px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: all .15s;
-    }
-    .btn-talent:hover { background: #e8eaf6; border-color: var(--navy); }
-    .btn-talent.aangemeld {
-      background: #e8f5e9;
-      color: #2e7d32;
-      border-color: #81c784;
-      cursor: default;
-    }
 
     /* ── TALENT MODAL ── */
     .talent-modal-bg {
@@ -893,6 +918,28 @@
     a.cloze-vrij:hover {
       background: #e2e8f0;
       color: #334155;
+    }
+    /* STERK signaal: dit is een echte klant van een collega */
+    .cloze-badge.sterk {
+      background: #fff4e6;
+      color: #c2410c;
+      border: 1px solid #fdba74;
+      font-weight: 600;
+    }
+    a.cloze-badge.sterk.klikbaar:hover {
+      background: #ffedd5;
+      color: #9a3412;
+      border-color: #fb923c;
+    }
+    /* ZWAK signaal: wel in Cloze maar geen klantmarkering — neutraal grijs */
+    .cloze-badge.zwak {
+      background: #f1f5f9;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
+    }
+    a.cloze-badge.zwak.klikbaar:hover {
+      background: #e2e8f0;
+      color: #475569;
     }
   </style>
   <!-- Supabase JS client (voor authenticatie) -->
@@ -1987,6 +2034,11 @@
               <div style="display:flex;gap:6px;align-items:center">
                 <button onclick="stuurTestPush('${b.naam.replace(/'/g, "\\'")}', '${b.tijdstip || ''}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
                   style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px" title="Test push notificatie">🔔</button>
+                <button
+                  class="btn-talent-icon ${isWaarschijnlijkMakelaar(b.naam, b.email) ? 'actief' : ''}"
+                  id="btn-talent-${b.id}"
+                  onclick="opentalentModal('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${(b.email || '').replace(/'/g, "\\'")}', '${(b.telefoon || '').replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
+                  title="Rank deze makelaar (recruitment)">🌱</button>
                 ${heeftFeedback
                   ? `<span style="background:#e8f5e9;color:#2e7d32;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap">✓ Klaar</span>`
                   : `<span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap">● Open</span>`}
@@ -2085,11 +2137,12 @@
                 📦 Naar archief
               </button>
               <button
-                class="btn-talent ${isWaarschijnlijkMakelaar(b.naam, b.email) ? 'actief' : ''}"
-                id="btn-talent-${b.id}"
-                onclick="opentalentModal('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${(b.email || '').replace(/'/g, "\\'")}', '${(b.telefoon || '').replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
-                title="Rank deze makelaar (recruitment)">
-                🌱 Rank de makelaar
+                class="btn-toewijzen"
+                id="btn-toewijzen-${b.id}"
+                onclick="openToewijzenModal('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
+                title="Direct toewijzen aan een collega — Round Robin overslaan"
+                ${alGedeeld ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
+                → Toewijzen
               </button>
             </div>
           </div>`;
@@ -2113,9 +2166,11 @@
           const badge = document.getElementById(`cloze-badge-${b.id}`);
           if (!badge) return;
 
-          // Bewaar eigenaar-info op de kaart zelf zodat we later bij klik
-          // op "Geef door aan pool" of "Zelf bellen" weten of er een andere
-          // makelaar al eigenaar is. Wordt gebruikt voor slimme routing.
+          // Bepaal klantsterkte op basis van Cloze-signalen
+          const sterkte = bepaalKlantSterkte(json);
+          const signalen = welkeSignalen(json);
+
+          // Bewaar alle relevante info op de kaart voor gebruik bij Pool/Zelf-clicks
           const card = document.getElementById(`bez-${b.id}`);
           if (card) {
             card.dataset.clozeBestaand = json.bestaand ? '1' : '0';
@@ -2123,6 +2178,8 @@
             card.dataset.clozeEigenaarNaam = json.eigenaar_naam || '';
             card.dataset.clozeStage = json.stage || '';
             card.dataset.clozeId = json.id || '';
+            card.dataset.clozeSterkte = sterkte;             // 'sterk' / 'zwak' / 'geen'
+            card.dataset.clozeSignalen = signalen.join('|'); // pipe-separated voor leesAndereEigenaar
           }
 
           if (!json.bestaand) {
@@ -2130,30 +2187,38 @@
             return;
           }
 
-          // Contact bestaat al — bouw badge op
+          // Contact bestaat al — bouw badge op afhankelijk van sterkte
           const eigenaarEmail = (json.eigenaar_email || '').toLowerCase();
           const huidigeEmail = (huidigeMakelaar?.email || '').toLowerCase();
           const heeftEigenaar = !!eigenaarEmail;
           const heeftAndereEigenaar = heeftEigenaar && eigenaarEmail !== huidigeEmail;
           const clozeUrl = json.id ? `https://app.cloze.com/app/#/people/${json.id}` : null;
+          const eigenaarNaam = json.eigenaar_naam || (eigenaarEmail ? eigenaarEmail.split('@')[0] : '');
+          const signalenLabel = signalen.length ? ` · ${signalen.join(', ')}` : '';
 
-          // Hoofdbadge — altijd klikbaar als we een Cloze-id hebben
-          let html = clozeUrl
-            ? `<a href="${clozeUrl}" target="_blank" rel="noopener" class="cloze-badge bekend klikbaar" title="Open in Cloze">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</a>`
-            : `<span class="cloze-badge bekend">📁 Bekend in Cloze${json.stage ? ' · ' + json.stage : ''}</span>`;
+          // Hoofdbadge: bij sterke klant prominenter (oranje), bij zwakke klant grijzer
+          const wrap = (cls, tekst, titel) => clozeUrl
+            ? `<a href="${clozeUrl}" target="_blank" rel="noopener" class="${cls} klikbaar" title="${titel}">${tekst}</a>`
+            : `<span class="${cls}">${tekst}</span>`;
 
-          // Waarschuwing bij andere eigenaar — amber, klikbaar
-          if (heeftAndereEigenaar) {
-            const eigenaarNaam = json.eigenaar_naam || eigenaarEmail.split('@')[0];
-            html += clozeUrl
-              ? ` <a href="${clozeUrl}" target="_blank" rel="noopener" class="cloze-eigenaar-warn" title="Open in Cloze in nieuw tabblad">🔔 Klant van ${eigenaarNaam}</a>`
-              : ` <span class="cloze-eigenaar-warn">🔔 Klant van ${eigenaarNaam}</span>`;
-          } else if (!heeftEigenaar) {
-            // Geen eigenaar — grijs signaal, klant is "vrij"
-            html += clozeUrl
-              ? ` <a href="${clozeUrl}" target="_blank" rel="noopener" class="cloze-vrij" title="Open in Cloze in nieuw tabblad">👤 Geen eigenaar</a>`
-              : ` <span class="cloze-vrij">👤 Geen eigenaar</span>`;
+          let html = '';
+          if (sterkte === 'sterk' && heeftAndereEigenaar) {
+            // Sterke klant van een collega — duidelijk signaal afgeven
+            html = wrap('cloze-badge sterk', `🔥 Klant van ${eigenaarNaam}${signalenLabel}`, 'Open in Cloze — bekijk relatiediepte');
+          } else if (sterkte === 'sterk') {
+            // Sterke klant van mezelf, of zonder eigenaar maar wel sterk
+            html = wrap('cloze-badge bekend', `📁 Bekend in Cloze${signalenLabel}`, 'Open in Cloze');
+            if (!heeftEigenaar) html += ' ' + wrap('cloze-vrij', '👤 Geen eigenaar', 'Open in Cloze');
+          } else if (sterkte === 'zwak') {
+            // Wel in Cloze, maar geen klantmarkering — gewoon doorlopen naar pool
+            const stageLabel = json.stage ? ` · ${json.stage}` : '';
+            html = wrap('cloze-badge zwak', `📁 Bekend bij ${eigenaarNaam || 'niemand'}${stageLabel}`, 'Open in Cloze — bekend maar geen klantmarkering');
+          } else {
+            // sterkte === 'geen' kan niet voorkomen wanneer json.bestaand=true,
+            // maar voor de zekerheid:
+            html = wrap('cloze-badge bekend', '📁 Bekend in Cloze', 'Open in Cloze');
           }
+
           badge.innerHTML = html;
         }).catch(() => {
           const badge = document.getElementById(`cloze-badge-${b.id}`);
@@ -2433,10 +2498,60 @@
   // nog niet klaar is, geen eigenaar bestaat, of de eigenaar de huidige
   // makelaar zelf is. Returns { email, naam } als er een ANDERE makelaar
   // eigenaar is van het Cloze-contact.
+  // ── KLANT-STERKTE BEPALEN — wat is een 'echte klant'? ────────────────
+  // Niet elke Cloze-vermelding telt als klantschap. Sommige makelaars
+  // zetten élke bezichtiger als contact in Cloze — dan zou bypass van
+  // round robin oneerlijk veel leads naar die makelaar sturen.
+  // 'sterk' = bypass-modal toont, 'zwak' = gewone pool-flow.
+  function bepaalKlantSterkte(d) {
+    if (!d || !d.bestaand) return 'geen';
+    const stage = (d.stage || '').toLowerCase();
+    const segment = (d.segment || '').toUpperCase();
+    const eng = parseInt(d.interacties || 0, 10);
+    const created = d.created_at ? new Date(d.created_at) : null;
+    const zesMaandenGeleden = Date.now() - (180 * 24 * 60 * 60 * 1000);
+    const oudeLead = created && created.getTime() < zesMaandenGeleden;
+
+    // 1. Stage = current/future = formele klant (sterkste signaal)
+    if (stage === 'current' || stage === 'future') return 'sterk';
+    // 2. Segment A/B/C = bewust prioriteit gegeven door eigenaar
+    if (['A','B','C'].includes(segment)) return 'sterk';
+    // 3. Pinned = handmatig sterk gemarkeerd
+    if (d.pinned) return 'sterk';
+    // 4. Engagement > 30 = veel interacties = echte relatie
+    if (eng > 30) return 'sterk';
+    // 5. Oude lead (>6 mnd) die niet is afgesloten
+    if (stage === 'lead' && oudeLead) return 'sterk';
+    // Verder: zwak — wel in Cloze maar geen bewuste klantmarkering
+    return 'zwak';
+  }
+
+  // Welke specifieke signalen gaan af? Voor uitleg in de modal.
+  function welkeSignalen(d) {
+    if (!d || !d.bestaand) return [];
+    const sig = [];
+    const stage = (d.stage || '').toLowerCase();
+    const segment = (d.segment || '').toUpperCase();
+    const eng = parseInt(d.interacties || 0, 10);
+    const created = d.created_at ? new Date(d.created_at) : null;
+    const zesMaandenGeleden = Date.now() - (180 * 24 * 60 * 60 * 1000);
+    if (stage === 'current')  sig.push('actieve klant');
+    if (stage === 'future')   sig.push('toekomstige klant');
+    if (['A','B','C'].includes(segment)) sig.push(`${segment}-segment`);
+    if (d.pinned)             sig.push('gepind');
+    if (eng > 30)             sig.push(`${eng} interacties`);
+    if (stage === 'lead' && created && created.getTime() < zesMaandenGeleden) {
+      sig.push('lead langer dan 6 maanden');
+    }
+    return sig;
+  }
+
+  // ── ANDERE EIGENAAR — alleen voor sterke klanten relevant ────────────
   function leesAndereEigenaar(itemId) {
     const card = document.getElementById(`bez-${itemId}`);
     if (!card) return null;
     if (card.dataset.clozeBestaand !== '1') return null;
+    if (card.dataset.clozeSterkte !== 'sterk') return null;  // alleen sterke klanten
     const eigenaarEmail = (card.dataset.clozeEigenaarEmail || '').toLowerCase();
     if (!eigenaarEmail) return null;
     const huidigeEmail = (huidigeMakelaar?.email || '').toLowerCase();
@@ -2444,6 +2559,7 @@
     return {
       email: eigenaarEmail,
       naam: card.dataset.clozeEigenaarNaam || eigenaarEmail.split('@')[0],
+      signalen: (card.dataset.clozeSignalen || '').split('|').filter(Boolean),
     };
   }
 
@@ -2500,23 +2616,32 @@
 
   // ── NAAR POOL ────────────────────────────────────────────────────────
   async function geefNaarPool(itemId, naam, adres) {
-    // Slimme routing: als klant al een eigenaar heeft in Cloze, bypass
-    // Round Robin en wijs lead direct toe aan oorspronkelijke eigenaar.
+    // Slimme routing: alleen bij STERKE klant van een collega tonen we de
+    // keuze-modal. Zwakke vermeldingen (zomaar bezichtiger toegevoegd)
+    // doorlopen gewoon round robin zonder modal.
     const andereEigenaar = leesAndereEigenaar(itemId);
     let directNaarEmail = null;
     if (andereEigenaar) {
+      const sigTekst = andereEigenaar.signalen.length
+        ? `\n\nSignalen: ${andereEigenaar.signalen.join(', ')}.`
+        : '';
       const ok = await mvaConfirm({
-        titel: '👤 Klant heeft al een makelaar',
-        tekst: `${naam} is in Cloze bekend als klant van ${andereEigenaar.naam}. Round Robin wordt overgeslagen — de lead gaat direct naar ${andereEigenaar.naam}.`,
-        okTekst: `Doorzetten naar ${andereEigenaar.naam}`,
+        titel: '🔥 Sterke klant van een collega',
+        tekst: `${naam} is een klant van ${andereEigenaar.naam} in Cloze.${sigTekst}\n\nWil je de lead direct aan ${andereEigenaar.naam} doorgeven, of via Round Robin laten verdelen?`,
+        okTekst: `Direct naar ${andereEigenaar.naam}`,
+        annuleerTekst: '🎲 Toch via Round Robin',
+        toonAnnuleer: true,
       });
-      if (!ok) return;
-      directNaarEmail = andereEigenaar.email;
+      // ok === true  → direct aan eigenaar
+      // ok === false → annuleer-knop = "Toch via Round Robin"
+      // ok === null  → modal weggeklikt = niets doen
+      if (ok === null) return;
+      if (ok === true) directNaarEmail = andereEigenaar.email;
     }
 
     const btn = document.getElementById(`btn-${itemId}`);
     btn.disabled = true;
-    btn.textContent = 'Bezig...'; 
+    btn.textContent = 'Bezig...';
 
     try {
       const res = await fetch('/.netlify/functions/monday', {
@@ -2736,17 +2861,140 @@
     }
   }
 
+  // ── DIRECT TOEWIJZEN AAN COLLEGA ──────────────────────────────────────
+  // Round Robin overslaan en lead direct aan een gekozen collega geven.
+  // Reden voor deze knop: de gevende makelaar weet soms beter wie bij de
+  // klant past dan een willekeurige round-robin verdeling.
+  let toewijzenContext = null;        // { itemId, naam, adres }
+  let toewijzenMakelaarsCache = null; // Eenmalig geladen lijst alle actieve makelaars
+
+  async function laadActieveMakelaars() {
+    if (toewijzenMakelaarsCache) return toewijzenMakelaarsCache;
+    try {
+      const { data, error } = await sb
+        .from('gebruikers')
+        .select('email,naam,rol,actief')
+        .eq('actief', true)
+        .order('naam', { ascending: true });
+      if (error) throw error;
+      toewijzenMakelaarsCache = (data || []).filter(m =>
+        m.email && (m.email.toLowerCase() !== (huidigeMakelaar?.email || '').toLowerCase())
+      );
+      return toewijzenMakelaarsCache;
+    } catch (err) {
+      toonToast('Kon makelaarslijst niet laden: ' + err.message, 'fout');
+      return [];
+    }
+  }
+
+  async function openToewijzenModal(itemId, naam, adres) {
+    toewijzenContext = { itemId, naam, adres };
+    document.getElementById('toewijzen-modal-titel').textContent = `Toewijzen: ${naam}`;
+    document.getElementById('toewijzen-modal-adres').textContent = adres ? `📍 ${adres}` : '';
+    const lijst = document.getElementById('toewijzen-makelaars-lijst');
+    lijst.innerHTML = '<div style="padding:20px;text-align:center;color:var(--grijs-tekst)">Makelaars laden...</div>';
+    document.getElementById('toewijzen-modal-bg').classList.add('actief');
+
+    const makelaars = await laadActieveMakelaars();
+    if (makelaars.length === 0) {
+      lijst.innerHTML = '<div style="padding:20px;text-align:center;color:var(--grijs-tekst)">Geen andere actieve makelaars gevonden.</div>';
+      return;
+    }
+    lijst.innerHTML = makelaars.map(m => `
+      <button class="toewijzen-makelaar-btn" data-email="${m.email}" data-naam="${m.naam.replace(/"/g, '&quot;')}">
+        <span style="font-weight:600">${m.naam}</span>
+        <span style="font-size:11px;color:var(--grijs-tekst);margin-left:8px">${m.email}</span>
+      </button>
+    `).join('');
+    // Event-delegation voor de makelaar-keuze
+    lijst.onclick = async (ev) => {
+      const btn = ev.target.closest('.toewijzen-makelaar-btn');
+      if (!btn) return;
+      const collegaEmail = btn.dataset.email;
+      const collegaNaam = btn.dataset.naam;
+      bevestigToewijzen(collegaEmail, collegaNaam);
+    };
+  }
+
+  async function bevestigToewijzen(collegaEmail, collegaNaam) {
+    if (!toewijzenContext) return;
+    const { itemId, naam } = toewijzenContext;
+    sluitToewijzenModal();
+
+    // Vraag bevestiging zoals bij Cloze-bypass — 1 modal extra
+    const ok = await mvaConfirm({
+      titel: '→ Direct toewijzen',
+      tekst: `Wil je ${naam} direct doorzetten naar ${collegaNaam}?\n\nRound Robin wordt overgeslagen.`,
+      okTekst: `Doorzetten naar ${collegaNaam}`,
+    });
+    if (ok !== true) return;
+
+    const btn = document.getElementById(`btn-toewijzen-${itemId}`);
+    const poolBtn = document.getElementById(`btn-${itemId}`);
+    if (btn) { btn.disabled = true; btn.textContent = 'Bezig...'; }
+
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'push_naar_pool',
+          data: {
+            item_id: itemId,
+            makelaar_naam: huidigeMakelaar.naam,
+            direct_naar_email: collegaEmail,
+          }
+        })
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+
+      if (btn) {
+        btn.textContent = `✅ Naar ${collegaNaam.split(' ')[0]}!`;
+        btn.style.background = '#2e7d32';
+        btn.style.color = 'white';
+        btn.style.borderColor = '#2e7d32';
+      }
+      if (poolBtn) {
+        poolBtn.disabled = true;
+        poolBtn.textContent = `✅ Aan ${collegaNaam.split(' ')[0]}`;
+        poolBtn.classList.add('gedeeld');
+      }
+      vergrendelAndereActies(itemId, 'pool');
+      markeerKaartAfgesloten(itemId, 'pool');
+      toonToast(`✅ ${naam} direct doorgezet naar ${collegaNaam}!`, 'succes');
+    } catch (err) {
+      if (btn) { btn.disabled = false; btn.textContent = '→ Toewijzen'; }
+      toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
+    }
+  }
+
+  function sluitToewijzenModal() {
+    document.getElementById('toewijzen-modal-bg').classList.remove('actief');
+  }
+  window.openToewijzenModal = openToewijzenModal;
+  window.sluitToewijzenModal = sluitToewijzenModal;
+
   // ── MVA CONFIRM MODAL (vervangt browser confirm() met MVA-stijl) ─────
   // Gebruik: const ok = await mvaConfirm({ titel, tekst, okTekst, okStijl });
   // Returns: Promise<boolean> — true bij OK, false bij Annuleren / overlay-klik
-  function mvaConfirm({ titel = 'Even bevestigen', tekst = 'Weet je het zeker?', okTekst = 'OK', okStijl = '' } = {}) {
+  function mvaConfirm({ titel = 'Even bevestigen', tekst = 'Weet je het zeker?', okTekst = 'OK', okStijl = '', annuleerTekst = 'Annuleren', toonAnnuleer = true } = {}) {
     return new Promise((resolve) => {
       document.getElementById('confirm-modal-titel').textContent = titel;
-      document.getElementById('confirm-modal-tekst').textContent = tekst;
+      const tekstEl = document.getElementById('confirm-modal-tekst');
+      // Whitespace + newlines bewaren in modal-tekst
+      tekstEl.style.whiteSpace = 'pre-line';
+      tekstEl.textContent = tekst;
       const okBtn = document.getElementById('confirm-modal-ok');
       okBtn.textContent = okTekst;
       // Optionele kleur-variant voor 'destructief' (wis/delete)
       okBtn.style.background = okStijl === 'destructief' ? '#c2410c' : '';
+      // Annuleer-knop tekst en zichtbaarheid
+      const cancelBtn = document.querySelector('#confirm-modal-bg button[data-confirm-action="cancel"]');
+      if (cancelBtn) {
+        cancelBtn.textContent = annuleerTekst;
+        cancelBtn.style.display = toonAnnuleer ? '' : 'none';
+      }
       const bg = document.getElementById('confirm-modal-bg');
 
       const handler = (ev) => {
@@ -2754,10 +3002,11 @@
         if (!actie) return;
         bg.classList.remove('actief');
         bg.removeEventListener('click', handler);
-        resolve(actie === 'ok');
+        // 'ok' = true (= primaire actie), 'cancel' = false (= alternatieve actie)
+        resolve(actie === 'ok' ? true : false);
       };
       bg.addEventListener('click', handler);
-      // Ook overlay-klik = annuleren (sluitConfirmModal hieronder roept resolve(false))
+      // Modal-overlay-klik buiten knoppen = null (= weggeklikt)
       window._confirmResolver = resolve;
       window._confirmHandler = handler;
       bg.classList.add('actief');
@@ -2768,7 +3017,9 @@
     bg.classList.remove('actief');
     if (window._confirmHandler) bg.removeEventListener('click', window._confirmHandler);
     if (window._confirmResolver) {
-      window._confirmResolver(!!ok);
+      // Bij overlay-klik: null teruggeven (= weggeklikt, niet hetzelfde als annuleren)
+      // ok parameter blijft voor backwards-compat: true/false als knop is geklikt
+      window._confirmResolver(ok === false ? null : !!ok);
       window._confirmResolver = null;
       window._confirmHandler = null;
     }
@@ -3265,6 +3516,19 @@
     <div class="talent-modal-acties">
       <button class="annuleer" onclick="sluitTalentModal()">Annuleer</button>
       <button class="bevestig" id="talent-modal-bevestig" onclick="bevestigTalent()">🌱 Aanmelden</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOEWIJZEN MODAL — kies collega voor directe toewijzing (RR-bypass) -->
+<div class="talent-modal-bg" id="toewijzen-modal-bg" onclick="if(event.target===this)sluitToewijzenModal()">
+  <div class="talent-modal" role="dialog" aria-labelledby="toewijzen-modal-titel" style="max-width:480px">
+    <h3 id="toewijzen-modal-titel">Toewijzen aan collega</h3>
+    <p id="toewijzen-modal-adres" style="color:var(--grijs-tekst);font-size:13px;margin-top:-8px;margin-bottom:14px"></p>
+    <p style="font-size:13px;color:var(--grijs-tekst);margin-bottom:10px">Round Robin wordt overgeslagen. Kies aan wie de lead moet:</p>
+    <div id="toewijzen-makelaars-lijst" style="display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow-y:auto"></div>
+    <div class="talent-modal-acties" style="margin-top:14px">
+      <button class="annuleer" onclick="sluitToewijzenModal()">Annuleren</button>
     </div>
   </div>
 </div>

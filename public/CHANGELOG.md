@@ -29,6 +29,28 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 - Browser-tab + iPhone home screen-titel: "MVA Bellijst" → "Makelaars van Amsterdam".
 - Logo-hoogte 30px, past compact tussen de navy header en de stat-cards.
 
+**Cloze-rework — strengere klantsterkte-detectie + manuele toewijzing:**
+
+Niet elke Cloze-vermelding telde voorheen als klantschap — sommige makelaars zetten élke bezichtiger in Cloze, waardoor zij oneerlijk veel bypass-leads kregen via Round Robin. De flow is herzien:
+
+- **Backend (`netlify/functions/cloze.js`):** `check_bestaand` haalt 4 extra velden op: `id` (expliciet voor URL), `segment` (A/B/C/D), `pinned`, `created_at`. Geen breaking change — bestaande callers blijven werken.
+
+- **Frontend `bepaalKlantSterkte()` helper:** classificeert elk Cloze-contact als `'sterk'` / `'zwak'` / `'geen'`. Sterk = stage current/future, OF segment A/B/C, OF pinned, OF engagement>30, OF lead+>6mnd oud.
+
+- **Cloze-badge differentiatie:**
+  - 🔥 oranje "Klant van [naam] · [signalen]" bij sterke klant
+  - 📁 grijs "Bekend bij [naam] · stage" bij zwakke vermelding (geen klantmarkering — gaat gewoon naar Round Robin)
+  - 🆕 / 👤 zoals voorheen
+  - Alle badges blijven klikbaar en openen het Cloze-contact in nieuwe tab
+
+- **Pool-knop modal aangepast:** alleen bij STERKE klant van een collega verschijnt de keuze-modal "Direct naar [naam]" / "🎲 Toch via Round Robin". Zwakke vermeldingen doorlopen direct Round Robin.
+
+- **Nieuwe vierde knop "→ Toewijzen"** in de actiebalk (vervangt Talent-knop daar): opent dropdown met alle 9 actieve makelaars (uit Supabase `gebruikers`-tabel). Klik op naam → 1 bevestiging → lead direct toegewezen aan die makelaar, Round Robin overgeslagen. Onafhankelijk van Cloze-status — kan altijd. Reden: gevende makelaar weet soms beter wie bij de klant past.
+
+- **MVA Talent-knop verplaatst:** uit de actiebalk naar klein 🌱-icoontje rechtsbovenaan in de kaart (naast 🔔 push-knop). Alleen zichtbaar bij externe makelaars (`isWaarschijnlijkMakelaar` detectie). Functionaliteit ongewijzigd.
+
+- **`mvaConfirm` uitgebreid:** ondersteunt nu `annuleerTekst` parameter (voor "🎲 Toch via Round Robin"-knop) en `toonAnnuleer` om annuleer-knop te verbergen. Backwards compatible met bestaande callers.
+
 **Code-cleanup:**
 - `filterBezichtigingen()` vereenvoudigd — alleen modi `'open'` en `'alles'` blijven over. Modi `'pool'`, `'zelf'`, `'afgehandeld'`, `'archief'` weg.
 - Teller-updates voor weggehaalde stat-cards weg uit `laadBezichtigingen()` en `markeerKaartAfgesloten()`.
