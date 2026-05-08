@@ -7,6 +7,38 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ## 2026-05-08
 
+### Toegevoegd — Spiekbrief-modus voor drukke bezichtigingsdagen (Rogier-feedback)
+
+**Probleem:** bij drukke pandbezichtigingen (open huizen) heeft Rogier 's avonds bij het nabellen moeite om gezicht-bij-naam te plaatsen. Hij wilde een snel overzicht van wie er komt, niet weer een formulier of foto-feature. Eerdere ideeën (LinkedIn-foto's, QR-check-in, foto per bezoeker) niet doorgegaan — te omslachtig of privacy-issue.
+
+**Oplossing:** toggle-knop `📋 Spiekbrief` naast het Selectie-knopje rechtsboven in het geven-scherm.
+
+**Werking:**
+- Klap-in: alle bezichtiging-kaarten worden compacte rijtjes (1 regel: `dd/mm tijd · naam · telefoon · status-icoon`).
+- Tap op rij: die ene kaart klapt uit met volle inhoud (feedback, knoppen, etc.). Andere kaarten blijven compact.
+- Tap op andere rij: vorige kaart klapt automatisch in, nieuwe kaart open.
+- Knoppen-klikken binnen uitgeklapte kaart: handler negeert die zodat acties (Pool / Zelf / etc.) gewoon werken.
+- Voorkeur in `localStorage` (`mva_spiekbrief`) → blijft hangen tussen sessies.
+- Mobiel: telefoonnummer verbergt zich automatisch onder 480px breedte (anders te krap).
+
+**Status-iconen op rij:**
+- `●` open (geen feedback gegeven, niet doorgezet)
+- `✓` feedback gegeven
+- `↗` doorgezet (pool / zelf / archief)
+
+**Implementatie `public/index.html`:**
+- CSS-block toegevoegd na `.bez-meta`: `.spiekbrief-rij`, `.spiekbrief-modus` container-class met `> *` selector om alle kaart-children te verbergen behalve de spiekbrief-rij. Uitgeklapte kaart heeft `.uitgeklapt`-class die alles weer toont.
+- Toggle-knop met class `.btn-spiekbrief` (active state = navy bg).
+- HTML-template van elke kaart krijgt een `<div class="spiekbrief-rij">…</div>` als eerste child + `onclick="klikSpiekbriefRij(event, '${b.id}')"` op de kaart zelf.
+- Drie nieuwe JS-functies: `toggleSpiekbrief()`, `pasSpiekbriefToe()`, `klikSpiekbriefRij(event, id)`. Geëxporteerd naar `window` voor onclick-handlers.
+- `pasSpiekbriefToe()` aangeroepen na elke render in `laadBezichtigingen()` zodat refresh de modus persistent houdt.
+
+**Niet veranderd:** zoekfilter, sortering, datum-navigator, selectie-modus. Allemaal werken hetzelfde, of spiekbrief nu aan of uit staat.
+
+---
+
+## 2026-05-08
+
 ### Gewijzigd — Fase 1 herontwerp Geven-scherm + Rogier-feedback
 
 **Stat-cards opgeschoond.** De tellers waren grotendeels dood by design (backend zette `actie_status` én `gearchiveerd=true` tegelijk, terwijl `bezichtigingen.js` filterde op `gearchiveerd=false` → tellers altijd 0). Voorbereiding voor "Doorgegeven aan leadpool"-database-pagina (komt in fase 2).

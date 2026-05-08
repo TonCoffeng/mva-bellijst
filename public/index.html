@@ -512,6 +512,92 @@
     .bez-naam { font-size: 17px; font-weight: 700; color: var(--navy); }
     .bez-adres { font-size: 13px; color: var(--grijs-tekst); margin-top: 3px; }
     .bez-meta { display: flex; gap: 16px; margin-top: 8px; font-size: 12px; flex-wrap: wrap; }
+
+    /* ── SPIEKBRIEF-MODUS — alle bezichtigingen ingeklapt op één regel ── */
+    /* Container krijgt class .spiekbrief-modus → kaarten worden compacte rijtjes.
+       Tap op rij → kaart krijgt class .uitgeklapt → toont weer volle inhoud.
+       Andere uitgeklapte kaarten worden automatisch teruggeklapt. */
+    #geven-container.spiekbrief-modus .bez-card {
+      padding: 0;
+      margin: 0 16px 4px;
+      cursor: pointer;
+      border-left-width: 3px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.04);
+      transition: background .15s;
+    }
+    #geven-container.spiekbrief-modus .bez-card:hover { background: var(--grijs); }
+    #geven-container.spiekbrief-modus .bez-card > * { display: none; }
+    #geven-container.spiekbrief-modus .bez-card .spiekbrief-rij { display: flex; }
+    #geven-container.spiekbrief-modus .bez-card.uitgeklapt {
+      padding: 16px;
+      margin: 0 16px 12px;
+      cursor: default;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    #geven-container.spiekbrief-modus .bez-card.uitgeklapt:hover { background: white; }
+    #geven-container.spiekbrief-modus .bez-card.uitgeklapt > * { display: block; }
+    #geven-container.spiekbrief-modus .bez-card.uitgeklapt .spiekbrief-rij { display: none; }
+    /* Herstel block-elementen die in volle modus flex zijn */
+    #geven-container.spiekbrief-modus .bez-card.uitgeklapt .bez-meta { display: flex; }
+    #geven-container.spiekbrief-modus .bez-card.uitgeklapt .feedback-grid:not(.verborgen) { display: grid; }
+
+    .spiekbrief-rij {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--navy);
+      min-height: 40px;
+    }
+    .spiekbrief-rij .sb-tijd {
+      font-weight: 700;
+      color: var(--navy);
+      min-width: 78px;
+      font-variant-numeric: tabular-nums;
+      font-size: 12px;
+    }
+    .spiekbrief-rij .sb-naam {
+      flex: 1;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .spiekbrief-rij .sb-tel {
+      font-size: 12px;
+      color: var(--grijs-tekst);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .spiekbrief-rij .sb-status {
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    @media (max-width: 480px) {
+      .spiekbrief-rij { padding: 9px 12px; gap: 8px; }
+      .spiekbrief-rij .sb-tel { display: none; }
+      .spiekbrief-rij .sb-tijd { min-width: 60px; }
+    }
+
+    /* Spiekbrief-toggle-knop in actiebalk bovenaan */
+    .btn-spiekbrief {
+      background: none;
+      border: 1px solid var(--grijs-mid);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--grijs-tekst);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-spiekbrief.actief {
+      background: var(--navy);
+      color: white;
+      border-color: var(--navy);
+    }
+
     .btn-naar-pool {
       background: var(--oranje);
       color: white;
@@ -1041,6 +1127,9 @@
       <button id="btn-sorteer" class="btn-sorteer" onclick="toggleSortering()" title="Wissel sortering">
         ↓ Nieuwste eerst
       </button>
+      <button id="btn-spiekbrief" class="btn-spiekbrief" onclick="toggleSpiekbrief()" title="Klap alle kaarten in tot rijtjes (tap een rij om te openen)">
+        📋 Spiekbrief
+      </button>
       <button id="btn-selectiemodus" onclick="toggleSelectiemodus()"
         style="background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;color:var(--grijs-tekst);cursor:pointer">
         &#9744; Selectie
@@ -1464,6 +1553,58 @@
     const richting = localStorage.getItem('mva_sorteer') || 'desc';
     btn.textContent = richting === 'desc' ? '↓ Nieuwste eerst' : '↑ Oudste eerst';
   }
+
+  // ── SPIEKBRIEF-MODUS TOGGLE ─────────────────────────────────────────
+  // Klap alle bezichtiging-kaarten in tot 1-regel rijtjes (tijd · naam · tel).
+  // Tap op rij → die ene kaart klapt uit; rest blijft compact.
+  // Voorkeur in localStorage zodat 'ie blijft hangen tussen sessies.
+  function toggleSpiekbrief() {
+    const huidig = localStorage.getItem('mva_spiekbrief') === '1';
+    const nieuw = !huidig;
+    localStorage.setItem('mva_spiekbrief', nieuw ? '1' : '0');
+    pasSpiekbriefToe();
+  }
+  window.toggleSpiekbrief = toggleSpiekbrief;
+
+  // Pas de spiekbrief-state toe op de container + werk knop bij.
+  // Wordt zowel aangeroepen door toggle als bij init (laden van pagina /
+  // herladen van bezichtigingen) zodat voorkeur persistent voelt.
+  function pasSpiekbriefToe() {
+    const container = document.getElementById('geven-container');
+    const btn = document.getElementById('btn-spiekbrief');
+    const aan = localStorage.getItem('mva_spiekbrief') === '1';
+    if (container) {
+      container.classList.toggle('spiekbrief-modus', aan);
+      // Reset uitgeklapte state bij wisselen — schone start
+      container.querySelectorAll('.bez-card.uitgeklapt').forEach(c => c.classList.remove('uitgeklapt'));
+    }
+    if (btn) {
+      btn.classList.toggle('actief', aan);
+      btn.textContent = aan ? '📇 Volledig' : '📋 Spiekbrief';
+    }
+  }
+  window.pasSpiekbriefToe = pasSpiekbriefToe;
+
+  // Klik-handler op een bez-card. In spiekbrief-modus: toggle uitgeklapt
+  // op deze kaart, en klap andere uitgeklapte kaarten weer in.
+  // Doet niets in volle modus (kaart is dan al volledig zichtbaar).
+  // Genegeerd als klik op knop/input/textarea/select/label binnen kaart was.
+  function klikSpiekbriefRij(event, id) {
+    const container = document.getElementById('geven-container');
+    if (!container || !container.classList.contains('spiekbrief-modus')) return;
+    // Negeer kliks op interactieve elementen binnen de kaart (zodra uitgeklapt)
+    const tag = (event.target.tagName || '').toLowerCase();
+    if (['button','input','textarea','select','label','a'].includes(tag)) return;
+    if (event.target.closest && event.target.closest('button,input,textarea,select,label,a')) return;
+    const kaart = document.getElementById('bez-' + id);
+    if (!kaart) return;
+    const wasUit = kaart.classList.contains('uitgeklapt');
+    // Klap andere kaarten in
+    container.querySelectorAll('.bez-card.uitgeklapt').forEach(c => c.classList.remove('uitgeklapt'));
+    // Toggle deze kaart
+    if (!wasUit) kaart.classList.add('uitgeklapt');
+  }
+  window.klikSpiekbriefRij = klikSpiekbriefRij;
 
   // Hersorteer alleen de ZICHTBARE kaarten in de container.
   // Wordt aangeroepen na elke filter-actie zodat het bovenste resultaat
@@ -2032,7 +2173,13 @@
         const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\n/g,'<br>');
 
         return `
-          <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''} ${heeftFeedback ? 'bez-gedaan' : 'bez-open'}" id="bez-${b.id}" data-adres="${(b.adres||'').toLowerCase().replace(/"/g,'&quot;')}" data-naam="${b.naam.toLowerCase().replace(/"/g,'&quot;')}" data-datum="${(b.datum||'').toLowerCase()}" data-tijdstip="${(b.tijdstip||'').toLowerCase()}" data-inpool="${alGedeeld?'1':'0'}" data-actie="${actieStatus}">
+          <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''} ${heeftFeedback ? 'bez-gedaan' : 'bez-open'}" id="bez-${b.id}" data-adres="${(b.adres||'').toLowerCase().replace(/"/g,'&quot;')}" data-naam="${b.naam.toLowerCase().replace(/"/g,'&quot;')}" data-datum="${(b.datum||'').toLowerCase()}" data-tijdstip="${(b.tijdstip||'').toLowerCase()}" data-inpool="${alGedeeld?'1':'0'}" data-actie="${actieStatus}" onclick="klikSpiekbriefRij(event, '${b.id}')">
+            <div class="spiekbrief-rij">
+              <span class="sb-tijd">${b.datum ? (b.datum.split('-')[2] || '') + '/' + (b.datum.split('-')[1] || '') : '—'}${b.tijdstip ? ' ' + b.tijdstip : ''}</span>
+              <span class="sb-naam">${b.naam}</span>
+              ${b.telefoon ? `<span class="sb-tel">${b.telefoon}</span>` : ''}
+              <span class="sb-status">${heeftFeedback ? '✓' : (alGedeeld ? '↗' : '●')}</span>
+            </div>
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
               <label class="bulk-checkbox-wrap" style="display:none;padding-top:2px;cursor:pointer">
                 <input type="checkbox" class="bulk-checkbox" data-bez-id="${b.id}"
@@ -2159,6 +2306,9 @@
             </div>
           </div>`;
       }).join('');
+
+      // Pas spiekbrief-modus toe op zojuist gerenderde kaarten (voorkeur uit localStorage)
+      pasSpiekbriefToe();
 
       // Cloze check per bezichtiging
       items.forEach(b => {
