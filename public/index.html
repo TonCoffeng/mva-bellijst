@@ -2193,7 +2193,15 @@
           const heeftEigenaar = !!eigenaarEmail;
           const heeftAndereEigenaar = heeftEigenaar && eigenaarEmail !== huidigeEmail;
           const benIkZelfEigenaar = heeftEigenaar && eigenaarEmail === huidigeEmail;
-          const clozeUrl = json.id ? `https://app.cloze.com/app/#/people/${json.id}` : null;
+          // Cloze URL: bij voorkeur direct contact-id, anders email-zoek als fallback
+          let clozeUrl = null;
+          if (json.id) {
+            clozeUrl = `https://app.cloze.com/app/#/people/${json.id}`;
+          } else if (b.email) {
+            clozeUrl = `https://app.cloze.com/app/#/search/${encodeURIComponent(b.email)}`;
+          } else if (b.telefoon) {
+            clozeUrl = `https://app.cloze.com/app/#/search/${encodeURIComponent(b.telefoon)}`;
+          }
           const eigenaarNaam = json.eigenaar_naam || (eigenaarEmail ? eigenaarEmail.split('@')[0] : '');
           const stage = json.stage || null;
           const stageLabel = stage ? ` · ${stage}` : '';
@@ -2216,13 +2224,13 @@
             html = wrap('cloze-badge bekend', `📁 Bekend in Cloze · ongekoppeld${signalenLabel}`, 'Open in Cloze — geen eigenaar gekoppeld');
           } else if (sterkte === 'zwak' && heeftAndereEigenaar) {
             // Zwak signaal: wel in Cloze bij collega maar geen klantmarkering
-            html = wrap('cloze-badge zwak', `📁 Op naam ${eigenaarNaam} · zwak signaal`, 'Bekend bij collega in Cloze, maar geen klantmarkering');
+            html = wrap('cloze-badge zwak', `📁 Bekend bij ${eigenaarNaam} · indicatie geen klant`, 'Bekend bij collega in Cloze, maar geen klantmarkering');
           } else if (sterkte === 'zwak' && benIkZelfEigenaar) {
             // Wel in Cloze bij mezelf, maar geen klantmarkering
-            html = wrap('cloze-badge zwak', `📁 Jouw contact · zwak signaal`, 'Bekend bij jou in Cloze, geen klantmarkering');
+            html = wrap('cloze-badge zwak', `📁 Jouw contact · indicatie geen klant`, 'Bekend bij jou in Cloze, geen klantmarkering');
           } else if (sterkte === 'zwak') {
             // In Cloze maar geen eigenaar EN geen klantmarkering
-            html = wrap('cloze-badge zwak', `📁 Bekend in Cloze · zwak signaal`, 'In Cloze zonder eigenaar of klantmarkering');
+            html = wrap('cloze-badge zwak', `📁 Bekend in Cloze · indicatie geen klant`, 'In Cloze zonder eigenaar of klantmarkering');
           } else {
             // Fallback (zou niet mogen voorkomen als bestaand=true)
             html = wrap('cloze-badge bekend', '📁 Bekend in Cloze', 'Open in Cloze');
@@ -3096,7 +3104,15 @@
             const heeftEigenaar = !!eigenaarEmail;
             const heeftAndereEigenaar = heeftEigenaar && eigenaarEmail !== huidigeEmail;
             const benIkZelfEigenaar = heeftEigenaar && eigenaarEmail === huidigeEmail;
-            const clozeUrl = json.id ? `https://app.cloze.com/app/#/people/${json.id}` : null;
+            // Cloze URL: bij voorkeur contact-id, anders email/telefoon zoek-URL als fallback
+            let clozeUrl = null;
+            if (json.id) {
+              clozeUrl = `https://app.cloze.com/app/#/people/${json.id}`;
+            } else if (lead.email) {
+              clozeUrl = `https://app.cloze.com/app/#/search/${encodeURIComponent(lead.email)}`;
+            } else if (lead.telefoon) {
+              clozeUrl = `https://app.cloze.com/app/#/search/${encodeURIComponent(lead.telefoon)}`;
+            }
             const eigenaarNaam = json.eigenaar_naam || (eigenaarEmail ? eigenaarEmail.split('@')[0] : '');
             const stage = json.stage || null;
             const stageLabel = stage ? ` · ${stage}` : '';
@@ -3118,11 +3134,11 @@
             } else if (sterkte === 'sterk') {
               html = wrap('cloze-badge bekend', `📁 Bekend in Cloze · ongekoppeld${signalenLabel}`, 'Open in Cloze — geen eigenaar gekoppeld');
             } else if (sterkte === 'zwak' && heeftAndereEigenaar) {
-              html = wrap('cloze-badge zwak', `📁 Op naam ${eigenaarNaam} · zwak signaal`, 'Bekend bij collega in Cloze, maar geen klantmarkering');
+              html = wrap('cloze-badge zwak', `📁 Bekend bij ${eigenaarNaam} · indicatie geen klant`, 'Bekend bij collega in Cloze, maar geen klantmarkering');
             } else if (sterkte === 'zwak' && benIkZelfEigenaar) {
-              html = wrap('cloze-badge zwak', `📁 Jouw contact · zwak signaal`, 'Bekend bij jou in Cloze, geen klantmarkering');
+              html = wrap('cloze-badge zwak', `📁 Jouw contact · indicatie geen klant`, 'Bekend bij jou in Cloze, geen klantmarkering');
             } else if (sterkte === 'zwak') {
-              html = wrap('cloze-badge zwak', `📁 Bekend in Cloze · zwak signaal`, 'In Cloze zonder eigenaar of klantmarkering');
+              html = wrap('cloze-badge zwak', `📁 Bekend in Cloze · indicatie geen klant`, 'In Cloze zonder eigenaar of klantmarkering');
             } else {
               html = wrap('cloze-badge bekend', '📁 Bekend in Cloze', 'Open in Cloze');
             }

@@ -44,11 +44,15 @@ Niet elke Cloze-vermelding telde voorheen als klantschap — sommige makelaars z
 | Niet in Cloze | 🆕 Niet in Cloze |
 | In Cloze, geen eigenaar, geen stage | 📁 Bekend in Cloze · ongekoppeld |
 | In Cloze, geen eigenaar, wel stage | 📁 Bekend in Cloze · ongekoppeld · [stage] |
-| Zwak signaal bij collega | 📁 Op naam [naam] · zwak signaal |
+| Zwak signaal bij collega | 📁 Bekend bij [naam] · indicatie geen klant |
 | Sterk signaal bij collega | 🔥 Klant van [naam] · [signalen] |
-| Eigen contact, zwak | 📁 Jouw contact · zwak signaal |
+| Eigen contact, zwak | 📁 Jouw contact · indicatie geen klant |
 | Eigen klant, sterk | 📁 Jouw klant · [signalen] |
-| Zwak signaal zonder eigenaar | 📁 Bekend in Cloze · zwak signaal |
+| Zwak signaal zonder eigenaar | 📁 Bekend in Cloze · indicatie geen klant |
+
+"Indicatie geen klant" is gekozen boven "zwak signaal" omdat het feitelijker is — het zegt wat het signaal **inhoudt** (er staat geen klantmarkering), niet alleen dat het zwak is.
+
+- **Cloze-link altijd klikbaar (fix):** voorheen kon de badge in de UI als niet-klikbare `<span>` renderen wanneer Cloze geen `id` retourneerde — bv. bij fuzzy name-match. Nu drie fallbacks: (1) `gevonden.id || _id || pid || contactId` op backend, (2) email-based search-URL als geen id, (3) telefoon-based search-URL als laatste optie. Resultaat: vrijwel altijd klikbaar.
 
 Eerdere ambigue labels ("Bekend bij niemand · none", "Bekend bij niemand · lead") zijn vervangen — duidelijk wat het betekent. "Niet in Cloze" maakt expliciet dat afwezigheid betekent dat iemand niet bekend is bij MVA.
 
