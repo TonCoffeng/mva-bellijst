@@ -2193,14 +2193,15 @@
           const heeftEigenaar = !!eigenaarEmail;
           const heeftAndereEigenaar = heeftEigenaar && eigenaarEmail !== huidigeEmail;
           const benIkZelfEigenaar = heeftEigenaar && eigenaarEmail === huidigeEmail;
-          // Cloze URL: bij voorkeur direct contact-id, anders email-zoek als fallback
+          // Cloze URL: bij voorkeur direct via id, anders /in/?contact= dat ook
+          // direct de contactkaart opent (niet een zoekoverzicht).
           let clozeUrl = null;
           if (json.id) {
             clozeUrl = `https://app.cloze.com/app/#/people/${json.id}`;
           } else if (b.email) {
-            clozeUrl = `https://app.cloze.com/app/#/search/${encodeURIComponent(b.email)}`;
+            clozeUrl = `https://cloze.com/in/?contact=${encodeURIComponent(b.email)}`;
           } else if (b.telefoon) {
-            clozeUrl = `https://app.cloze.com/app/#/search/${encodeURIComponent(b.telefoon)}`;
+            clozeUrl = `https://cloze.com/in/?contact=${encodeURIComponent(b.telefoon)}`;
           }
           const eigenaarNaam = json.eigenaar_naam || (eigenaarEmail ? eigenaarEmail.split('@')[0] : '');
           const stage = json.stage || null;
@@ -3104,14 +3105,15 @@
             const heeftEigenaar = !!eigenaarEmail;
             const heeftAndereEigenaar = heeftEigenaar && eigenaarEmail !== huidigeEmail;
             const benIkZelfEigenaar = heeftEigenaar && eigenaarEmail === huidigeEmail;
-            // Cloze URL: bij voorkeur contact-id, anders email/telefoon zoek-URL als fallback
+            // Cloze URL: bij voorkeur direct via id, anders /in/?contact= dat ook
+            // direct de contactkaart opent.
             let clozeUrl = null;
             if (json.id) {
               clozeUrl = `https://app.cloze.com/app/#/people/${json.id}`;
             } else if (lead.email) {
-              clozeUrl = `https://app.cloze.com/app/#/search/${encodeURIComponent(lead.email)}`;
+              clozeUrl = `https://cloze.com/in/?contact=${encodeURIComponent(lead.email)}`;
             } else if (lead.telefoon) {
-              clozeUrl = `https://app.cloze.com/app/#/search/${encodeURIComponent(lead.telefoon)}`;
+              clozeUrl = `https://cloze.com/in/?contact=${encodeURIComponent(lead.telefoon)}`;
             }
             const eigenaarNaam = json.eigenaar_naam || (eigenaarEmail ? eigenaarEmail.split('@')[0] : '');
             const stage = json.stage || null;
