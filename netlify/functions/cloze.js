@@ -325,83 +325,187 @@ exports.handler = async (event) => {
       };
     }
 
-    // ── DEBUG: TIMELINE OPHALEN VOOR ÉÉN PERSOON ─────────────────────
-    // Tijdelijke action om de structuur van timeline/items/get response te
-    // verkennen. Wordt verwijderd zodra pool_routing_check werkt.
-    // Aanroep: { action: "debug_timeline", data: { email: "..." } }
-    //   of:    { action: "debug_timeline", data: { portableId: "..." } }
-    if (action === "debug_timeline") {
-      const { email, portableId: providedId } = data;
-      let portableId = providedId || null;
-      let person_summary = null;
+    // ── POOL ROUTING CHECK ─────────────────────────────────────────────
+    // Bepaalt of een lead direct naar een specifieke makelaar moet (omdat
+    // klant al actief contact heeft met een MvA-makelaar) of via Round Robin
+    // naar de pool. Beslislogica:
+    //   1. Klant niet in Cloze → pool
+    //   2. Klant in Cloze + actieve MvA-eigenaar + lastChanged < 90d → makelaar
+    //   3. Klant in Cloze maar lastChanged ≥ 90d → pool (record te oud)
+    //
+    // OPMERKING: `lastChanged` is een proxy voor "recent contact". Cloze
+    // heeft geen publiek endpoint om individuele tijdlijn-items op te halen
+    // (alleen people/feed voor bulk sync of webhooks). lastChanged schuift
+    // wanneer een email/call/note/todo aan het record wordt toegevoegd, maar
+    // ook bij handmatige wijzigingen (stage, segment). Niet 100% accuraat
+    // maar goed genoeg voor 90-dagen-grens.
+    //
+    // Aanroep: { action: "pool_routing_check", data: { email, telefoon, naam, gevende_makelaar_email } }
+    //   gevende_makelaar_email is optioneel — als gevuld én gelijk aan de Cloze-eigenaar,
+    //   dan gaat de lead naar pool (de gevende makelaar IS de eigenaar; hij wil hem juist weggeven).
+    if (action === "pool_routing_check") {
+      const { email, telefoon, naam, gevende_makelaar_email } = data;
+      const VENSTER_DAGEN = 90;
+      const MVA_DOMEINEN = ['@makelaarsvan.nl', '@teunisse.nl'];
 
-      // Als alleen email gegeven: eerst people/find om portableId te krijgen
-      if (!portableId && email) {
-        const findRes = await fetch(
-          `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(email)}&pagesize=3`
-        );
-        const findJson = await findRes.json();
-        const matches = Array.isArray(findJson?.people) ? findJson.people : [];
-        const match = matches.find(p => {
-          if (!Array.isArray(p.emails)) return false;
-          return p.emails.some(e => (e.value || e || '').toLowerCase() === email.toLowerCase());
-        }) || matches[0] || null;
+      // STAP 1 — Zoek persoon via people/find (zelfde patroon als check_bestaand)
+      const queries = [email, telefoon].filter(Boolean);
+      let gevonden = null;
 
-        if (match) {
-          portableId = match.portableId || match.id || match._id || null;
-          person_summary = {
-            name: match.name,
-            stage: match.stage,
-            assignedTo: match.assignedTo,
-            portableId,
-            top_level_keys: Object.keys(match).slice(0, 30),
-          };
+      try {
+        for (const query of queries) {
+          const res = await fetch(
+            `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(query)}&pagesize=3`
+          );
+          const json = await res.json();
+          if (json?.people?.length > 0) {
+            // Valideer match op email of telefoon (geen fuzzy naam-match)
+            const valid = json.people.find(p => {
+              if (email && Array.isArray(p.emails)) {
+                if (p.emails.some(e => (e.value || e).toLowerCase() === email.toLowerCase())) return true;
+              }
+              if (telefoon && Array.isArray(p.phones)) {
+                const tel = telefoon.replace(/\D/g, '');
+                if (p.phones.some(ph => {
+                  const v = (ph.value || ph || '').replace(/\D/g, '');
+                  return v && (v === tel || v.endsWith(tel) || tel.endsWith(v));
+                })) return true;
+              }
+              return false;
+            });
+            if (valid) { gevonden = valid; break; }
+          }
         }
-      }
-
-      if (!portableId) {
+      } catch (e) {
+        // Cloze API down/timeout → fallback naar pool (regel 3 fail-safe)
         return {
           statusCode: 200,
           headers,
           body: JSON.stringify({
-            ok: false,
-            reden: "Geen portableId — persoon niet gevonden via email",
-            person_summary,
+            routing: "pool",
+            reden: "Cloze-check niet beschikbaar — lead gaat naar pool",
+            error: e.message,
           }),
         };
       }
 
-      // Haal de timeline op
-      const tlRes = await fetch(
-        `https://api.cloze.com/v1/timeline/items/get?api_key=${CLOZE_API_KEY}&user_email=${encodeURIComponent(CLOZE_USER)}&personId=${encodeURIComponent(portableId)}&pagesize=20`
-      );
-      const tlText = await tlRes.text();
-      let tlJson = null;
-      try { tlJson = JSON.parse(tlText); } catch (e) { /* keep raw */ }
+      // REGEL 1 — niet gevonden in Cloze
+      if (!gevonden) {
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            routing: "pool",
+            reden: "Klant niet bekend in Cloze",
+          }),
+        };
+      }
 
-      const items = Array.isArray(tlJson?.items) ? tlJson.items : null;
+      // STAP 2 — Bepaal eigenaar (assignedTo)
+      const a = gevonden.assignedTo;
+      let makelaar_email = null;
+      let makelaar_naam = null;
+      if (typeof a === 'string') {
+        makelaar_email = a;
+      } else if (a && typeof a === 'object') {
+        makelaar_email = a.email || a.value || null;
+        makelaar_naam = a.name || null;
+      }
+      if (!makelaar_naam && gevonden.assigneeName) makelaar_naam = gevonden.assigneeName;
+      if (!makelaar_email && gevonden.owner) makelaar_email = gevonden.owner;
 
+      const isMvaEigenaar = makelaar_email
+        && MVA_DOMEINEN.some(d => makelaar_email.toLowerCase().endsWith(d));
+
+      // Als geen MvA-eigenaar → naar pool (Niels Ottink van Effytool, externe partners, etc.)
+      if (!isMvaEigenaar) {
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            routing: "pool",
+            reden: makelaar_email
+              ? `Eigenaar ${makelaar_email} is geen MvA-makelaar`
+              : "Klant heeft geen eigenaar in Cloze",
+          }),
+        };
+      }
+
+      // STAP 3 — Haal verse person details op (people/get) voor lastChanged
+      // Cloze heeft geen tijdlijn-API; lastChanged is onze proxy voor "recent contact".
+      const portableId = gevonden.portableId || gevonden.id || gevonden._id;
+      let lastChanged = gevonden.lastChanged || null;
+      let firstSeen = gevonden.firstSeen || null;
+
+      if (portableId && !lastChanged) {
+        try {
+          const getRes = await fetch(
+            `https://api.cloze.com/v1/people/get?api_key=${CLOZE_API_KEY}&uniqueid=${encodeURIComponent(portableId)}`
+          );
+          const getJson = await getRes.json();
+          const p = getJson?.person || getJson;
+          lastChanged = p?.lastChanged || lastChanged;
+          firstSeen = p?.firstSeen || firstSeen;
+        } catch (e) { /* lastChanged blijft null → behandelen als oud */ }
+      }
+
+      // Bepaal of contact recent is
+      const VENSTER_MS = VENSTER_DAGEN * 24 * 60 * 60 * 1000;
+      const lastChangedTs = lastChanged ? new Date(lastChanged).getTime() : null;
+      const dagenGeleden = lastChangedTs
+        ? Math.floor((Date.now() - lastChangedTs) / (24 * 60 * 60 * 1000))
+        : null;
+      const recentContact = lastChangedTs && (Date.now() - lastChangedTs) < VENSTER_MS;
+
+      // REGEL 3 — geen recent contact → naar pool
+      if (!recentContact) {
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            routing: "pool",
+            reden: dagenGeleden !== null
+              ? `Geen recent contact (laatste activiteit ${dagenGeleden} dagen geleden, ouder dan ${VENSTER_DAGEN}d)`
+              : `Geen lastChanged-datum bekend — behandeld als ouder dan ${VENSTER_DAGEN}d`,
+            makelaar_email,
+            makelaar_naam,
+            laatste_activiteit_datum: lastChanged,
+            dagen_geleden: dagenGeleden,
+          }),
+        };
+      }
+
+      // CHECK — gevende makelaar IS zelf de eigenaar
+      // (hij doet de bezichtiging, ziet "actief contact", maar wil hem
+      // juist doorgeven aan pool; hij heeft hem zelf.)
+      if (gevende_makelaar_email
+          && makelaar_email
+          && gevende_makelaar_email.toLowerCase() === makelaar_email.toLowerCase()) {
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            routing: "pool",
+            reden: `Je bent zelf de eigenaar in Cloze — lead gaat naar pool`,
+            makelaar_email,
+            makelaar_naam,
+            laatste_activiteit_datum: lastChanged,
+            dagen_geleden: dagenGeleden,
+          }),
+        };
+      }
+
+      // REGEL 2 — actieve MvA-makelaar + recent contact → naar die makelaar
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
-          ok: tlRes.ok,
-          http_status: tlRes.status,
-          person_summary,
-          portableId_used: portableId,
-          response_top_keys: tlJson ? Object.keys(tlJson) : null,
-          items_count: items ? items.length : null,
-          first_item_keys: items && items[0] ? Object.keys(items[0]) : null,
-          first_item: items && items[0] ? items[0] : null,
-          // Compact overzicht van alle items: alleen date + style + subject
-          all_items_compact: items ? items.map(i => ({
-            date: i.date || i.timestamp || i.createdAt || null,
-            style: i.style || i.type || null,
-            subject: i.subject || i.title || null,
-            outcome: i.outcome || null,
-          })) : null,
-          // Als parsen faalde: raw response (eerste 1500 chars)
-          raw_sample: tlJson ? null : tlText.slice(0, 1500),
+          routing: "naar_makelaar",
+          reden: `Klant heeft actief contact met ${makelaar_naam || makelaar_email} (laatste activiteit ${dagenGeleden} dagen geleden)`,
+          makelaar_email,
+          makelaar_naam,
+          laatste_activiteit_datum: lastChanged,
+          dagen_geleden: dagenGeleden,
         }),
       };
     }
