@@ -45,6 +45,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 10px;
       position: sticky;
       top: 0;
       z-index: 100;
@@ -54,13 +55,26 @@
       display: flex;
       align-items: center;
       gap: 14px;
+      min-width: 0;
+      flex: 1 1 auto;
+      overflow: hidden;
     }
     .header-logo img.logo {
       height: 30px;
       width: auto;
       display: block;
+      flex-shrink: 0;
     }
-    .header-title { color: white; font-size: 17px; font-weight: 700; letter-spacing: 0.3px; }
+    .header-title {
+      color: white;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
     .header-sub { color: rgba(255,255,255,0.6); font-size: 12px; }
     .header-badge {
       background: var(--oranje);
@@ -69,6 +83,19 @@
       padding: 4px 12px;
       font-size: 13px;
       font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    /* Mobiel: minder padding, kleinere header-titel, compacte badge */
+    @media (max-width: 480px) {
+      .header { padding: 12px 14px; gap: 8px; }
+      .header-logo { gap: 10px; }
+      .header-logo img.logo { height: 24px; }
+      .header-title { font-size: 14px; }
+      .header-badge { font-size: 11px; padding: 3px 9px; }
+    }
+    @media (max-width: 360px) {
+      .header-title { display: none; }
     }
 
     /* ── LOGIN SCHERM ── */
@@ -798,6 +825,16 @@
       transition: all .15s;
     }
     .btn-sorteer:hover { background: var(--grijs); color: var(--navy); border-color: var(--navy); }
+    .btn-spiekbrief, .btn-selectie { white-space: nowrap; }
+    /* Mobiel: korte labels tonen, volle labels verbergen — past binnen smal scherm */
+    @media (max-width: 480px) {
+      .btn-sorteer .lbl-vol,
+      .btn-spiekbrief .lbl-vol,
+      .btn-selectie .lbl-vol { display: none !important; }
+      .btn-sorteer .lbl-kort,
+      .btn-spiekbrief .lbl-kort,
+      .btn-selectie .lbl-kort { display: inline !important; }
+    }
 
     /* ── TALENT MODAL ── */
     .talent-modal-bg {
@@ -1141,20 +1178,20 @@
     <button class="datum-nav-btn" id="datum-volgende" onclick="datumNav(1)" title="Volgende dag">→</button>
   </div>
 
-  <div style="padding:0 16px 8px;display:flex;justify-content:space-between;align-items:center;gap:10px">
-    <div style="font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em">
+  <div class="bez-actiebalk-rij" style="padding:0 16px 8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <div class="bez-actiebalk-label" style="font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em">
       JOUW BEZICHTIGINGEN
     </div>
-    <div style="display:flex;gap:6px;align-items:center">
+    <div class="bez-actiebalk-knoppen" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
       <button id="btn-sorteer" class="btn-sorteer" onclick="toggleSortering()" title="Wissel sortering">
-        ↓ Nieuwste eerst
+        <span class="lbl-vol">↓ Nieuwste eerst</span><span class="lbl-kort" style="display:none">↓ Nieuwste</span>
       </button>
       <button id="btn-spiekbrief" class="btn-spiekbrief" onclick="toggleSpiekbrief()" title="Klap alle kaarten in tot rijtjes (tap een rij om te openen)">
-        📋 Spiekbrief
+        <span class="lbl-vol">📋 Spiekbrief</span><span class="lbl-kort" style="display:none">📋</span>
       </button>
-      <button id="btn-selectiemodus" onclick="toggleSelectiemodus()"
-        style="background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;color:var(--grijs-tekst);cursor:pointer">
-        &#9744; Selectie
+      <button id="btn-selectiemodus" class="btn-selectie" onclick="toggleSelectiemodus()"
+        style="background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;color:var(--grijs-tekst);cursor:pointer;font-family:inherit">
+        <span class="lbl-vol">&#9744; Selectie</span><span class="lbl-kort" style="display:none">&#9744;</span>
       </button>
     </div>
   </div>
@@ -1573,7 +1610,9 @@
     const btn = document.getElementById('btn-sorteer');
     if (!btn) return;
     const richting = localStorage.getItem('mva_sorteer') || 'desc';
-    btn.textContent = richting === 'desc' ? '↓ Nieuwste eerst' : '↑ Oudste eerst';
+    const vol = richting === 'desc' ? '↓ Nieuwste eerst' : '↑ Oudste eerst';
+    const kort = richting === 'desc' ? '↓ Nieuwste' : '↑ Oudste';
+    btn.innerHTML = `<span class="lbl-vol">${vol}</span><span class="lbl-kort" style="display:none">${kort}</span>`;
   }
 
   // ── SPIEKBRIEF-MODUS TOGGLE ─────────────────────────────────────────
@@ -1608,7 +1647,9 @@
     }
     if (btn) {
       btn.classList.toggle('actief', aan);
-      btn.textContent = aan ? '📇 Volledig' : '📋 Spiekbrief';
+      const vol = aan ? '📇 Volledig' : '📋 Spiekbrief';
+      const kort = aan ? '📇' : '📋';
+      btn.innerHTML = `<span class="lbl-vol">${vol}</span><span class="lbl-kort" style="display:none">${kort}</span>`;
     }
   }
   window.pasSpiekbriefToe = pasSpiekbriefToe;
@@ -2514,13 +2555,13 @@
     const wraps = document.querySelectorAll('.bulk-checkbox-wrap');
     wraps.forEach(w => { w.style.display = selectieModusActief ? 'flex' : 'none'; });
     if (selectieModusActief) {
-      btn.textContent = '\u2715 Selectie stop';
+      btn.innerHTML = '<span class="lbl-vol">\u2715 Selectie stop</span><span class="lbl-kort" style="display:none">\u2715</span>';
       btn.style.background = 'var(--oranje)';
       btn.style.color = 'white';
       btn.style.borderColor = 'var(--oranje)';
       balk.style.display = 'flex';
     } else {
-      btn.textContent = '\u2610 Selectie';
+      btn.innerHTML = '<span class="lbl-vol">\u2610 Selectie</span><span class="lbl-kort" style="display:none">\u2610</span>';
       btn.style.background = 'none';
       btn.style.color = 'var(--grijs-tekst)';
       btn.style.borderColor = 'var(--grijs-mid)';

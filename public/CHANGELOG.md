@@ -42,6 +42,15 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 - Layout-fixes voor smal scherm: `width:100%`, `box-sizing:border-box`, `overflow:hidden`, marges van 16px → 8px. Eerdere versie scrolde horizontaal weg op telefoon.
 - `pasSpiekbriefToe()` aangeroepen na elke filter-actie (datum-nav / zoekveld) zodat datum-tonen-of-niet real-time klopt. Reset van uitgeklapte kaarten gebeurt alleen bij modus-wissel, niet bij elke filter-actie (anders klapte de uitgeklapte kaart dicht tijdens typen).
 
+**Fix mobiele layout header + actiebalk-knoppen (9 mei vroege ochtend):**
+
+Met de extra spiekbrief-knop kwam de drie-knop-rij (Sortering · Spiekbrief · Selectie) op mobiel niet meer uit. Ook de header-badge "63 bezichtigingen" + naam "Rogier de Vries" overflowden buiten beeld. Gefixt:
+
+- **Header responsive:** logo + naam-blok krijgt `flex: 1 1 auto; min-width: 0; overflow: hidden`, naam krijgt `text-overflow: ellipsis`. Mediaquery voor mobiel: kleinere padding (16→12px), logo 30→24px, titel 17→14px, badge 13→11px font + minder padding. Onder 360px verdwijnt de naam helemaal — alleen logo + Terug + badge.
+- **Actiebalk-knoppen responsive:** elke knop heeft nu twee labels: `<span class="lbl-vol">` (volle tekst) en `<span class="lbl-kort">` (icoon-only of korter). Mediaquery onder 480px: vol verbergen, kort tonen. Plus `flex-wrap: wrap` zodat als het toch niet past, ze naar tweede regel gaan. Desktop: 100% identiek aan vroeger.
+- **Sortering-knop, spiekbrief-knop, selectie-knop tekst-update via `innerHTML`** in plaats van `textContent` — `textContent` zou de span-structuur stuk maken bij elke state-wissel. Drie functies aangepast: `updateSorteerKnop()`, `pasSpiekbriefToe()`, `updateSelectieModusUI()`.
+- **Layout-controle nu standaard:** elke UI-wijziging vooraf gechecked op breakpoints 1280px (desktop), 768px (tablet), 480px (mobiel), 360px (smalste iPhone) voordat ik lever.
+
 ---
 
 ## 2026-05-08
