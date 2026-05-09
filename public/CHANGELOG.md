@@ -42,6 +42,16 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 **Fix:** beide actions lezen nu `assignee` als primair veld, met `assignedTo` als fallback voor robuustheid.
 
+### Gefixt — telefoon-vergelijking faalde na E.164-conversie
+
+**Probleem:** ook na de E.164-fix gaf find wel een resultaat, maar de match-validatie verwierp het. Cloze geeft `+31646727045` terug, wij vergeleken nog tegen `0646727045` met `endsWith` — laatste 10 cijfers van Cloze (`1646727045`) matchen niet met `0646727045`.
+
+**Fix:** `stripPrefix()` helper die zowel landcode `31` als leading `0` afhaalt vóór vergelijking. Zo vergelijken we kale 9 cijfers tegen kale 9 cijfers.
+
+### Toegevoegd — `pool_routing_debug` (tijdelijk)
+
+**Doel:** ontdekken welk veld in het Cloze person-object de echte "laatste activiteit" weerspiegelt. `lastChanged` blijkt 7+ jaar oud te zijn voor klanten met recente calls/texts (Gerrit Jeuring testcase: `lastChanged` = nov 2018, maar recente call jul 2025). Dump alle tijd-achtige velden uit zowel `people/find` als `people/get` responses. Wordt verwijderd zodra het juiste veld bekend is.
+
 ---
 
 ## 2026-05-08
