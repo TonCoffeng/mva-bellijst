@@ -269,12 +269,19 @@ exports.handler = async (event) => {
               );
               if (heeftMatch) return true;
             }
-            // Telefoon match (verwijder spaties/tekens voor vergelijking)
+            // Telefoon match — Cloze slaat op als +31..., wij krijgen vaak 06...
+            // Vergelijk daarom op de "kale" laatste 9 cijfers (NL mobiel zonder prefix).
             if (telefoon && Array.isArray(p.phones)) {
-              const tel = telefoon.replace(/\D/g, '');
+              const stripPrefix = (s) => {
+                let d = String(s || '').replace(/\D/g, '');
+                if (d.startsWith('31')) d = d.slice(2);  // 31646... → 646...
+                if (d.startsWith('0'))  d = d.slice(1);  // 0646... → 646...
+                return d;
+              };
+              const tel = stripPrefix(telefoon);
               const heeftMatch = p.phones.some(ph => {
-                const v = (ph.value || ph || '').replace(/\D/g, '');
-                return v && (v === tel || v.endsWith(tel) || tel.endsWith(v));
+                const v = stripPrefix(ph.value || ph);
+                return v && tel && (v === tel || v.endsWith(tel) || tel.endsWith(v));
               });
               if (heeftMatch) return true;
             }
@@ -388,10 +395,16 @@ exports.handler = async (event) => {
                 if (p.emails.some(e => (e.value || e).toLowerCase() === email.toLowerCase())) return true;
               }
               if (telefoon && Array.isArray(p.phones)) {
-                const tel = telefoon.replace(/\D/g, '');
+                const stripPrefix = (s) => {
+                  let d = String(s || '').replace(/\D/g, '');
+                  if (d.startsWith('31')) d = d.slice(2);
+                  if (d.startsWith('0'))  d = d.slice(1);
+                  return d;
+                };
+                const tel = stripPrefix(telefoon);
                 if (p.phones.some(ph => {
-                  const v = (ph.value || ph || '').replace(/\D/g, '');
-                  return v && (v === tel || v.endsWith(tel) || tel.endsWith(v));
+                  const v = stripPrefix(ph.value || ph);
+                  return v && tel && (v === tel || v.endsWith(tel) || tel.endsWith(v));
                 })) return true;
               }
               return false;
@@ -532,6 +545,67 @@ exports.handler = async (event) => {
           makelaar_naam,
           laatste_activiteit_datum: lastChanged,
           dagen_geleden: dagenGeleden,
+        }),
+      };
+    }
+
+    // ── DEBUG (tijdelijk) — toon alle tijd-velden van een Cloze persoon ─
+    // Doel: ontdekken welk veld de "laatste activiteit" weerspiegelt.
+    // lastChanged blijkt te schuiven bij record-edits, niet bij activiteiten.
+    // Aanroep: { action: "pool_routing_debug", data: { telefoon: "+316..." } }
+    if (action === "pool_routing_debug") {
+      const { email, telefoon } = data;
+      const telE164 = normalizeTelToE164NL(telefoon);
+
+      const q = email || telE164;
+      if (!q) return { statusCode: 400, headers, body: JSON.stringify({ error: "geen email of telefoon" }) };
+      const findRes = await fetch(
+        `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(q)}&pagesize=3`
+      );
+      const findJson = await findRes.json();
+      const findFirst = findJson?.people?.[0];
+
+      let getPerson = null;
+      if (findFirst?.portableId) {
+        const getRes = await fetch(
+          `https://api.cloze.com/v1/people/get?api_key=${CLOZE_API_KEY}&uniqueid=${encodeURIComponent(findFirst.portableId)}`
+        );
+        const getJson = await getRes.json();
+        getPerson = getJson?.person || null;
+      }
+
+      const tijdVelden = (obj) => {
+        if (!obj) return null;
+        const out = {};
+        for (const k of Object.keys(obj)) {
+          const lk = k.toLowerCase();
+          if (lk.includes('date') || lk.includes('time') || lk.includes('seen') ||
+              lk.includes('changed') || lk.includes('engage') || lk.includes('contact') ||
+              lk.includes('activ') || lk.includes('last') || lk.includes('first') ||
+              lk.includes('created') || lk.includes('updated')) {
+            const v = obj[k];
+            const iso = (typeof v === 'number' && v > 1000000000000)
+              ? new Date(v).toISOString()
+              : null;
+            out[k] = iso ? `${v} (${iso})` : v;
+          }
+        }
+        return out;
+      };
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          query: q,
+          found: !!findFirst,
+          name: findFirst?.name,
+          portableId: findFirst?.portableId,
+          assignee: findFirst?.assignee || findFirst?.assignedTo || null,
+          find_alle_keys: findFirst ? Object.keys(findFirst) : null,
+          find_tijd_velden: tijdVelden(findFirst),
+          get_alle_keys: getPerson ? Object.keys(getPerson) : null,
+          get_tijd_velden: tijdVelden(getPerson),
         }),
       };
     }
