@@ -42,6 +42,21 @@ exports.handler = async (event) => {
     noshow:     '🚫 No-show',
   };
 
+  // Cloze indexeert telefoonnummers in E.164-formaat (+31...).
+  // Realworks/onze leads geven 06... — moet vóór de Cloze-query
+  // genormaliseerd worden, anders vindt Cloze niets.
+  const normalizeTelToE164NL = (tel) => {
+    if (!tel) return null;
+    const trimmed = String(tel).trim();
+    const digits = trimmed.replace(/\D/g, '');
+    if (!digits) return null;
+    if (trimmed.startsWith('+')) return '+' + digits;        // al E.164
+    if (digits.startsWith('31'))  return '+' + digits;       // 31... zonder +
+    if (digits.startsWith('0'))   return '+31' + digits.slice(1); // 06... of 020...
+    if (digits.length === 8)      return '+316' + digits;    // mobiel zonder 0
+    return trimmed;                                          // onbekend, ongewijzigd
+  };
+
   try {
 
     // ── VERWERK LEAD — alles in één ───────────────────────────────────────
@@ -227,11 +242,15 @@ exports.handler = async (event) => {
     if (action === "check_bestaand") {
       const { email, telefoon, naam } = data;
 
+      // Cloze slaat telefoons op in E.164 (+31...). Normaliseer 06... → +316...
+      // anders vindt freeformquery ze niet. (Bevestigd 9 mei 2026.)
+      const telE164 = normalizeTelToE164NL(telefoon);
+
       // Zoek alleen op email en telefoon — die zijn uniek genoeg om
       // safe te matchen. Naam-zoek leverde fuzzy false-positives op
       // (bv. "Eveline Kraan" → "Roos Solleveld" via naam-deel match).
       // Naam wordt alleen gebruikt om de match te valideren als laatste check.
-      const queries = [email, telefoon].filter(Boolean);
+      const queries = [email, telE164].filter(Boolean);
       let gevonden = null;
 
       for (const query of queries) {
@@ -268,11 +287,12 @@ exports.handler = async (event) => {
         }
       }
 
-      // Eigenaar bepalen — Cloze geeft 'assignedTo' (email of object met email/name)
+      // Eigenaar bepalen — Cloze response heeft 'assignee'
+      // (bevestigd 9 mei 2026; 'assignedTo' bestaat niet in find/get).
       let eigenaar_email = null;
       let eigenaar_naam = null;
       if (gevonden) {
-        const a = gevonden.assignedTo;
+        const a = gevonden.assignee || gevonden.assignedTo;
         if (typeof a === 'string') {
           eigenaar_email = a;
         } else if (a && typeof a === 'object') {
@@ -348,8 +368,11 @@ exports.handler = async (event) => {
       const VENSTER_DAGEN = 90;
       const MVA_DOMEINEN = ['@makelaarsvan.nl', '@teunisse.nl'];
 
+      // Cloze slaat telefoons op in E.164. Normaliseer vóór de query.
+      const telE164 = normalizeTelToE164NL(telefoon);
+
       // STAP 1 — Zoek persoon via people/find (zelfde patroon als check_bestaand)
-      const queries = [email, telefoon].filter(Boolean);
+      const queries = [email, telE164].filter(Boolean);
       let gevonden = null;
 
       try {
@@ -401,8 +424,11 @@ exports.handler = async (event) => {
         };
       }
 
-      // STAP 2 — Bepaal eigenaar (assignedTo)
-      const a = gevonden.assignedTo;
+      // STAP 2 — Bepaal eigenaar
+      // Cloze response heeft 'assignee' (bevestigd 9 mei 2026 via _debug_velden).
+      // Oude code keek naar 'assignedTo' — bestaat niet in find/get response.
+      // Beide proberen voor robuustheid; eerste niet-leeg wint.
+      const a = gevonden.assignee || gevonden.assignedTo;
       let makelaar_email = null;
       let makelaar_naam = null;
       if (typeof a === 'string') {
