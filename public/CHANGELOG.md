@@ -7,13 +7,28 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ## 2026-05-09
 
-### Toegevoegd — `debug_timeline` action (tijdelijk)
+### Toegevoegd — `pool_routing_check` action (Cloze-check vóór pool-routing)
 
-**Doel:** verkenning van Cloze `timeline/items/get` response-structuur, vóór bouw van de echte `pool_routing_check` action. Wordt verwijderd zodra die laatste werkt.
+**Doel:** voorkomen dat een lead via Round Robin in de pool belandt terwijl er al een MvA-makelaar actief contact mee heeft. Wordt aangeroepen wanneer gevende makelaar op "Geef door aan pool" klikt — voordat de pool-flow start.
 
-**Werking:** action `debug_timeline` accepteert `{ email }` of `{ portableId }`. Doet eerst `people/find` als alleen email gegeven is, dan `timeline/items/get?personId=…&pagesize=20`. Returnt structuur: `items_count`, `first_item_keys`, `all_items_compact` (date/style/subject/outcome).
+**Beslislogica (3 regels):**
+1. Klant niet in Cloze → `routing: "pool"` (gewone Round Robin)
+2. Klant in Cloze + MvA-eigenaar (@makelaarsvan.nl / @teunisse.nl) + recent contact (lastChanged < 90d) → `routing: "naar_makelaar"` (modal met waarschuwing, Round Robin overgeslagen)
+3. Klant in Cloze maar lastChanged ≥ 90d → `routing: "pool"` (record te oud, Round Robin doet zijn werk)
 
-**Implementatie `netlify/functions/cloze.js`:** nieuw blok vóór de `Onbekende actie` catch-all. Bestaande acties ongewijzigd.
+**Uitzondering:** als de gevende makelaar zelf de Cloze-eigenaar is (parameter `gevende_makelaar_email` matcht eigenaar) → altijd `routing: "pool"`. Hij doet de bezichtiging zelf en wil hem juist weggeven.
+
+**Belangrijke beperking:** Cloze publieke API heeft GEEN endpoint om individuele tijdlijn-items op te halen (alleen `people/feed` voor bulk sync of webhooks voor push). We gebruiken het `lastChanged` veld van het person-record als proxy voor "recent contact". Schuift mee bij emails/calls/notes/todos, maar ook bij handmatige stage/segment-wijzigingen. Niet 100% accuraat maar goed genoeg voor 90-dagen-grens.
+
+**Implementatie `netlify/functions/cloze.js`:** nieuwe action `pool_routing_check` vóór de catch-all. Roept twee Cloze endpoints aan:
+- `people/find?freeformquery=...` (zelfde patroon als `check_bestaand`) — match-validatie op email of telefoon
+- `people/get?uniqueid={portableId}` — voor `lastChanged` datum
+
+**Returnt:** `{ routing: "pool" | "naar_makelaar", reden, makelaar_email, makelaar_naam, laatste_activiteit_datum, dagen_geleden }`
+
+**Fail-safe:** als Cloze API down/timeout → routing="pool" (liever onnodige Round Robin dan vastgelopen knop).
+
+**Frontend nog niet aangepast** — `index.html` rewrite van `geefNaarPool()` voor de modal komt in een volgende stap, na backend testen via curl/fetch.
 
 ---
 
