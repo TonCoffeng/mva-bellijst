@@ -1831,12 +1831,22 @@
         toon = adres.includes(zoekTerm) || naam.includes(zoekTerm) || datum.includes(zoekTerm);
       }
       card.style.display = toon ? '' : 'none';
+      // Bij wissel van filter: deselecteer kaarten die nu verborgen zijn,
+      // anders blijft een onzichtbare selectie achter (verwarrend bij datum-nav).
+      if (!toon) {
+        card.querySelectorAll('.bulk-checkbox:checked').forEach(cb => {
+          cb.checked = false;
+        });
+      }
     });
     // Na filteren: hersorteer zichtbare kaarten
     hersorteerZichtbareKaarten();
     updateDatumLabel();
     // Werk spiekbrief-state bij (datum-filter beïnvloedt of datum getoond wordt)
     pasSpiekbriefToe();
+    // Tellers bijwerken — selectie kan veranderd zijn door verborgen kaarten te uncheckken
+    if (typeof updateBulkTeller === 'function') updateBulkTeller();
+    if (typeof werkAllesSelecterenBijTellerBij === 'function') werkAllesSelecterenBijTellerBij();
   }
   window.filterBezichtigingen = filterBezichtigingen;
 
@@ -2686,20 +2696,22 @@
   }
 
   function updateBulkTeller() {
-    const checked = Array.from(document.querySelectorAll('.bulk-checkbox:checked'));
-    const geselecteerd = checked.length;
+    // Dedupe: er zijn 2 checkboxes per lead (sb-checkbox + header-checkbox).
+    // Tel unieke bez-id's, niet checkboxes — anders verdubbelt het aantal.
+    const checkedBoxes = Array.from(document.querySelectorAll('.bulk-checkbox:checked'));
+    const uniekeIds = new Set(checkedBoxes.map(cb => cb.dataset.bezId).filter(Boolean));
+    const geselecteerd = uniekeIds.size;
     const countEl = document.getElementById('bulk-count');
     const btnStart = document.getElementById('btn-bulk-start');
     const btnArchief = document.getElementById('btn-bulk-archiveer');
 
     if (countEl) countEl.textContent = geselecteerd + ' bezichtiging' + (geselecteerd===1?'':'en');
 
-    // Bepaal types van geselecteerde kaarten:
-    // - 'open' kaarten (geen actie) → kunnen doorgezet worden, niet gearchiveerd
-    // - 'afgesloten' kaarten (pool/zelf/afgehandeld) → kunnen gearchiveerd worden, niet doorgezet
+    // Bepaal types van geselecteerde kaarten — gebruik unieke ids zodat we
+    // elke lead maar 1x meetellen ondanks de dubbele checkboxes.
     let openAantal = 0, afgeslotenAantal = 0;
-    checked.forEach(cb => {
-      const card = document.getElementById('bez-' + cb.dataset.bezId);
+    uniekeIds.forEach(id => {
+      const card = document.getElementById('bez-' + id);
       const actie = card?.dataset.actie || '';
       const alGedeeld = card?.classList.contains('al-gedeeld');
       if (actie || alGedeeld) afgeslotenAantal++;
