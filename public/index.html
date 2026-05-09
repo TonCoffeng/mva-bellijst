@@ -519,7 +519,7 @@
        Andere uitgeklapte kaarten worden automatisch teruggeklapt. */
     #geven-container.spiekbrief-modus .bez-card {
       padding: 0;
-      margin: 0 16px 4px;
+      margin: 0 8px 4px;
       cursor: pointer;
       border-left-width: 3px;
       box-shadow: 0 1px 2px rgba(0,0,0,.04);
@@ -543,25 +543,39 @@
     #geven-container.spiekbrief-modus .bez-card.uitgeklapt .bez-meta { display: flex !important; }
     #geven-container.spiekbrief-modus .bez-card.uitgeklapt .actiebalk { display: flex !important; }
     #geven-container.spiekbrief-modus .bez-card.uitgeklapt .feedback-grid:not(.verborgen) { display: grid !important; }
+    /* Datum verbergen in spiekbrief als datum-filter actief is — dan staat datum al in de header */
+    #geven-container.spiekbrief-modus.datum-filter-actief .spiekbrief-rij .sb-datum { display: none; }
 
     .spiekbrief-rij {
       display: none;
       align-items: center;
-      gap: 10px;
-      padding: 10px 14px;
+      gap: 8px;
+      padding: 9px 12px;
       font-size: 13px;
       color: var(--navy);
       min-height: 40px;
+      box-sizing: border-box;
+      width: 100%;
+      overflow: hidden;
+    }
+    .spiekbrief-rij .sb-datum {
+      font-weight: 700;
+      color: var(--grijs-tekst);
+      font-variant-numeric: tabular-nums;
+      font-size: 11px;
+      flex-shrink: 0;
     }
     .spiekbrief-rij .sb-tijd {
       font-weight: 700;
       color: var(--navy);
-      min-width: 78px;
       font-variant-numeric: tabular-nums;
-      font-size: 12px;
+      font-size: 13px;
+      flex-shrink: 0;
+      min-width: 42px;
     }
     .spiekbrief-rij .sb-naam {
-      flex: 1;
+      flex: 1 1 auto;
+      min-width: 0;
       font-weight: 600;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -572,15 +586,20 @@
       color: var(--grijs-tekst);
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
-    }
-    .spiekbrief-rij .sb-status {
-      font-size: 14px;
       flex-shrink: 0;
     }
+    .spiekbrief-rij .sb-status {
+      font-size: 12px;
+      flex-shrink: 0;
+      margin-left: auto;
+      color: var(--grijs-tekst);
+    }
+    .spiekbrief-rij .sb-status.is-feedback { color: var(--groen); }
+    .spiekbrief-rij .sb-status.is-doorgezet { color: var(--oranje); }
     @media (max-width: 480px) {
-      .spiekbrief-rij { padding: 9px 12px; gap: 8px; }
+      .spiekbrief-rij { padding: 8px 10px; gap: 6px; font-size: 13px; }
       .spiekbrief-rij .sb-tel { display: none; }
-      .spiekbrief-rij .sb-tijd { min-width: 60px; }
+      .spiekbrief-rij .sb-datum { display: none; }
     }
 
     /* Spiekbrief-toggle-knop in actiebalk bovenaan */
@@ -1577,9 +1596,15 @@
     const btn = document.getElementById('btn-spiekbrief');
     const aan = localStorage.getItem('mva_spiekbrief') === '1';
     if (container) {
+      const wasAan = container.classList.contains('spiekbrief-modus');
       container.classList.toggle('spiekbrief-modus', aan);
-      // Reset uitgeklapte state bij wisselen — schone start
-      container.querySelectorAll('.bez-card.uitgeklapt').forEach(c => c.classList.remove('uitgeklapt'));
+      // Datum-filter actief? Dan datum verbergen in spiekbrief (anders dubbel met header)
+      const datumFilterAan = !!window._datumFilter;
+      container.classList.toggle('datum-filter-actief', datumFilterAan);
+      // Reset uitgeklapte state alleen als modus daadwerkelijk wisselt — niet bij gewone re-renders/filters
+      if (wasAan !== aan) {
+        container.querySelectorAll('.bez-card.uitgeklapt').forEach(c => c.classList.remove('uitgeklapt'));
+      }
     }
     if (btn) {
       btn.classList.toggle('actief', aan);
@@ -1681,6 +1706,8 @@
     // Na filteren: hersorteer zichtbare kaarten
     hersorteerZichtbareKaarten();
     updateDatumLabel();
+    // Werk spiekbrief-state bij (datum-filter beïnvloedt of datum getoond wordt)
+    pasSpiekbriefToe();
   }
   window.filterBezichtigingen = filterBezichtigingen;
 
@@ -2178,10 +2205,11 @@
         return `
           <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''} ${heeftFeedback ? 'bez-gedaan' : 'bez-open'}" id="bez-${b.id}" data-adres="${(b.adres||'').toLowerCase().replace(/"/g,'&quot;')}" data-naam="${b.naam.toLowerCase().replace(/"/g,'&quot;')}" data-datum="${(b.datum||'').toLowerCase()}" data-tijdstip="${(b.tijdstip||'').toLowerCase()}" data-inpool="${alGedeeld?'1':'0'}" data-actie="${actieStatus}" onclick="klikSpiekbriefRij(event, '${b.id}')">
             <div class="spiekbrief-rij">
-              <span class="sb-tijd">${b.datum ? (b.datum.split('-')[2] || '') + '/' + (b.datum.split('-')[1] || '') : '—'}${b.tijdstip ? ' ' + b.tijdstip : ''}</span>
+              ${b.datum ? `<span class="sb-datum">${(b.datum.split('-')[2] || '')}/${(b.datum.split('-')[1] || '')}</span>` : ''}
+              <span class="sb-tijd">${b.tijdstip || '—'}</span>
               <span class="sb-naam">${b.naam}</span>
               ${b.telefoon ? `<span class="sb-tel">${b.telefoon}</span>` : ''}
-              <span class="sb-status">${heeftFeedback ? '✓' : (alGedeeld ? '↗' : '●')}</span>
+              <span class="sb-status ${heeftFeedback ? 'is-feedback' : (alGedeeld ? 'is-doorgezet' : '')}">${heeftFeedback ? '✓' : (alGedeeld ? '↗' : '●')}</span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
               <label class="bulk-checkbox-wrap" style="display:none;padding-top:2px;cursor:pointer">

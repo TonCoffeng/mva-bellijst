@@ -35,6 +35,13 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 **Niet veranderd:** zoekfilter, sortering, datum-navigator, selectie-modus. Allemaal werken hetzelfde, of spiekbrief nu aan of uit staat.
 
+**Fix later op 8 mei (mobiel + layout):**
+- Tijd en datum gesplitst in eigen spans (`.sb-tijd` en `.sb-datum`). Datum verbergt automatisch wanneer datum-filter actief is (anders dubbel met header) én onder 480px breedte.
+- Tijdsformat in spiekbrief is nu alleen `HH:MM` (vroeger `dd/mm HH:MM`), datum komt los ervoor wanneer relevant.
+- Status-icoon (●/✓/↗) staat nu rechts vast (margin-left: auto) en krijgt kleur per status: groen voor feedback, oranje voor doorgezet, grijs voor open.
+- Layout-fixes voor smal scherm: `width:100%`, `box-sizing:border-box`, `overflow:hidden`, marges van 16px → 8px. Eerdere versie scrolde horizontaal weg op telefoon.
+- `pasSpiekbriefToe()` aangeroepen na elke filter-actie (datum-nav / zoekveld) zodat datum-tonen-of-niet real-time klopt. Reset van uitgeklapte kaarten gebeurt alleen bij modus-wissel, niet bij elke filter-actie (anders klapte de uitgeklapte kaart dicht tijdens typen).
+
 ---
 
 ## 2026-05-08
