@@ -30,6 +30,18 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 **Frontend nog niet aangepast** — `index.html` rewrite van `geefNaarPool()` voor de modal komt in een volgende stap, na backend testen via curl/fetch.
 
+### Gefixt — telefoon-zoek werkte niet (Cloze gebruikt E.164)
+
+**Probleem:** `check_bestaand` en `pool_routing_check` zochten op `0646727045`, maar Cloze indexeert telefoons als `+31646727045`. Resultaat: bekende klanten werden niet gevonden via telefoonnummer.
+
+**Fix:** helper `normalizeTelToE164NL()` toegevoegd — converteert `06...` / `020...` / `+31...` / `31...` allemaal naar `+31...` formaat vóór de Cloze-query. Originele telefoon blijft de input, normalisatie alleen voor de zoekquery.
+
+### Gefixt — eigenaar-veld heet `assignee`, niet `assignedTo`
+
+**Probleem:** zowel `check_bestaand` als `pool_routing_check` lazen het veld `assignedTo` uit Cloze responses, maar dat veld bestaat niet in `people/find` of `people/get` responses (bevestigd via `_debug_velden`). Het werkelijke veld is `assignee`.
+
+**Fix:** beide actions lezen nu `assignee` als primair veld, met `assignedTo` als fallback voor robuustheid.
+
 ---
 
 ## 2026-05-08
