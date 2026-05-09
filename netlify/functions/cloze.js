@@ -325,6 +325,87 @@ exports.handler = async (event) => {
       };
     }
 
+    // ── DEBUG: TIMELINE OPHALEN VOOR ÉÉN PERSOON ─────────────────────
+    // Tijdelijke action om de structuur van timeline/items/get response te
+    // verkennen. Wordt verwijderd zodra pool_routing_check werkt.
+    // Aanroep: { action: "debug_timeline", data: { email: "..." } }
+    //   of:    { action: "debug_timeline", data: { portableId: "..." } }
+    if (action === "debug_timeline") {
+      const { email, portableId: providedId } = data;
+      let portableId = providedId || null;
+      let person_summary = null;
+
+      // Als alleen email gegeven: eerst people/find om portableId te krijgen
+      if (!portableId && email) {
+        const findRes = await fetch(
+          `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(email)}&pagesize=3`
+        );
+        const findJson = await findRes.json();
+        const matches = Array.isArray(findJson?.people) ? findJson.people : [];
+        const match = matches.find(p => {
+          if (!Array.isArray(p.emails)) return false;
+          return p.emails.some(e => (e.value || e || '').toLowerCase() === email.toLowerCase());
+        }) || matches[0] || null;
+
+        if (match) {
+          portableId = match.portableId || match.id || match._id || null;
+          person_summary = {
+            name: match.name,
+            stage: match.stage,
+            assignedTo: match.assignedTo,
+            portableId,
+            top_level_keys: Object.keys(match).slice(0, 30),
+          };
+        }
+      }
+
+      if (!portableId) {
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            ok: false,
+            reden: "Geen portableId — persoon niet gevonden via email",
+            person_summary,
+          }),
+        };
+      }
+
+      // Haal de timeline op
+      const tlRes = await fetch(
+        `https://api.cloze.com/v1/timeline/items/get?api_key=${CLOZE_API_KEY}&user_email=${encodeURIComponent(CLOZE_USER)}&personId=${encodeURIComponent(portableId)}&pagesize=20`
+      );
+      const tlText = await tlRes.text();
+      let tlJson = null;
+      try { tlJson = JSON.parse(tlText); } catch (e) { /* keep raw */ }
+
+      const items = Array.isArray(tlJson?.items) ? tlJson.items : null;
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          ok: tlRes.ok,
+          http_status: tlRes.status,
+          person_summary,
+          portableId_used: portableId,
+          response_top_keys: tlJson ? Object.keys(tlJson) : null,
+          items_count: items ? items.length : null,
+          first_item_keys: items && items[0] ? Object.keys(items[0]) : null,
+          first_item: items && items[0] ? items[0] : null,
+          // Compact overzicht van alle items: alleen date + style + subject
+          all_items_compact: items ? items.map(i => ({
+            date: i.date || i.timestamp || i.createdAt || null,
+            style: i.style || i.type || null,
+            subject: i.subject || i.title || null,
+            outcome: i.outcome || null,
+          })) : null,
+          // Als parsen faalde: raw response (eerste 1500 chars)
+          raw_sample: tlJson ? null : tlText.slice(0, 1500),
+        }),
+      };
+    }
+
     return {
       statusCode: 400,
       headers,
