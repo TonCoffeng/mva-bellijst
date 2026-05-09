@@ -5,6 +5,18 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-09
+
+### Toegevoegd — `debug_timeline` action (tijdelijk)
+
+**Doel:** verkenning van Cloze `timeline/items/get` response-structuur, vóór bouw van de echte `pool_routing_check` action. Wordt verwijderd zodra die laatste werkt.
+
+**Werking:** action `debug_timeline` accepteert `{ email }` of `{ portableId }`. Doet eerst `people/find` als alleen email gegeven is, dan `timeline/items/get?personId=…&pagesize=20`. Returnt structuur: `items_count`, `first_item_keys`, `all_items_compact` (date/style/subject/outcome).
+
+**Implementatie `netlify/functions/cloze.js`:** nieuw blok vóór de `Onbekende actie` catch-all. Bestaande acties ongewijzigd.
+
+---
+
 ## 2026-05-08
 
 ### Toegevoegd — Spiekbrief-modus voor drukke bezichtigingsdagen (Rogier-feedback)
