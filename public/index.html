@@ -623,6 +623,21 @@
     }
     .spiekbrief-rij .sb-status.is-feedback { color: var(--groen); }
     .spiekbrief-rij .sb-status.is-doorgezet { color: var(--oranje); }
+    /* Lead-geblokkeerd: sterke klant van een collega — niet meegaan in bulk */
+    .bez-card.lead-geblokkeerd .spiekbrief-rij::before {
+      content: "🔒";
+      font-size: 12px;
+      flex-shrink: 0;
+      margin-right: 2px;
+    }
+    .bez-card.lead-geblokkeerd .spiekbrief-rij {
+      background: rgba(239, 159, 31, 0.06);
+    }
+    .bez-card.lead-geblokkeerd .sb-checkbox-wrap input[type="checkbox"]:disabled,
+    .bez-card.lead-geblokkeerd .bulk-checkbox-wrap input[type="checkbox"]:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
     @media (max-width: 480px) {
       .spiekbrief-rij { padding: 8px 10px; gap: 6px; font-size: 13px; }
       .spiekbrief-rij .sb-tel { display: none; }
@@ -698,16 +713,34 @@
       background: #e8eaf6;
       border-color: var(--navy);
     }
-    /* Mobiel (≤600px): alle 4 knoppen blijven op 1 rij, kleiner padding/font */
+    /* Mobiel (≤600px): kleiner padding/font om te passen */
     @media (max-width: 600px) {
       .actiebalk { gap: 6px; }
       .actiebalk .btn-naar-pool,
       .actiebalk .btn-zichzelf,
       .actiebalk .btn-afgehandeld,
       .actiebalk .btn-toewijzen {
-        padding: 10px 8px;
+        padding: 10px 6px;
         font-size: 12px;
         text-align: center;
+      }
+    }
+    /* Echt smal (≤420px): toon korte labels (lbl-kort) ipv volle, en flex-basis groter */
+    @media (max-width: 420px) {
+      .actiebalk .btn-naar-pool .lbl-vol,
+      .actiebalk .btn-zichzelf .lbl-vol,
+      .actiebalk .btn-afgehandeld .lbl-vol,
+      .actiebalk .btn-toewijzen .lbl-vol { display: none; }
+      .actiebalk .btn-naar-pool .lbl-kort,
+      .actiebalk .btn-zichzelf .lbl-kort,
+      .actiebalk .btn-afgehandeld .lbl-kort,
+      .actiebalk .btn-toewijzen .lbl-kort { display: inline; }
+      .actiebalk .btn-naar-pool,
+      .actiebalk .btn-zichzelf,
+      .actiebalk .btn-afgehandeld,
+      .actiebalk .btn-toewijzen {
+        padding: 10px 4px;
+        font-size: 12px;
       }
     }
     /* MVA Talent als klein icoontje rechtsboven in de kaart (vervangt
@@ -1204,6 +1237,15 @@
     </div>
     <div id="filter-teller" style="display:none;font-size:11px;color:var(--grijs-tekst);margin-top:6px;padding-left:4px"></div>
   </div>
+  <!-- ALLES SELECTEREN — verschijnt alleen als selectiemodus aan staat -->
+  <div id="alles-selecteren-bar" style="display:none;padding:0 16px 10px">
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--grijs);border:1px solid var(--grijs-mid);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--navy);font-weight:600">
+      <input type="checkbox" id="chk-alles-selecteren" onchange="toggleAllesSelecteren(this)"
+        style="width:20px;height:20px;cursor:pointer;accent-color:var(--oranje)" />
+      <span>Selecteer alle zichtbare</span>
+      <span id="alles-selecteren-teller" style="font-size:11px;font-weight:500;color:var(--grijs-tekst);margin-left:auto"></span>
+    </label>
+  </div>
   <div id="geven-container"></div>
   <div id="bulk-actiebalk" style="display:none;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--navy);color:white;padding:12px 18px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.25);z-index:90;gap:10px;align-items:center;min-width:280px;max-width:92vw;flex-wrap:wrap">
     <div style="flex:1;min-width:120px">
@@ -1651,8 +1693,54 @@
       const kort = aan ? '📇' : '📋';
       btn.innerHTML = `<span class="lbl-vol">${vol}</span><span class="lbl-kort" style="display:none">${kort}</span>`;
     }
+    // Selectiemodus checkbox-zichtbaarheid hangt af van spiekbrief/volle modus
+    if (typeof updateSelectieModusUI === 'function') updateSelectieModusUI();
   }
   window.pasSpiekbriefToe = pasSpiekbriefToe;
+
+  // Synchroniseer beide checkboxes (header-row + spiekbrief-rij) voor dezelfde lead.
+  // Wordt aangeroepen wanneer een van de twee verandert — zorgt dat state altijd één geheel is.
+  function syncBulkCheckbox(checkbox) {
+    const id = checkbox.dataset.bezId;
+    if (!id) return;
+    const allBoxes = document.querySelectorAll(`.bulk-checkbox[data-bez-id="${id}"]`);
+    allBoxes.forEach(cb => { if (cb !== checkbox) cb.checked = checkbox.checked; });
+  }
+  window.syncBulkCheckbox = syncBulkCheckbox;
+
+  // ── CLOZE-BLOKKADE OP SPIEKBRIEF-RIJ ────────────────────────────────
+  // Wanneer Cloze-data binnenkomt en de bezichtiger een 'sterke klant' van
+  // een COLLEGA is, blokkeren we deze lead voor bulk-doorzetten:
+  // - Spiekbrief-rij krijgt class .lead-geblokkeerd → toont slot-icoon
+  // - Beide checkboxes worden disabled → niet aanvinkbaar bij bulk
+  // Sterke klanten van JEZELF blokkeren we niet (je beheert ze al).
+  function werkSpiekbriefBlokkadeBij(card) {
+    if (!card) return;
+    const sterk = card.dataset.clozeSterkte === 'sterk';
+    const eigenaarEmail = (card.dataset.clozeEigenaarEmail || '').toLowerCase();
+    const huidigeEmail = (huidigeMakelaar?.email || '').toLowerCase();
+    const heeftAndereEigenaar = !!eigenaarEmail && eigenaarEmail !== huidigeEmail;
+    const moetBlokkeren = sterk && heeftAndereEigenaar;
+    card.classList.toggle('lead-geblokkeerd', moetBlokkeren);
+    // Disable beide checkboxes (header + spiekbrief)
+    const eigenaarNaam = card.dataset.clozeEigenaarNaam || '';
+    const checkboxes = card.querySelectorAll('.bulk-checkbox');
+    checkboxes.forEach(cb => {
+      cb.disabled = moetBlokkeren;
+      if (moetBlokkeren) {
+        cb.checked = false;  // veilig: deselecteer als 'ie geblokkeerd raakt
+        const wrap = cb.closest('label');
+        if (wrap) wrap.title = `Klant van ${eigenaarNaam || 'een collega'} — apart afhandelen`;
+      } else {
+        const wrap = cb.closest('label');
+        if (wrap) wrap.title = '';
+      }
+    });
+    // Werk teller bij want zichtbaar-selecteerbaar telling kan veranderd zijn
+    if (typeof werkAllesSelecterenBijTellerBij === 'function') werkAllesSelecterenBijTellerBij();
+    if (typeof updateBulkTeller === 'function') updateBulkTeller();
+  }
+  window.werkSpiekbriefBlokkadeBij = werkSpiekbriefBlokkadeBij;
 
   // Klik-handler op een bez-card. In spiekbrief-modus: toggle uitgeklapt
   // op deze kaart, en klap andere uitgeklapte kaarten weer in.
@@ -2246,6 +2334,11 @@
         return `
           <div class="bez-card ${alGedeeld ? 'al-gedeeld' : ''} ${heeftFeedback ? 'bez-gedaan' : 'bez-open'}" id="bez-${b.id}" data-adres="${(b.adres||'').toLowerCase().replace(/"/g,'&quot;')}" data-naam="${b.naam.toLowerCase().replace(/"/g,'&quot;')}" data-datum="${(b.datum||'').toLowerCase()}" data-tijdstip="${(b.tijdstip||'').toLowerCase()}" data-inpool="${alGedeeld?'1':'0'}" data-actie="${actieStatus}" onclick="klikSpiekbriefRij(event, '${b.id}')">
             <div class="spiekbrief-rij">
+              <label class="sb-checkbox-wrap bulk-checkbox-wrap" style="display:none;cursor:pointer;flex-shrink:0;align-items:center;padding:2px 0" onclick="event.stopPropagation()">
+                <input type="checkbox" class="bulk-checkbox sb-checkbox" data-bez-id="${b.id}"
+                  onchange="syncBulkCheckbox(this); updateBulkTeller()"
+                  style="width:20px;height:20px;cursor:pointer;accent-color:var(--oranje)" />
+              </label>
               ${b.datum ? `<span class="sb-datum">${(b.datum.split('-')[2] || '')}/${(b.datum.split('-')[1] || '')}</span>` : ''}
               <span class="sb-tijd">${b.tijdstip || '—'}</span>
               <span class="sb-naam">${b.naam}</span>
@@ -2255,7 +2348,7 @@
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
               <label class="bulk-checkbox-wrap" style="display:none;padding-top:2px;cursor:pointer">
                 <input type="checkbox" class="bulk-checkbox" data-bez-id="${b.id}"
-                  onchange="updateBulkTeller()"
+                  onchange="syncBulkCheckbox(this); updateBulkTeller()"
                   style="width:20px;height:20px;cursor:pointer;accent-color:var(--oranje)" />
               </label>
               <div style="flex:1;min-width:0">
@@ -2349,7 +2442,7 @@
                 onclick="geefNaarPool('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
                 ${actieStatus==='pool' ? 'disabled' : ''}
                 ${alGedeeld && actieStatus !== 'pool' ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
-                ${actieStatus==='pool' ? '✅ Al in de pool' : '📤 Geef door aan pool'}
+                <span class="lbl-vol">${actieStatus==='pool' ? '✅ Al in de pool' : '📤 Geef door aan pool'}</span><span class="lbl-kort" style="display:none">${actieStatus==='pool' ? '✅ Pool' : '📤 Pool'}</span>
               </button>
               <button
                 class="btn-zichzelf ${actieStatus==='zelf' ? 'gedeeld' : ''}"
@@ -2357,7 +2450,7 @@
                 onclick="geefAanZichzelf('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
                 ${actieStatus==='zelf' ? 'disabled' : ''}
                 ${alGedeeld && actieStatus !== 'zelf' ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
-                ${actieStatus==='zelf' ? '✅ Staat bij jou!' : '👤 Zelf bellen'}
+                <span class="lbl-vol">${actieStatus==='zelf' ? '✅ Staat bij jou!' : '👤 Zelf bellen'}</span><span class="lbl-kort" style="display:none">${actieStatus==='zelf' ? '✅ Zelf' : '👤 Zelf'}</span>
               </button>
               <button
                 class="btn-afgehandeld"
@@ -2365,7 +2458,7 @@
                 onclick="markeerAfgehandeld('${b.id}', '${b.naam.replace(/'/g, "\'")}', '${b.adres?.replace(/'/g, "\'") || ''}')"
                 title="Naar archief — bezichtiging is afgerond, gaat uit de actieve lijst"
                 ${alGedeeld ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
-                📦 Naar archief
+                <span class="lbl-vol">📦 Naar archief</span><span class="lbl-kort" style="display:none">📦 Archief</span>
               </button>
               <button
                 class="btn-toewijzen"
@@ -2373,7 +2466,7 @@
                 onclick="openToewijzenModal('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
                 title="Direct toewijzen aan een collega — Round Robin overslaan"
                 ${alGedeeld ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
-                → Toewijzen
+                <span class="lbl-vol">→ Toewijzen</span><span class="lbl-kort" style="display:none">→ Toew.</span>
               </button>
             </div>
           </div>`;
@@ -2424,6 +2517,9 @@
             card.dataset.clozeId = json.id || '';
             card.dataset.clozeSterkte = sterkte;             // 'sterk' / 'zwak' / 'geen'
             card.dataset.clozeSignalen = signalen.join('|'); // pipe-separated voor leesAndereEigenaar
+            // Werk de spiekbrief-rij bij: toon slot-icoon en blokkeer checkbox
+            // wanneer dit een sterke klant van een collega is.
+            werkSpiekbriefBlokkadeBij(card);
           }
 
           if (!json.bestaand) {
@@ -2552,14 +2648,30 @@
   function updateSelectieModusUI() {
     const btn = document.getElementById('btn-selectiemodus');
     const balk = document.getElementById('bulk-actiebalk');
+    const allesBar = document.getElementById('alles-selecteren-bar');
     const wraps = document.querySelectorAll('.bulk-checkbox-wrap');
-    wraps.forEach(w => { w.style.display = selectieModusActief ? 'flex' : 'none'; });
+    // Toon checkbox-wraps op de juiste plek afhankelijk van modus:
+    // - Volle modus + selectie aan: alleen header-row checkbox tonen (niet sb-checkbox)
+    // - Spiekbrief-modus + selectie aan: alleen sb-checkbox tonen (niet header-row)
+    const inSpiekbrief = document.getElementById('geven-container')?.classList.contains('spiekbrief-modus');
+    wraps.forEach(w => {
+      if (!selectieModusActief) {
+        w.style.display = 'none';
+        return;
+      }
+      const isSb = w.classList.contains('sb-checkbox-wrap');
+      // Sb-checkbox alleen zichtbaar in spiekbrief-modus, header-checkbox alleen in volle modus
+      w.style.display = (inSpiekbrief ? isSb : !isSb) ? 'flex' : 'none';
+    });
+    // Alles-selecteren-bar tonen/verbergen
+    if (allesBar) allesBar.style.display = selectieModusActief ? 'block' : 'none';
     if (selectieModusActief) {
       btn.innerHTML = '<span class="lbl-vol">\u2715 Selectie stop</span><span class="lbl-kort" style="display:none">\u2715</span>';
       btn.style.background = 'var(--oranje)';
       btn.style.color = 'white';
       btn.style.borderColor = 'var(--oranje)';
       balk.style.display = 'flex';
+      werkAllesSelecterenBijTellerBij();
     } else {
       btn.innerHTML = '<span class="lbl-vol">\u2610 Selectie</span><span class="lbl-kort" style="display:none">\u2610</span>';
       btn.style.background = 'none';
@@ -2567,6 +2679,8 @@
       btn.style.borderColor = 'var(--grijs-mid)';
       balk.style.display = 'none';
       document.querySelectorAll('.bulk-checkbox').forEach(cb => { cb.checked = false; });
+      const allesCb = document.getElementById('chk-alles-selecteren');
+      if (allesCb) allesCb.checked = false;
     }
     updateBulkTeller();
   }
@@ -2611,12 +2725,108 @@
         ? 'Archiveren kan alleen voor leads met actie (pool/zelf/afgehandeld)'
         : 'Archiveer geselecteerde leads';
     }
+    // Werk de alles-selecteren-checkbox state bij (klopt 'ie nog met de selectie?)
+    werkAllesSelecterenBijTellerBij();
   }
 
+  // ── ALLES SELECTEREN ─────────────────────────────────────────────────
+  // Vink alle ZICHTBARE en SELECTEERBARE checkboxes in de lijst aan/uit.
+  // 'Zichtbaar' = niet uitgefilterd (door datum/zoekterm). 'Selecteerbaar' = niet
+  // geblokkeerd door Cloze-klantstatus van een collega (komt later).
+  function toggleAllesSelecteren(checkbox) {
+    const aan = checkbox.checked;
+    // Pak alle checkboxes van zichtbare kaarten — gebruik unieke bez-id zodat
+    // we niet 2x dezelfde lead aanvinken (sb-checkbox + header-checkbox samen).
+    const inSpiekbrief = document.getElementById('geven-container')?.classList.contains('spiekbrief-modus');
+    const cards = document.querySelectorAll('#geven-container .bez-card');
+    const gezienIds = new Set();
+    cards.forEach(card => {
+      // Alleen zichtbare kaarten (niet verborgen door filter)
+      if (card.style.display === 'none') return;
+      const id = card.id?.replace(/^bez-/, '');
+      if (!id || gezienIds.has(id)) return;
+      gezienIds.add(id);
+      // Pak de relevante checkbox: in spiekbrief de sb-checkbox, anders de header-checkbox
+      const cb = inSpiekbrief
+        ? card.querySelector('.sb-checkbox')
+        : card.querySelector('.bulk-checkbox:not(.sb-checkbox)');
+      if (cb && !cb.disabled) {
+        cb.checked = aan;
+        syncBulkCheckbox(cb);
+      }
+    });
+    updateBulkTeller();
+  }
+  window.toggleAllesSelecteren = toggleAllesSelecteren;
+
+  // Werk de "alles geselecteerd"-state bij — checkbox aan als alle zichtbare
+  // selecteerbare kaarten aangevinkt zijn, anders uit (of indeterminate als gemengd).
+  function werkAllesSelecterenBijTellerBij() {
+    const allesCb = document.getElementById('chk-alles-selecteren');
+    const teller = document.getElementById('alles-selecteren-teller');
+    if (!allesCb) return;
+    const inSpiekbrief = document.getElementById('geven-container')?.classList.contains('spiekbrief-modus');
+    const cards = document.querySelectorAll('#geven-container .bez-card');
+    let zichtbaarTotaal = 0, aangevinkt = 0;
+    const gezienIds = new Set();
+    cards.forEach(card => {
+      if (card.style.display === 'none') return;
+      const id = card.id?.replace(/^bez-/, '');
+      if (!id || gezienIds.has(id)) return;
+      gezienIds.add(id);
+      const cb = inSpiekbrief
+        ? card.querySelector('.sb-checkbox')
+        : card.querySelector('.bulk-checkbox:not(.sb-checkbox)');
+      if (cb && !cb.disabled) {
+        zichtbaarTotaal++;
+        if (cb.checked) aangevinkt++;
+      }
+    });
+    if (zichtbaarTotaal === 0) {
+      allesCb.checked = false;
+      allesCb.indeterminate = false;
+    } else if (aangevinkt === 0) {
+      allesCb.checked = false;
+      allesCb.indeterminate = false;
+    } else if (aangevinkt === zichtbaarTotaal) {
+      allesCb.checked = true;
+      allesCb.indeterminate = false;
+    } else {
+      allesCb.checked = false;
+      allesCb.indeterminate = true;
+    }
+    if (teller) {
+      teller.textContent = zichtbaarTotaal > 0
+        ? `${aangevinkt} / ${zichtbaarTotaal} zichtbaar`
+        : 'Geen leads zichtbaar';
+    }
+  }
+  window.werkAllesSelecterenBijTellerBij = werkAllesSelecterenBijTellerBij;
+
   function openBulkModal() {
-    const ids = Array.from(document.querySelectorAll('.bulk-checkbox:checked')).map(cb => cb.dataset.bezId);
+    const allChecked = Array.from(document.querySelectorAll('.bulk-checkbox:checked')).map(cb => cb.dataset.bezId);
+    // Dedupe (sb-checkbox + header-checkbox zijn synced maar voor de zekerheid)
+    const ids = [...new Set(allChecked)];
     if (ids.length === 0) return;
-    const items = ids.map(id => {
+    // Filter geblokkeerde leads (sterke klant van een collega) eruit — die mogen
+    // niet in bulk doorgezet worden; ze moeten apart via single-flow met modal.
+    const geblokkeerd = [];
+    const toegestaan = [];
+    ids.forEach(id => {
+      const card = document.getElementById('bez-' + id);
+      if (!card) return;
+      if (card.classList.contains('lead-geblokkeerd')) {
+        geblokkeerd.push({ id, naam: card.querySelector('.bez-naam')?.textContent || 'lead', eigenaar: card.dataset.clozeEigenaarNaam || 'collega' });
+      } else {
+        toegestaan.push(id);
+      }
+    });
+    // Als er niets over is na filtering: melding tonen, geen modal
+    if (toegestaan.length === 0) {
+      toonToast('Alle geselecteerde leads zijn klanten van collega\'s — behandel ze apart via de pool-knop op elke kaart.', 'fout');
+      return;
+    }
+    const items = toegestaan.map(id => {
       const card = document.getElementById('bez-' + id);
       return {
         id: id,
@@ -2645,6 +2855,14 @@
       '</div>';
     }).join('');
     const modal = document.createElement('div');
+    // Bouw waarschuwing op als er geblokkeerde leads zijn weggefilterd
+    const escHtml = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const blokkadeWaarschuwing = geblokkeerd.length > 0
+      ? '<div style="margin:0 16px 8px;padding:10px 12px;background:#fff3e0;border:1px solid #fed7aa;border-radius:10px;font-size:12px;color:#c2410c;line-height:1.4">' +
+          '<div style="font-weight:700;margin-bottom:4px">🔒 ' + geblokkeerd.length + ' lead' + (geblokkeerd.length===1?'':'s') + ' overgeslagen — klant van een collega</div>' +
+          '<div>' + geblokkeerd.map(g => escHtml(g.naam) + ' (' + escHtml(g.eigenaar) + ')').join(', ') + '. Behandel apart via de pool-knop op elke kaart.</div>' +
+        '</div>'
+      : '';
     modal.id = 'bulk-modal';
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:flex-end;justify-content:center';
     modal.innerHTML = '<div style="background:var(--grijs);width:100%;max-width:600px;max-height:92vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column">'+
@@ -2653,6 +2871,7 @@
         '<div style="font-size:16px;font-weight:700">'+items.length+' bezichtiging'+(items.length===1?'':'en')+'</div></div>'+
         '<button onclick="sluitBulkModal()" style="background:none;border:none;color:white;font-size:22px;cursor:pointer;padding:4px 8px">\u2715</button>'+
       '</div>'+
+      blokkadeWaarschuwing +
       '<div style="padding:14px 16px 6px;font-size:11px;color:var(--grijs-tekst);line-height:1.4">Kies per bezichtiging de feedback. Leeg laten = overslaan. Druk \u00E9\u00E9n keer op Verstuur alles.</div>'+
       '<div style="flex:1;overflow-y:auto;padding:6px 16px">'+kaartHtml+'</div>'+
       '<div style="padding:14px 16px 20px;background:white;border-top:1px solid var(--grijs-mid);display:flex;gap:10px">'+
@@ -2678,13 +2897,20 @@
     const kaarten = modal.querySelectorAll('.bulk-kaart');
     const verstuurBtn = document.getElementById('bulk-verstuur-btn');
     const taken = [];
+    let geblokkeerdSafetyNet = 0;
     kaarten.forEach(function(k){
       const id = k.dataset.bulkId;
+      // Safety net: kaart kan tussentijds geblokkeerd zijn (Cloze-data nét binnen)
+      const card = document.getElementById('bez-' + id);
+      if (card?.classList.contains('lead-geblokkeerd')) { geblokkeerdSafetyNet++; return; }
       const actief = Array.from(k.querySelectorAll('.bulk-fb-btn.actief')).map(function(b){return b.dataset.fbKey;});
       const opmerking = k.querySelector('.bulk-opmerking').value.trim();
       if (actief.length > 0) taken.push({ id: id, feedback: actief, opmerking: opmerking, kaart: k });
     });
     if (taken.length === 0) { toonToast('Kies minimaal bij \u00E9\u00E9n bezichtiging feedback, of annuleer.', 'fout'); return; }
+    if (geblokkeerdSafetyNet > 0) {
+      toonToast(geblokkeerdSafetyNet + ' geblokkeerde lead' + (geblokkeerdSafetyNet===1?'':'s') + ' overgeslagen (klant van collega)', 'fout');
+    }
     verstuurBtn.disabled = true;
     verstuurBtn.textContent = 'Bezig... (0/' + taken.length + ')';
     const labels = { serieus:'\uD83D\uDD25 Serieuze koper', verkoop:'\uD83D\uDCB0 Verkoopprospect', aankoop:'\uD83C\uDFE0 Aankoopprospect', makelaar:'\u270B Heeft makelaar', geen_beeld:'\uD83D\uDCAD Geen beeld', noshow:'\uD83D\uDEAB No-show' };

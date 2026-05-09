@@ -51,6 +51,33 @@ Met de extra spiekbrief-knop kwam de drie-knop-rij (Sortering · Spiekbrief · S
 - **Sortering-knop, spiekbrief-knop, selectie-knop tekst-update via `innerHTML`** in plaats van `textContent` — `textContent` zou de span-structuur stuk maken bij elke state-wissel. Drie functies aangepast: `updateSorteerKnop()`, `pasSpiekbriefToe()`, `updateSelectieModusUI()`.
 - **Layout-controle nu standaard:** elke UI-wijziging vooraf gechecked op breakpoints 1280px (desktop), 768px (tablet), 480px (mobiel), 360px (smalste iPhone) voordat ik lever.
 
+### Toegevoegd — Bulk-selectie via spiekbrief + Cloze-blokkade voor sterke klanten van collega's (9 mei)
+
+**Doel:** in spiekbrief-modus een bulk-workflow waarin je snel veel leads tegelijk kan doorzetten, met als hard vereiste dat sterke klanten van collega's niet stilletjes door bulk gaan (consistent met de single-flow die al een keuzemodal toont voor sterke klanten).
+
+**Wijzigingen in `public/index.html`:**
+
+1. **Selectie-checkbox in elke spiekbrief-rij** (`.sb-checkbox`). Werkt synchroon met de bestaande header-row checkbox via nieuwe `syncBulkCheckbox(checkbox)` functie — beide hebben dezelfde `data-bez-id`, `onchange` synced de tweede automatisch. `updateSelectieModusUI()` toont nu alleen de checkbox die past bij de huidige modus (spiekbrief vs volle kaart) zodat je nooit dubbele checkboxes ziet.
+
+2. **"Alles selecteren"-bar bovenaan** (`#alles-selecteren-bar`) — verschijnt alleen als selectiemodus aan staat. Vinkt alle ZICHTBARE en SELECTEERBARE checkboxes aan/uit (respecteert datum-filter, zoekfilter, en Cloze-blokkade). Functie `toggleAllesSelecteren(cb)` doet de bulk-actie; `werkAllesSelecterenBijTellerBij()` houdt de checkbox-state synced met de werkelijke selectie (aangevinkt / uitgevinkt / indeterminate) en toont een teller "X / Y zichtbaar".
+
+3. **Cloze-blokkade visueel + functioneel** voor leads die een sterke klant zijn van een collega:
+   - Wanneer Cloze-data binnenkomt na render, roept de Cloze-handler `werkSpiekbriefBlokkadeBij(card)` aan.
+   - Logica: `clozeSterkte === 'sterk'` ÉN eigenaar-email !== huidige-makelaar-email → kaart krijgt class `.lead-geblokkeerd`.
+   - Visueel: `🔒` icoon vóór de spiekbrief-rij, lichte oranje achtergrond (rgba(239,159,31,0.06)).
+   - Functioneel: beide checkboxes (sb + header) worden `disabled`, bestaande `checked = false`, hover-tooltip "Klant van [naam] — apart afhandelen". 
+   - "Alles selecteren" slaat geblokkeerde leads automatisch over (skip op `cb.disabled`).
+
+4. **Bulk-modal weert geblokkeerde leads vooraf:** `openBulkModal()` filtert nu alle aangevinkte ids op `card.classList.contains('lead-geblokkeerd')` voordat hij de modal opent. Geblokkeerde leads tonen als waarschuwingsblok bovenaan de modal: `🔒 X leads overgeslagen — [namen + eigenaars]. Behandel apart via de pool-knop op elke kaart.` Als ALLE selecties geblokkeerd zijn, opent de modal helemaal niet (toast met uitleg).
+
+5. **Safety net in `bulkVerstuurAlles()`:** voor het geval Cloze-data tussendoor binnenkomt en een lead alsnog blokkeert, wordt vlak voor verzending nogmaals gechecked op `.lead-geblokkeerd`. Tellers tonen "X overgeslagen (klant van collega)".
+
+6. **Actiebalk in uitgeklapte kaart compacter op mobiel:** vier knoppen (Pool / Zelf / Naar / Toewijzen) hebben nu lbl-vol/lbl-kort spans; mediaquery onder 420px toont korte labels (`📤 Pool`, `👤 Zelf`, `📦 Archief`, `→ Toew.`) zodat ze niet meer over elkaar lopen. Eerdere screenshot van Rogier toonde "Geef" en "Naar" afgesneden — nu opgelost.
+
+**Consistent met bestaande single-flow:** de `bepaalKlantSterkte()` en `leesAndereEigenaar()` logica wordt niet veranderd of gedupliceerd. De blokkade-check leest uit dezelfde `card.dataset.cloze*` velden die de bestaande Cloze-handler al schrijft. Bron is dus één.
+
+**Layout-controle:** breakpoints 1280 / 768 / 480 / 360 doorlopen, allemaal correct.
+
 ---
 
 ## 2026-05-08
