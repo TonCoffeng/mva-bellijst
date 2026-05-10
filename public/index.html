@@ -3082,10 +3082,13 @@
     if (!eigenaarEmail) return null;
     const huidigeEmail = (huidigeMakelaar?.email || '').toLowerCase();
     if (eigenaarEmail === huidigeEmail) return null;  // ben zelf eigenaar
+    const portableId = card.dataset.clozeId || '';
+    const clozeUrl = portableId ? `https://app.cloze.com/app/#/people/${portableId}` : null;
     return {
       email: eigenaarEmail,
       naam: card.dataset.clozeEigenaarNaam || eigenaarEmail.split('@')[0],
       signalen: (card.dataset.clozeSignalen || '').split('|').filter(Boolean),
+      clozeUrl,
     };
   }
 
@@ -3100,6 +3103,7 @@
         tekst: `${naam} is al bekend in Cloze als klant van ${andereEigenaar.naam}. Weet je zeker dat je deze lead zelf wilt bellen?`,
         okTekst: 'Toch zelf bellen',
         okStijl: 'destructief',
+        clozeUrl: andereEigenaar.clozeUrl,
       });
       if (!ok) return;
     }
@@ -3157,6 +3161,7 @@
         okTekst: `Direct naar ${andereEigenaar.naam}`,
         annuleerTekst: '🎲 Toch via Round Robin',
         toonAnnuleer: true,
+        clozeUrl: andereEigenaar.clozeUrl,
       });
       // ok === true  → direct aan eigenaar
       // ok === false → annuleer-knop = "Toch via Round Robin"
@@ -3502,15 +3507,26 @@
   window.sluitToewijzenModal = sluitToewijzenModal;
 
   // ── MVA CONFIRM MODAL (vervangt browser confirm() met MVA-stijl) ─────
-  // Gebruik: const ok = await mvaConfirm({ titel, tekst, okTekst, okStijl });
+  // Gebruik: const ok = await mvaConfirm({ titel, tekst, okTekst, okStijl, clozeUrl });
   // Returns: Promise<boolean> — true bij OK, false bij Annuleren / overlay-klik
-  function mvaConfirm({ titel = 'Even bevestigen', tekst = 'Weet je het zeker?', okTekst = 'OK', okStijl = '', annuleerTekst = 'Annuleren', toonAnnuleer = true } = {}) {
+  function mvaConfirm({ titel = 'Even bevestigen', tekst = 'Weet je het zeker?', okTekst = 'OK', okStijl = '', annuleerTekst = 'Annuleren', toonAnnuleer = true, clozeUrl = null } = {}) {
     return new Promise((resolve) => {
       document.getElementById('confirm-modal-titel').textContent = titel;
       const tekstEl = document.getElementById('confirm-modal-tekst');
       // Whitespace + newlines bewaren in modal-tekst
       tekstEl.style.whiteSpace = 'pre-line';
       tekstEl.textContent = tekst;
+      // Optionele Cloze-link onder de tekst (rechtstreeks doorklikken naar klant)
+      const clozeEl = document.getElementById('confirm-modal-cloze-link');
+      if (clozeEl) {
+        const link = clozeEl.querySelector('a');
+        if (clozeUrl && link) {
+          link.href = clozeUrl;
+          clozeEl.style.display = '';
+        } else {
+          clozeEl.style.display = 'none';
+        }
+      }
       const okBtn = document.getElementById('confirm-modal-ok');
       okBtn.textContent = okTekst;
       // Optionele kleur-variant voor 'destructief' (wis/delete)
@@ -4092,6 +4108,11 @@
   <div class="talent-modal" role="dialog" aria-labelledby="confirm-modal-titel">
     <h3 id="confirm-modal-titel">Even bevestigen</h3>
     <p id="confirm-modal-tekst">Weet je het zeker?</p>
+    <p id="confirm-modal-cloze-link" style="display:none; margin: -8px 0 12px; font-size: 0.95em;">
+      <a href="#" target="_blank" rel="noopener" style="color: #c2410c; text-decoration: none; font-weight: 500;">
+        🔗 Bekijk klant in Cloze
+      </a>
+    </p>
     <div class="talent-modal-acties">
       <button class="annuleer" data-confirm-action="cancel">Annuleren</button>
       <button class="bevestig" id="confirm-modal-ok" data-confirm-action="ok">OK</button>
