@@ -7,6 +7,12 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ## 2026-05-10
 
+### Veranderd — lead-status filter is nu een dropdown
+
+De lead-status filter-pillen (Hot / Warm / Afspraak / Deal / Lost / Toegewezen) waren visueel te druk naast de bel-status pillen. Vervangen door een **dropdown** "Lead-status" onder de bel-status rij. Werkt functioneel hetzelfde, ziet er rustiger uit. Bel-status pillen blijven gewoon als pillen (vaker gebruikt, sneller filteren).
+
+Tegelijk: dubbele filter-rij die per ongeluk in een eerdere upload was ontstaan, opgeruimd.
+
 ### Toegevoegd — lead-status filter-pillen + "Spiekbrief" hernoemd naar "Compact"
 
 **Tweede rij filter-pillen** in Leads bellen, onder de bestaande bel-status pillen:
