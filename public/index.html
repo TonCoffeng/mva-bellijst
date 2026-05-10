@@ -204,6 +204,31 @@
     .filter-knop.actief.oranje { border-color: var(--oranje); }
     .filter-knop.actief.groen { border-color: var(--groen); }
 
+    /* Bel-status filter-pillen op de Leads-bellen tab */
+    .leads-statusfilter-pil {
+      background: var(--wit);
+      border: 1px solid var(--grijs-mid);
+      color: var(--grijs-tekst);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .leads-statusfilter-pil:hover {
+      background: var(--grijs);
+      color: var(--navy);
+      border-color: var(--navy);
+    }
+    .leads-statusfilter-pil.actief {
+      background: var(--navy);
+      color: var(--wit);
+      border-color: var(--navy);
+    }
+
     .section-title {
       font-size: 13px;
       font-weight: 600;
@@ -1267,26 +1292,90 @@
 <!-- OVERZICHT SCHERM -->
 <div id="overzicht-screen" class="hidden">
   <div class="stats-bar">
-    <div class="stat-card oranje">
-      <div class="stat-number" id="stat-vandaag">0</div>
-      <div class="stat-label">Vandaag</div>
-    </div>
-    <div class="stat-card">
+    <div class="stat-card filter-knop actief" id="leads-filter-openstaand" onclick="filterLeads('openstaand')" title="Alleen openstaande leads">
       <div class="stat-number" id="stat-totaal">0</div>
       <div class="stat-label">Openstaand</div>
     </div>
-    <div class="stat-card groen">
-      <div class="stat-number" id="stat-gedaan">0</div>
-      <div class="stat-label">Afgerond</div>
+    <div class="stat-card filter-knop" id="leads-filter-ontvangen" onclick="openOntvangenPagina()" title="Bekijk wat je hebt ontvangen vanuit de leadpool">
+      <div class="stat-number">📂</div>
+      <div class="stat-label">Ontvangen leads</div>
     </div>
   </div>
 
-  <div class="section-title">Jouw leads</div>
+  <!-- BEL-STATUS FILTER PILLEN -->
+  <div id="leads-status-filter" style="padding:0 16px 8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+    <button class="leads-statusfilter-pil actief" data-status="alle" onclick="filterLeadsOpStatus('alle')">Alle</button>
+    <button class="leads-statusfilter-pil" data-status="open" onclick="filterLeadsOpStatus('open')">Nog niet gebeld</button>
+    <button class="leads-statusfilter-pil" data-status="bereikt_ja" onclick="filterLeadsOpStatus('bereikt_ja')">✅ Bereikt</button>
+    <button class="leads-statusfilter-pil" data-status="niet_bereikbaar" onclick="filterLeadsOpStatus('niet_bereikbaar')">📵 Niet bereikbaar</button>
+    <button class="leads-statusfilter-pil" data-status="bereikt_later" onclick="filterLeadsOpStatus('bereikt_later')">📲 Bel later</button>
+    <button class="leads-statusfilter-pil" data-status="voicemail" onclick="filterLeadsOpStatus('voicemail')">📬 Voicemail</button>
+    <button class="leads-statusfilter-pil" data-status="wellicht_later" onclick="filterLeadsOpStatus('wellicht_later')">💤 Wellicht later</button>
+    <button class="leads-statusfilter-pil" data-status="niet_geinteresseerd" onclick="filterLeadsOpStatus('niet_geinteresseerd')">❌ Niet geïnt.</button>
+  </div>
+
+  <!-- ACTIEBALK: SECTIE-LABEL + SORTEER + SPIEKBRIEF + SELECTIE -->
+  <div class="bez-actiebalk-rij" style="padding:0 16px 8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <div class="bez-actiebalk-label" style="font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em">
+      JOUW LEADS
+    </div>
+    <div class="bez-actiebalk-knoppen" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <button id="btn-leads-sorteer" class="btn-sorteer" onclick="toggleLeadsSortering()" title="Wissel sortering">
+        <span class="lbl-vol">↕ Hot eerst</span><span class="lbl-kort" style="display:none">↕ Hot</span>
+      </button>
+      <button id="btn-leads-spiekbrief" class="btn-spiekbrief" onclick="toggleLeadsSpiekbrief()" title="Klap alle kaarten in tot rijtjes (tap een rij om te openen)">
+        <span class="lbl-vol">📋 Spiekbrief</span><span class="lbl-kort" style="display:none">📋</span>
+      </button>
+      <button id="btn-leads-selectiemodus" class="btn-selectie" onclick="toggleLeadsSelectiemodus()"
+        style="background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;color:var(--grijs-tekst);cursor:pointer;font-family:inherit">
+        <span class="lbl-vol">&#9744; Selectie</span><span class="lbl-kort" style="display:none">&#9744;</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ZOEK-VELD -->
+  <div style="padding:0 16px 10px">
+    <div style="position:relative">
+      <input id="leads-zoek" type="search" autocomplete="off" placeholder="Zoek op naam, adres of telefoonnummer..."
+        oninput="zoekLeadsFilter()"
+        style="width:100%;padding:10px 36px 10px 14px;border:1px solid var(--grijs-mid);border-radius:10px;font-size:13px;font-family:inherit;color:var(--navy);background:var(--wit);box-sizing:border-box" />
+      <button id="leads-zoek-wissen" onclick="wisLeadsZoek()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;cursor:pointer;color:var(--grijs-tekst);padding:4px 8px">&#10005;</button>
+    </div>
+    <div id="leads-zoek-teller" style="display:none;font-size:11px;color:var(--grijs-tekst);margin-top:6px;padding-left:4px"></div>
+  </div>
+
+  <!-- ALLES SELECTEREN — verschijnt alleen als selectiemodus aan staat -->
+  <div id="leads-alles-selecteren-bar" style="display:none;padding:0 16px 10px">
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--grijs);border:1px solid var(--grijs-mid);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--navy);font-weight:600">
+      <input type="checkbox" id="leads-chk-alles-selecteren" onchange="toggleLeadsAllesSelecteren(this)"
+        style="width:20px;height:20px;cursor:pointer;accent-color:var(--oranje)" />
+      <span>Selecteer alle zichtbare</span>
+      <span id="leads-alles-selecteren-teller" style="font-size:11px;font-weight:500;color:var(--grijs-tekst);margin-left:auto"></span>
+    </label>
+  </div>
+
   <div id="leads-container">
     <div class="loading">
       <div class="spinner"></div>
       Leads ophalen...
     </div>
+  </div>
+
+  <!-- BULK-ACTIEBALK voor leads bellen (verschijnt bij selectie) -->
+  <div id="leads-bulk-actiebalk" style="display:none;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--navy);color:white;padding:12px 18px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.25);z-index:90;gap:10px;align-items:center;min-width:280px;max-width:92vw;flex-wrap:wrap">
+    <div style="flex:1;min-width:120px">
+      <div style="font-size:11px;opacity:0.8;letter-spacing:.05em">GESELECTEERD</div>
+      <div id="leads-bulk-count" style="font-size:18px;font-weight:700">0 leads</div>
+    </div>
+    <button onclick="openLeadsBulkStatusModal()" id="btn-leads-bulk-status" disabled
+      style="background:var(--oranje);color:white;border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">
+      Lead-status zetten
+    </button>
+    <button onclick="archiveerLeadsSelectie()" id="btn-leads-bulk-archiveer" disabled
+      style="background:#475569;color:white;border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap"
+      title="Archiveer geselecteerde afgeronde leads">
+      📦 Archiveer
+    </button>
   </div>
 </div>
 
@@ -3680,10 +3769,25 @@
     }
   }
 
+  // ── LEADS BELLEN — state voor filters/selectie/spiekbrief/sortering ──
+  let leadsFilterModus       = 'openstaand'; // 'openstaand' / 'alles' (alleen openstaand+alles)
+  let leadsStatusFilter      = 'alle';       // 'alle' / 'open' / 'bereikt_ja' / etc.
+  let leadsZoekTerm          = '';
+  let leadsSpiekbriefAan     = false;
+  let leadsSelectieModusAan  = false;
+  let leadsSortering         = 'hot';        // 'hot' (standaard) / 'datum' (nieuwste eerst)
+  let leadsGeselecteerd      = new Set();    // ids van geselecteerde leads
+  let leadsIngeklapt         = new Set();    // ids die inklapt zijn (in spiekbrief-modus)
+
   function renderLeads() {
     const container = document.getElementById('leads-container');
 
-    // ── Sortering: Hot → Warm → Toegewezen → rest ──────────────────────
+    // ── 0. Verberg gearchiveerde leads uit alle overzichten ─────────────
+    // Soft archive via lead_status='Gearchiveerd' (zie archiveerLeadsSelectie).
+    // Gearchiveerde leads worden later zichtbaar in een eigen "Archief"-view.
+    const zichtbareDataset = leadsData.filter(l => l.lead_status !== 'Gearchiveerd');
+
+    // ── 1. Sortering ───────────────────────────────────────────────────
     const prioriteit = {
       'Hot': 1,
       'Warm': 2,
@@ -3692,32 +3796,74 @@
       'Deal': 5,
       'Lost': 6,
     };
-    const sorted = [...leadsData].sort((a, b) => {
-      const pa = prioriteit[a.lead_status] || 99;
-      const pb = prioriteit[b.lead_status] || 99;
-      return pa - pb;
-    });
+    let sorted = [...zichtbareDataset];
+    if (leadsSortering === 'hot') {
+      sorted.sort((a, b) => {
+        const pa = prioriteit[a.lead_status] || 99;
+        const pb = prioriteit[b.lead_status] || 99;
+        return pa - pb;
+      });
+    } else {
+      // Nieuwste eerst: op datum_bezichtiging desc, fallback op datum (in pool) desc
+      sorted.sort((a, b) => {
+        const da = a.datum_bezichtiging || a.datum || '';
+        const db = b.datum_bezichtiging || b.datum || '';
+        return db.localeCompare(da);
+      });
+    }
 
-    // ── Tellers in header ──────────────────────────────────────────────
-    const openstaand = sorted.filter(l => !['bereikt_ja','niet_geinteresseerd'].includes(l.status));
-    const afgerond = sorted.filter(l => ['bereikt_ja','niet_geinteresseerd'].includes(l.status));
+    // ── 2. Tellers — op zichtbare dataset (zonder gearchiveerde) ────────
+    const openstaandHeleSet = zichtbareDataset.filter(l => !['bereikt_ja','niet_geinteresseerd'].includes(l.status));
+    document.getElementById('stat-totaal').textContent = openstaandHeleSet.length;
+    const headerBadge = document.getElementById('header-badge');
+    if (headerBadge) headerBadge.textContent = openstaandHeleSet.length + ' leads';
 
-    document.getElementById('stat-totaal').textContent = openstaand.length;
-    document.getElementById('stat-vandaag').textContent = openstaand.filter(l => !l.status).length;
-    document.getElementById('stat-gedaan').textContent = afgerond.length;
-    document.getElementById('header-badge').textContent = openstaand.length + ' leads';
+    // ── 3. Filteren — modus-filter (openstaand/alles) ───────────────────
+    if (leadsFilterModus === 'openstaand') {
+      sorted = sorted.filter(l => !['bereikt_ja','niet_geinteresseerd'].includes(l.status));
+    }
 
+    // ── 4. Filteren — bel-status pillen ─────────────────────────────────
+    if (leadsStatusFilter === 'open') {
+      sorted = sorted.filter(l => !l.status);
+    } else if (leadsStatusFilter !== 'alle') {
+      sorted = sorted.filter(l => l.status === leadsStatusFilter);
+    }
+
+    // ── 5. Filteren — zoek-veld ─────────────────────────────────────────
+    if (leadsZoekTerm) {
+      const t = leadsZoekTerm.toLowerCase();
+      sorted = sorted.filter(l =>
+        (l.naam || '').toLowerCase().includes(t) ||
+        (l.adres || '').toLowerCase().includes(t) ||
+        (l.telefoon || '').toLowerCase().includes(t) ||
+        (l.email || '').toLowerCase().includes(t)
+      );
+    }
+
+    // ── 6. Render ───────────────────────────────────────────────────────
     if (sorted.length === 0) {
-      container.innerHTML = `<div class="leeg">
-        <div class="leeg-icon">🎉</div>
-        <h3>Alles afgehandeld!</h3>
-        <p>Je hebt geen openstaande leads meer.</p>
-      </div>`;
+      // Onderscheid: lege dataset vs. filter wegfilterd
+      const totaalZichtbaar = zichtbareDataset.length;
+      if (totaalZichtbaar === 0) {
+        container.innerHTML = `<div class="leeg">
+          <div class="leeg-icon">🎉</div>
+          <h3>Nog geen leads</h3>
+          <p>Je hebt nog geen leads ontvangen vanuit de pool.</p>
+        </div>`;
+      } else {
+        container.innerHTML = `<div class="leeg">
+          <div class="leeg-icon">🔍</div>
+          <h3>Geen resultaten</h3>
+          <p>Geen leads die voldoen aan dit filter.</p>
+        </div>`;
+      }
+      werkLeadsBulkActiebalkBij();
       return;
     }
 
     container.innerHTML = sorted.map(lead => {
-      // ── Lead-status chip (Toegewezen / Afspraak / Deal / Lost / Warm / Hot) ──
+      // Lead-status chip
       const leadStatusChip = {
         'Hot':        { cls: 'chip-hot',        label: '🔥 Hot' },
         'Warm':       { cls: 'chip-warm',       label: '🌡️ Warm' },
@@ -3727,7 +3873,7 @@
         'Lost':       { cls: 'chip-lost',       label: '❌ Lost' },
       }[lead.lead_status] || { cls: 'chip-toegewezen', label: '📥 Toegewezen' };
 
-      // ── Bel-status chip (Niet bereikbaar / Voicemail / Bel terug etc.) ──
+      // Bel-status chip
       const belChip = {
         'niet_bereikbaar':    { cls: 'chip-urgent', label: 'Niet bereikbaar' },
         'bereikt_later':      { cls: 'chip-later',  label: 'Bel terug' },
@@ -3738,14 +3884,52 @@
       }[lead.status];
 
       const cardClass = {
-        'niet_bereikbaar': 'urgent',
-        'bereikt_later':   'later',
-        'bereikt_ja':      'afgerond',
+        'niet_bereikbaar':     'urgent',
+        'bereikt_later':       'later',
+        'bereikt_ja':          'afgerond',
         'niet_geinteresseerd': 'afgerond',
       }[lead.status] || 'nieuw';
 
+      const isGeselecteerd  = leadsGeselecteerd.has(String(lead.id));
+      const isIngeklapt     = leadsSpiekbriefAan && !leadsIngeklapt.has(String(lead.id));
+      const safeNaam        = (lead.naam || '').replace(/'/g, "\\'");
+
+      // ── SPIEKBRIEF-MODUS: ingeklapte rij ──────────────────────────────
+      if (isIngeklapt) {
+        return `
+          <div class="lead-card-rij ${cardClass}" data-lead-id="${lead.id}"
+               onclick="klapLeadOpen('${lead.id}')"
+               style="background:var(--wit);border:1px solid var(--grijs-mid);border-radius:10px;padding:8px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer">
+            ${leadsSelectieModusAan ? `
+              <input type="checkbox" ${isGeselecteerd ? 'checked' : ''}
+                     onclick="event.stopPropagation();toggleLeadSelectie('${lead.id}', this)"
+                     style="width:18px;height:18px;cursor:pointer;accent-color:var(--oranje)" />
+            ` : ''}
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;color:var(--navy);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                ${lead.naam}
+              </div>
+              <div style="font-size:11px;color:var(--grijs-tekst);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                ${lead.adres || ''} ${lead.telefoon ? '· ' + lead.telefoon : ''}
+              </div>
+            </div>
+            <span class="lead-chip ${leadStatusChip.cls}" style="font-size:10px">${leadStatusChip.label}</span>
+            ${belChip ? `<span class="lead-chip ${belChip.cls}" style="font-size:10px">${belChip.label}</span>` : ''}
+          </div>
+        `;
+      }
+
+      // ── NORMALE KAART ──────────────────────────────────────────────────
       return `
-        <div class="lead-card ${cardClass}" onclick="openModal('${lead.id}')">
+        <div class="lead-card ${cardClass}" data-lead-id="${lead.id}" onclick="${leadsSelectieModusAan ? `toggleLeadSelectie('${lead.id}')` : `openModal('${lead.id}')`}">
+          ${leadsSelectieModusAan ? `
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <input type="checkbox" ${isGeselecteerd ? 'checked' : ''}
+                     onclick="event.stopPropagation();toggleLeadSelectie('${lead.id}', this)"
+                     style="width:20px;height:20px;cursor:pointer;accent-color:var(--oranje)" />
+              <span style="font-size:11px;color:var(--grijs-tekst);font-weight:600">SELECTEER</span>
+            </div>
+          ` : ''}
           <div class="lead-naam">${lead.naam}</div>
           ${lead.adres ? `<div class="lead-adres">📍 ${lead.adres}</div>` : ''}
           ${lead.bij_wie ? `<div class="lead-adres" style="font-size:12px;margin-top:2px">📓 Bezichtigd bij: ${lead.bij_wie}</div>` : ''}
@@ -3768,25 +3952,299 @@
 
           ${lead.opmerkingen ? `<div style="margin-top:6px;font-size:12px;color:var(--grijs-tekst);font-style:italic">💬 ${lead.opmerkingen}</div>` : ''}
 
-          <div class="lead-acties" onclick="event.stopPropagation()">
-            <button class="btn-bel" onclick="bel('${lead.telefoon}', '${lead.naam}')">
-              📞 Bellen
-            </button>
-            <button class="btn-status" onclick="openModal('${lead.id}')">
-              Status →
-            </button>
-          </div>
+          ${leadsSelectieModusAan ? '' : `
+            <div class="lead-acties" onclick="event.stopPropagation()">
+              <button class="btn-bel" onclick="bel('${lead.telefoon}', '${safeNaam}')">
+                📞 Bellen
+              </button>
+              <button class="btn-status" onclick="openModal('${lead.id}')">
+                Status →
+              </button>
+            </div>
 
-          <div class="leadstatus-knoppen" onclick="event.stopPropagation()" style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-            <button class="btn-leadstatus btn-hot"        onclick="zetLeadStatus('${lead.id}', 'Hot')">🔥 Hot</button>
-            <button class="btn-leadstatus btn-warm"       onclick="zetLeadStatus('${lead.id}', 'Warm')">🌡️ Warm</button>
-            <button class="btn-leadstatus btn-afspraak"   onclick="zetLeadStatus('${lead.id}', 'Afspraak')">📅 Afspraak</button>
-            <button class="btn-leadstatus btn-deal"       onclick="zetLeadStatus('${lead.id}', 'Deal')">✅ Deal</button>
-            <button class="btn-leadstatus btn-lost"       onclick="zetLeadStatus('${lead.id}', 'Lost')">❌ Lost</button>
-          </div>
+            <div class="leadstatus-knoppen" onclick="event.stopPropagation()" style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+              <button class="btn-leadstatus btn-hot"        onclick="zetLeadStatus('${lead.id}', 'Hot')">🔥 Hot</button>
+              <button class="btn-leadstatus btn-warm"       onclick="zetLeadStatus('${lead.id}', 'Warm')">🌡️ Warm</button>
+              <button class="btn-leadstatus btn-afspraak"   onclick="zetLeadStatus('${lead.id}', 'Afspraak')">📅 Afspraak</button>
+              <button class="btn-leadstatus btn-deal"       onclick="zetLeadStatus('${lead.id}', 'Deal')">✅ Deal</button>
+              <button class="btn-leadstatus btn-lost"       onclick="zetLeadStatus('${lead.id}', 'Lost')">❌ Lost</button>
+            </div>
+          `}
         </div>
       `;
     }).join('');
+
+    werkLeadsBulkActiebalkBij();
+    werkLeadsAllesSelecterenTellerBij(sorted);
+  }
+
+  // ── FILTER: stat-card 'Openstaand' klikken ──────────────────────────
+  function filterLeads(modus) {
+    leadsFilterModus = modus;
+    document.getElementById('leads-filter-openstaand').classList.toggle('actief', modus === 'openstaand');
+    renderLeads();
+  }
+  window.filterLeads = filterLeads;
+
+  // ── FILTER: bel-status pillen ───────────────────────────────────────
+  function filterLeadsOpStatus(status) {
+    leadsStatusFilter = status;
+    document.querySelectorAll('.leads-statusfilter-pil').forEach(p => {
+      p.classList.toggle('actief', p.dataset.status === status);
+    });
+    renderLeads();
+  }
+  window.filterLeadsOpStatus = filterLeadsOpStatus;
+
+  // ── ZOEK ─────────────────────────────────────────────────────────────
+  function zoekLeadsFilter() {
+    const inp = document.getElementById('leads-zoek');
+    leadsZoekTerm = inp.value.trim();
+    document.getElementById('leads-zoek-wissen').style.display = leadsZoekTerm ? '' : 'none';
+    renderLeads();
+  }
+  window.zoekLeadsFilter = zoekLeadsFilter;
+
+  function wisLeadsZoek() {
+    document.getElementById('leads-zoek').value = '';
+    leadsZoekTerm = '';
+    document.getElementById('leads-zoek-wissen').style.display = 'none';
+    renderLeads();
+  }
+  window.wisLeadsZoek = wisLeadsZoek;
+
+  // ── SORTERING ────────────────────────────────────────────────────────
+  function toggleLeadsSortering() {
+    leadsSortering = leadsSortering === 'hot' ? 'datum' : 'hot';
+    const btn = document.getElementById('btn-leads-sorteer');
+    if (btn) {
+      const vol = btn.querySelector('.lbl-vol');
+      const kort = btn.querySelector('.lbl-kort');
+      if (leadsSortering === 'hot') {
+        if (vol)  vol.textContent  = '↕ Hot eerst';
+        if (kort) kort.textContent = '↕ Hot';
+      } else {
+        if (vol)  vol.textContent  = '↓ Nieuwste eerst';
+        if (kort) kort.textContent = '↓ Nieuw';
+      }
+    }
+    renderLeads();
+  }
+  window.toggleLeadsSortering = toggleLeadsSortering;
+
+  // ── SPIEKBRIEF (inklap) ──────────────────────────────────────────────
+  function toggleLeadsSpiekbrief() {
+    leadsSpiekbriefAan = !leadsSpiekbriefAan;
+    leadsIngeklapt.clear(); // reset welke individueel uitgeklapt zijn
+    document.getElementById('btn-leads-spiekbrief').classList.toggle('actief', leadsSpiekbriefAan);
+    renderLeads();
+  }
+  window.toggleLeadsSpiekbrief = toggleLeadsSpiekbrief;
+
+  // Klap één rij open in spiekbrief-modus (handmatig per kaart)
+  function klapLeadOpen(leadId) {
+    leadsIngeklapt.add(String(leadId));
+    renderLeads();
+  }
+  window.klapLeadOpen = klapLeadOpen;
+
+  // ── SELECTIE-MODUS ───────────────────────────────────────────────────
+  function toggleLeadsSelectiemodus() {
+    leadsSelectieModusAan = !leadsSelectieModusAan;
+    if (!leadsSelectieModusAan) {
+      leadsGeselecteerd.clear();
+    }
+    document.getElementById('btn-leads-selectiemodus').classList.toggle('actief', leadsSelectieModusAan);
+    document.getElementById('leads-alles-selecteren-bar').style.display = leadsSelectieModusAan ? '' : 'none';
+    renderLeads();
+  }
+  window.toggleLeadsSelectiemodus = toggleLeadsSelectiemodus;
+
+  function toggleLeadSelectie(leadId, checkboxEl) {
+    const id = String(leadId);
+    if (leadsGeselecteerd.has(id)) {
+      leadsGeselecteerd.delete(id);
+    } else {
+      leadsGeselecteerd.add(id);
+    }
+    // Zonder volledige rerender alleen UI bijwerken voor smooth feel
+    if (checkboxEl) {
+      checkboxEl.checked = leadsGeselecteerd.has(id);
+    } else {
+      // Klik op de kaart zelf — vind checkbox en update visueel
+      const card = document.querySelector(`[data-lead-id="${leadId}"]`);
+      if (card) {
+        const cb = card.querySelector('input[type="checkbox"]');
+        if (cb) cb.checked = leadsGeselecteerd.has(id);
+      }
+    }
+    werkLeadsBulkActiebalkBij();
+  }
+  window.toggleLeadSelectie = toggleLeadSelectie;
+
+  function toggleLeadsAllesSelecteren(checkbox) {
+    // Pak alle lead-ids die NU zichtbaar zijn (na alle filters)
+    const zichtbareKaarten = document.querySelectorAll('#leads-container [data-lead-id]');
+    if (checkbox.checked) {
+      zichtbareKaarten.forEach(el => leadsGeselecteerd.add(String(el.dataset.leadId)));
+    } else {
+      zichtbareKaarten.forEach(el => leadsGeselecteerd.delete(String(el.dataset.leadId)));
+    }
+    renderLeads();
+  }
+  window.toggleLeadsAllesSelecteren = toggleLeadsAllesSelecteren;
+
+  // ── BULK-ACTIEBALK UPDATE ────────────────────────────────────────────
+  function werkLeadsBulkActiebalkBij() {
+    const balk = document.getElementById('leads-bulk-actiebalk');
+    if (!balk) return;
+    const aantal = leadsGeselecteerd.size;
+    if (leadsSelectieModusAan && aantal > 0) {
+      balk.style.display = 'flex';
+      document.getElementById('leads-bulk-count').textContent = `${aantal} ${aantal === 1 ? 'lead' : 'leads'}`;
+      document.getElementById('btn-leads-bulk-status').disabled = false;
+      // Archiveren is alleen voor afgeronde leads — check of er minstens één afgerond geselecteerd is
+      const heeftAfgerond = [...leadsGeselecteerd].some(id => {
+        const l = leadsData.find(x => String(x.id) === id);
+        return l && ['bereikt_ja','niet_geinteresseerd'].includes(l.status);
+      });
+      document.getElementById('btn-leads-bulk-archiveer').disabled = !heeftAfgerond;
+    } else {
+      balk.style.display = 'none';
+    }
+  }
+
+  function werkLeadsAllesSelecterenTellerBij(zichtbaar) {
+    const teller = document.getElementById('leads-alles-selecteren-teller');
+    const chk = document.getElementById('leads-chk-alles-selecteren');
+    if (!teller || !chk) return;
+    teller.textContent = `${zichtbaar.length} zichtbaar`;
+    // Check of alle zichtbare geselecteerd zijn
+    const alleGeselecteerd = zichtbaar.length > 0
+      && zichtbaar.every(l => leadsGeselecteerd.has(String(l.id)));
+    chk.checked = alleGeselecteerd;
+  }
+
+  // ── BULK-LEAD-STATUS modal ───────────────────────────────────────────
+  // Toont een eigen kleine modal met de 5 lead-statussen.
+  // Bij klik op één status: bevestig + voer uit op alle geselecteerde leads.
+  function openLeadsBulkStatusModal() {
+    if (leadsGeselecteerd.size === 0) return;
+    const aantal = leadsGeselecteerd.size;
+    const modal = document.getElementById('leads-bulk-status-modal');
+    if (!modal) return;
+    document.getElementById('leads-bulk-status-aantal').textContent =
+      `${aantal} ${aantal === 1 ? 'lead' : 'leads'}`;
+    modal.classList.add('actief');
+  }
+  window.openLeadsBulkStatusModal = openLeadsBulkStatusModal;
+
+  function sluitLeadsBulkStatusModal() {
+    document.getElementById('leads-bulk-status-modal').classList.remove('actief');
+  }
+  window.sluitLeadsBulkStatusModal = sluitLeadsBulkStatusModal;
+
+  async function pasLeadsBulkStatusToe(nieuweStatus) {
+    sluitLeadsBulkStatusModal();
+    const ids = [...leadsGeselecteerd];
+    if (ids.length === 0) return;
+
+    const ok = await mvaConfirm({
+      titel: `Status zetten op ${nieuweStatus}`,
+      tekst: `${ids.length} ${ids.length === 1 ? 'lead krijgt' : 'leads krijgen'} status "${nieuweStatus}". Doorgaan?`,
+      okTekst: 'Ja, zetten',
+    });
+    if (!ok) return;
+
+    let geslaagd = 0;
+    for (const id of ids) {
+      const lead = leadsData.find(l => String(l.id) === id);
+      if (!lead) continue;
+      try {
+        // Optimistisch lokaal updaten
+        const oudeStatus = lead.lead_status;
+        lead.lead_status = nieuweStatus;
+        const res = await fetch('/.netlify/functions/monday', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update_lead_status',
+            data: { item_id: lead.id, lead_status: nieuweStatus }
+          })
+        });
+        const json = await res.json();
+        if (json.error) {
+          lead.lead_status = oudeStatus; // rollback bij fout
+        } else {
+          geslaagd++;
+        }
+      } catch (e) { /* skip individueel falen */ }
+    }
+    leadsGeselecteerd.clear();
+    renderLeads();
+    toonToast(geslaagd === ids.length
+      ? `✅ ${geslaagd} leads bijgewerkt naar "${nieuweStatus}"`
+      : `${geslaagd} van ${ids.length} bijgewerkt (${ids.length - geslaagd} fout)`,
+      geslaagd === ids.length ? 'succes' : 'fout');
+  }
+  window.pasLeadsBulkStatusToe = pasLeadsBulkStatusToe;
+
+  // ── BULK ARCHIVEREN ──────────────────────────────────────────────────
+  // Soft archive: zet lead_status op 'Gearchiveerd' via de bestaande
+  // update_lead_status action. Geen aparte backend-actie nodig.
+  // De renderLeads filter onderaan verbergt 'Gearchiveerd' uit het overzicht.
+  async function archiveerLeadsSelectie() {
+    const ids = [...leadsGeselecteerd];
+    const teArchiveren = ids
+      .map(id => leadsData.find(l => String(l.id) === id))
+      .filter(l => l && ['bereikt_ja','niet_geinteresseerd'].includes(l.status));
+    if (teArchiveren.length === 0) {
+      toonToast('Geen afgeronde leads in selectie. Alleen ✅ Bereikt en ❌ Niet geïnt. zijn te archiveren.', 'fout');
+      return;
+    }
+    const ok = await mvaConfirm({
+      titel: '📦 Leads archiveren',
+      tekst: `${teArchiveren.length} ${teArchiveren.length === 1 ? 'lead wordt' : 'leads worden'} gearchiveerd. Ze verdwijnen uit je lijst maar de data blijft bewaard. Doorgaan?`,
+      okTekst: 'Archiveren',
+    });
+    if (!ok) return;
+
+    let geslaagd = 0;
+    for (const lead of teArchiveren) {
+      try {
+        // Optimistisch lokaal updaten
+        const oudeStatus = lead.lead_status;
+        lead.lead_status = 'Gearchiveerd';
+        const res = await fetch('/.netlify/functions/monday', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update_lead_status',
+            data: { item_id: lead.id, lead_status: 'Gearchiveerd' }
+          })
+        });
+        const json = await res.json();
+        if (json.error) {
+          lead.lead_status = oudeStatus; // rollback
+        } else {
+          geslaagd++;
+        }
+      } catch (e) { /* skip individueel falen */ }
+    }
+    leadsGeselecteerd.clear();
+    renderLeads();
+    toonToast(geslaagd === teArchiveren.length
+      ? `📦 ${geslaagd} leads gearchiveerd`
+      : `📦 ${geslaagd} van ${teArchiveren.length} gearchiveerd (${teArchiveren.length - geslaagd} fout)`,
+      geslaagd === teArchiveren.length ? 'succes' : 'fout');
+  }
+  window.archiveerLeadsSelectie = archiveerLeadsSelectie;
+
+  // ── ONTVANGEN PAGINA — placeholder voor volgende sessie ──────────────
+  function openOntvangenPagina() {
+    toonToast('Ontvangen-leads pagina komt in een volgende sessie', 'fout');
+  }
+  window.openOntvangenPagina = openOntvangenPagina;
   }
   // ── LEAD STATUS WIJZIGEN (Hot / Warm / Afspraak / Deal / Lost) ──────
   async function zetLeadStatus(leadId, nieuweStatus) {
@@ -4099,6 +4557,26 @@
     <div id="toewijzen-makelaars-lijst" style="display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow-y:auto"></div>
     <div class="talent-modal-acties" style="margin-top:14px">
       <button class="annuleer" onclick="sluitToewijzenModal()">Annuleren</button>
+    </div>
+  </div>
+</div>
+
+<!-- LEADS BULK-STATUS MODAL — kies status om bulk toe te kennen aan selectie -->
+<div class="talent-modal-bg" id="leads-bulk-status-modal" onclick="if(event.target===this)sluitLeadsBulkStatusModal()">
+  <div class="talent-modal" role="dialog" aria-labelledby="leads-bulk-status-titel" style="max-width:340px">
+    <h3 id="leads-bulk-status-titel">Lead-status zetten</h3>
+    <p style="margin:0 0 16px;color:var(--grijs-tekst);font-size:13px">
+      Voor <strong id="leads-bulk-status-aantal">0 leads</strong>
+    </p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn-leadstatus btn-hot"      onclick="pasLeadsBulkStatusToe('Hot')"      style="text-align:left;padding:12px 14px;font-size:14px">🔥 Hot</button>
+      <button class="btn-leadstatus btn-warm"     onclick="pasLeadsBulkStatusToe('Warm')"     style="text-align:left;padding:12px 14px;font-size:14px">🌡️ Warm</button>
+      <button class="btn-leadstatus btn-afspraak" onclick="pasLeadsBulkStatusToe('Afspraak')" style="text-align:left;padding:12px 14px;font-size:14px">📅 Afspraak</button>
+      <button class="btn-leadstatus btn-deal"     onclick="pasLeadsBulkStatusToe('Deal')"     style="text-align:left;padding:12px 14px;font-size:14px">✅ Deal</button>
+      <button class="btn-leadstatus btn-lost"     onclick="pasLeadsBulkStatusToe('Lost')"     style="text-align:left;padding:12px 14px;font-size:14px">❌ Lost</button>
+    </div>
+    <div class="talent-modal-acties" style="margin-top:14px">
+      <button class="annuleer" onclick="sluitLeadsBulkStatusModal()" style="width:100%">Annuleren</button>
     </div>
   </div>
 </div>
