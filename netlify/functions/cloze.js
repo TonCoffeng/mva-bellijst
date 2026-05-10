@@ -372,7 +372,6 @@ exports.handler = async (event) => {
     //   dan gaat de lead naar pool (de gevende makelaar IS de eigenaar; hij wil hem juist weggeven).
     if (action === "pool_routing_check") {
       const { email, telefoon, naam, gevende_makelaar_email } = data;
-      const VENSTER_DAGEN = 90;
       const MVA_DOMEINEN = ['@makelaarsvan.nl', '@teunisse.nl'];
 
       // Cloze slaat telefoons op in E.164. Normaliseer vóór de query.
@@ -433,6 +432,7 @@ exports.handler = async (event) => {
           body: JSON.stringify({
             routing: "pool",
             reden: "Klant niet bekend in Cloze",
+            cloze_url: null,
           }),
         };
       }
@@ -441,6 +441,11 @@ exports.handler = async (event) => {
       // Cloze response heeft 'assignee' (bevestigd 9 mei 2026 via _debug_velden).
       // Oude code keek naar 'assignedTo' — bestaat niet in find/get response.
       // Beide proberen voor robuustheid; eerste niet-leeg wint.
+      const portableId = gevonden.portableId || gevonden.id || gevonden._id;
+      const cloze_url = portableId
+        ? `https://app.cloze.com/app/#/people/${portableId}`
+        : null;
+
       const a = gevonden.assignee || gevonden.assignedTo;
       let makelaar_email = null;
       let makelaar_naam = null;
@@ -466,50 +471,35 @@ exports.handler = async (event) => {
             reden: makelaar_email
               ? `Eigenaar ${makelaar_email} is geen MvA-makelaar`
               : "Klant heeft geen eigenaar in Cloze",
+            cloze_url,
           }),
         };
       }
 
-      // STAP 3 — Haal verse person details op (people/get) voor lastChanged
-      // Cloze heeft geen tijdlijn-API; lastChanged is onze proxy voor "recent contact".
-      const portableId = gevonden.portableId || gevonden.id || gevonden._id;
-      let lastChanged = gevonden.lastChanged || null;
-      let firstSeen = gevonden.firstSeen || null;
+      // STAP 3 — Stage-check (vervangt lastChanged proxy van 9 mei)
+      // Cloze person-API geeft geen activiteits-data terug; alleen het
+      // person-record met stage. Stage is wat de makelaar zelf onderhoudt:
+      //   lead/current/future = actieve relatie  → naar makelaar
+      //   out/closed/null     = niet meer actief → naar pool
+      const stage = (gevonden.stage || '').toLowerCase();
 
-      if (portableId && !lastChanged) {
-        try {
-          const getRes = await fetch(
-            `https://api.cloze.com/v1/people/get?api_key=${CLOZE_API_KEY}&uniqueid=${encodeURIComponent(portableId)}`
-          );
-          const getJson = await getRes.json();
-          const p = getJson?.person || getJson;
-          lastChanged = p?.lastChanged || lastChanged;
-          firstSeen = p?.firstSeen || firstSeen;
-        } catch (e) { /* lastChanged blijft null → behandelen als oud */ }
-      }
+      const ACTIEVE_STAGES = ['lead', 'current', 'future'];
+      const isActief = ACTIEVE_STAGES.includes(stage);
 
-      // Bepaal of contact recent is
-      const VENSTER_MS = VENSTER_DAGEN * 24 * 60 * 60 * 1000;
-      const lastChangedTs = lastChanged ? new Date(lastChanged).getTime() : null;
-      const dagenGeleden = lastChangedTs
-        ? Math.floor((Date.now() - lastChangedTs) / (24 * 60 * 60 * 1000))
-        : null;
-      const recentContact = lastChangedTs && (Date.now() - lastChangedTs) < VENSTER_MS;
-
-      // REGEL 3 — geen recent contact → naar pool
-      if (!recentContact) {
+      // REGEL 3 — niet-actieve stage → naar pool
+      if (!isActief) {
         return {
           statusCode: 200,
           headers,
           body: JSON.stringify({
             routing: "pool",
-            reden: dagenGeleden !== null
-              ? `Geen recent contact (laatste activiteit ${dagenGeleden} dagen geleden, ouder dan ${VENSTER_DAGEN}d)`
-              : `Geen lastChanged-datum bekend — behandeld als ouder dan ${VENSTER_DAGEN}d`,
+            reden: stage
+              ? `Klant in Cloze met stage "${stage}" — niet meer actief`
+              : `Klant in Cloze maar zonder stage — behandeld als niet-actief`,
             makelaar_email,
             makelaar_naam,
-            laatste_activiteit_datum: lastChanged,
-            dagen_geleden: dagenGeleden,
+            stage: stage || null,
+            cloze_url,
           }),
         };
       }
@@ -528,23 +518,23 @@ exports.handler = async (event) => {
             reden: `Je bent zelf de eigenaar in Cloze — lead gaat naar pool`,
             makelaar_email,
             makelaar_naam,
-            laatste_activiteit_datum: lastChanged,
-            dagen_geleden: dagenGeleden,
+            stage,
+            cloze_url,
           }),
         };
       }
 
-      // REGEL 2 — actieve MvA-makelaar + recent contact → naar die makelaar
+      // REGEL 2 — actieve MvA-makelaar + actieve stage → naar die makelaar
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           routing: "naar_makelaar",
-          reden: `Klant heeft actief contact met ${makelaar_naam || makelaar_email} (laatste activiteit ${dagenGeleden} dagen geleden)`,
+          reden: `Actieve klant van ${makelaar_naam || makelaar_email} (stage: ${stage})`,
           makelaar_email,
           makelaar_naam,
-          laatste_activiteit_datum: lastChanged,
-          dagen_geleden: dagenGeleden,
+          stage,
+          cloze_url,
         }),
       };
     }
