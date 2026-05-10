@@ -229,6 +229,56 @@
       border-color: var(--navy);
     }
 
+    /* Lead-status filter-pillen (Hot/Warm/etc) — iets andere kleur om visueel onderscheid te maken */
+    .leads-leadstatusfilter-pil {
+      background: var(--wit);
+      border: 1px solid var(--grijs-mid);
+      color: var(--grijs-tekst);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .leads-leadstatusfilter-pil:hover {
+      background: var(--grijs);
+      color: var(--oranje);
+      border-color: var(--oranje);
+    }
+    .leads-leadstatusfilter-pil.actief {
+      background: var(--oranje);
+      color: var(--wit);
+      border-color: var(--oranje);
+    }
+
+    /* Lead-status filter-pillen (Hot/Warm/Afspraak/Deal/Lost/Toegewezen) — oranje accent als actief */
+    .leads-leadstatusfilter-pil {
+      background: var(--wit);
+      border: 1px solid var(--grijs-mid);
+      color: var(--grijs-tekst);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .leads-leadstatusfilter-pil:hover {
+      background: var(--grijs);
+      color: var(--navy);
+      border-color: var(--oranje);
+    }
+    .leads-leadstatusfilter-pil.actief {
+      background: var(--oranje);
+      color: var(--wit);
+      border-color: var(--oranje);
+    }
+
     .section-title {
       font-size: 13px;
       font-weight: 600;
@@ -1314,6 +1364,28 @@
     <button class="leads-statusfilter-pil" data-status="niet_geinteresseerd" onclick="filterLeadsOpStatus('niet_geinteresseerd')">❌ Niet geïnt.</button>
   </div>
 
+  <!-- LEAD-STATUS FILTER PILLEN (Hot/Warm/Afspraak/Deal/Lost) -->
+  <div id="leads-leadstatusfilter" style="padding:0 16px 10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+    <button class="leads-leadstatusfilter-pil actief" data-leadstatus="alle" onclick="filterLeadsOpLeadStatus('alle')">Alle</button>
+    <button class="leads-leadstatusfilter-pil" data-leadstatus="Hot" onclick="filterLeadsOpLeadStatus('Hot')">🔥 Hot</button>
+    <button class="leads-leadstatusfilter-pil" data-leadstatus="Warm" onclick="filterLeadsOpLeadStatus('Warm')">🌡️ Warm</button>
+    <button class="leads-leadstatusfilter-pil" data-leadstatus="Afspraak" onclick="filterLeadsOpLeadStatus('Afspraak')">📅 Afspraak</button>
+    <button class="leads-leadstatusfilter-pil" data-leadstatus="Deal" onclick="filterLeadsOpLeadStatus('Deal')">✅ Deal</button>
+    <button class="leads-leadstatusfilter-pil" data-leadstatus="Lost" onclick="filterLeadsOpLeadStatus('Lost')">❌ Lost</button>
+    <button class="leads-leadstatusfilter-pil" data-leadstatus="Toegewezen" onclick="filterLeadsOpLeadStatus('Toegewezen')">📥 Toegewezen</button>
+  </div>
+
+  <!-- LEAD-STATUS FILTER PILLEN (Hot / Warm / Afspraak / Deal / Lost) -->
+  <div id="leads-leadstatus-filter" style="padding:0 16px 8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+    <button class="leads-leadstatusfilter-pil actief" data-leadstatus="alle" onclick="filterLeadsOpLeadStatus('alle')">Alle statussen</button>
+    <button class="leads-leadstatusfilter-pil" data-leadstatus="Hot" onclick="filterLeadsOpLeadStatus('Hot')">🔥 Hot</button>
+    <button class="leads-leadstatusfilter-pil" data-leadstatus="Warm" onclick="filterLeadsOpLeadStatus('Warm')">🌡️ Warm</button>
+    <button class="leads-leadstatusfilter-pil" data-leadstatus="Afspraak" onclick="filterLeadsOpLeadStatus('Afspraak')">📅 Afspraak</button>
+    <button class="leads-leadstatusfilter-pil" data-leadstatus="Deal" onclick="filterLeadsOpLeadStatus('Deal')">✅ Deal</button>
+    <button class="leads-leadstatusfilter-pil" data-leadstatus="Lost" onclick="filterLeadsOpLeadStatus('Lost')">❌ Lost</button>
+    <button class="leads-leadstatusfilter-pil" data-leadstatus="Toegewezen" onclick="filterLeadsOpLeadStatus('Toegewezen')">📥 Toegewezen</button>
+  </div>
+
   <!-- ACTIEBALK: SECTIE-LABEL + SORTEER + SPIEKBRIEF + SELECTIE -->
   <div class="bez-actiebalk-rij" style="padding:0 16px 8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
     <div class="bez-actiebalk-label" style="font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em">
@@ -1323,8 +1395,8 @@
       <button id="btn-leads-sorteer" class="btn-sorteer" onclick="toggleLeadsSortering()" title="Wissel sortering">
         <span class="lbl-vol">↕ Hot eerst</span><span class="lbl-kort" style="display:none">↕ Hot</span>
       </button>
-      <button id="btn-leads-spiekbrief" class="btn-spiekbrief" onclick="toggleLeadsSpiekbrief()" title="Klap alle kaarten in tot rijtjes (tap een rij om te openen)">
-        <span class="lbl-vol">📋 Spiekbrief</span><span class="lbl-kort" style="display:none">📋</span>
+      <button id="btn-leads-spiekbrief" class="btn-spiekbrief" onclick="toggleLeadsSpiekbrief()" title="Compacte weergave: alle kaarten als rijtjes (tap een rij om uit te klappen)">
+        <span class="lbl-vol">📋 Compact</span><span class="lbl-kort" style="display:none">📋</span>
       </button>
       <button id="btn-leads-selectiemodus" class="btn-selectie" onclick="toggleLeadsSelectiemodus()"
         style="background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;color:var(--grijs-tekst);cursor:pointer;font-family:inherit">
@@ -3797,7 +3869,8 @@
 
   // ── LEADS BELLEN — state voor filters/selectie/spiekbrief/sortering ──
   let leadsFilterModus       = 'openstaand'; // 'openstaand' / 'alles' (alleen openstaand+alles)
-  let leadsStatusFilter      = 'alle';       // 'alle' / 'open' / 'bereikt_ja' / etc.
+  let leadsStatusFilter      = 'alle';       // 'alle' / 'open' / 'bereikt_ja' / etc. (BEL-status)
+  let leadsLeadStatusFilter  = 'alle';       // 'alle' / 'Hot' / 'Warm' / 'Afspraak' / 'Deal' / 'Lost' / 'Toegewezen'
   let leadsZoekTerm          = '';
   let leadsSpiekbriefAan     = false;
   let leadsSelectieModusAan  = false;
@@ -3854,6 +3927,11 @@
       sorted = sorted.filter(l => !l.status);
     } else if (leadsStatusFilter !== 'alle') {
       sorted = sorted.filter(l => l.status === leadsStatusFilter);
+    }
+
+    // ── 4b. Filteren — lead-status pillen (Hot/Warm/Afspraak/Deal/Lost) ─
+    if (leadsLeadStatusFilter !== 'alle') {
+      sorted = sorted.filter(l => l.lead_status === leadsLeadStatusFilter);
     }
 
     // ── 5. Filteren — zoek-veld ─────────────────────────────────────────
@@ -4021,6 +4099,26 @@
     renderLeads();
   }
   window.filterLeadsOpStatus = filterLeadsOpStatus;
+
+  // ── FILTER: lead-status pillen (Hot/Warm/Afspraak/Deal/Lost) ────────
+  function filterLeadsOpLeadStatus(leadStatus) {
+    leadsLeadStatusFilter = leadStatus;
+    document.querySelectorAll('.leads-leadstatusfilter-pil').forEach(p => {
+      p.classList.toggle('actief', p.dataset.leadstatus === leadStatus);
+    });
+    renderLeads();
+  }
+  window.filterLeadsOpLeadStatus = filterLeadsOpLeadStatus;
+
+  // ── FILTER: lead-status pillen (Hot/Warm/Afspraak/Deal/Lost) ────────
+  function filterLeadsOpLeadStatus(leadStatus) {
+    leadsLeadStatusFilter = leadStatus;
+    document.querySelectorAll('.leads-leadstatusfilter-pil').forEach(p => {
+      p.classList.toggle('actief', p.dataset.leadstatus === leadStatus);
+    });
+    renderLeads();
+  }
+  window.filterLeadsOpLeadStatus = filterLeadsOpLeadStatus;
 
   // ── ZOEK ─────────────────────────────────────────────────────────────
   function zoekLeadsFilter() {
@@ -4367,12 +4465,21 @@
     const lead = leadsData.find(l => l.id === leadId);
     if (!lead) return;
 
+    // Voor Hot/Warm/Afspraak/Deal: eerst Aankoop/Verkoop kiezen, dan Cloze-flow
+    const TRIGGERS_CLOZE = ['Hot', 'Warm', 'Afspraak', 'Deal'];
+    let aankoopOfVerkoop = null;
+    if (TRIGGERS_CLOZE.includes(nieuweStatus)) {
+      aankoopOfVerkoop = await kiesAankoopOfVerkoop(lead, nieuweStatus);
+      if (!aankoopOfVerkoop) return;  // gebruiker heeft geannuleerd
+    }
+
     // Optimistisch updaten — voelt sneller
     const oudeStatus = lead.lead_status;
     lead.lead_status = nieuweStatus;
     renderLeads();
 
     try {
+      // 1. Lead-status updaten in Supabase (via monday function)
       const res = await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -4384,12 +4491,86 @@
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error || 'Update mislukt');
 
-      toonToast(`✅ Status: ${nieuweStatus}`, 'succes');
+      // 2. Indien Hot/Warm/Afspraak/Deal: klant in Cloze aanmaken/updaten
+      if (aankoopOfVerkoop) {
+        // Niet awaiten — Cloze-flow loopt op de achtergrond, falen daar mag de
+        // lead-status update niet omgooien (die is al geslaagd).
+        clozeKlantFlow(lead, aankoopOfVerkoop, nieuweStatus).catch(e => {
+          console.warn('Cloze-flow faalde:', e);
+        });
+        toonToast(`✅ Status: ${nieuweStatus} — Cloze-klant wordt bijgewerkt…`, 'succes');
+      } else {
+        toonToast(`✅ Status: ${nieuweStatus}`, 'succes');
+      }
     } catch (err) {
       // Rollback bij fout
       lead.lead_status = oudeStatus;
       renderLeads();
       toonToast('Status updaten mislukt: ' + err.message, 'fout');
+    }
+  }
+
+  // ── AANKOOP / VERKOOP DROPDOWN ─────────────────────────────────────
+  // Toont een mini-modal en returnt 'Aankoop' / 'Verkoop' / null (annuleer)
+  function kiesAankoopOfVerkoop(lead, nieuweStatus) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('aankoop-verkoop-modal');
+      if (!modal) { resolve('Aankoop'); return; }  // fallback als modal niet bestaat
+      document.getElementById('aankoop-verkoop-naam').textContent = lead.naam || '(geen naam)';
+      document.getElementById('aankoop-verkoop-status').textContent = nieuweStatus;
+      modal.classList.add('actief');
+      // Knop-handlers via dataset, één gedeelde resolver
+      modal._resolver = resolve;
+    });
+  }
+
+  function kiesAankoopOfVerkoopAfsluiten(keuze) {
+    const modal = document.getElementById('aankoop-verkoop-modal');
+    if (!modal) return;
+    modal.classList.remove('actief');
+    if (modal._resolver) {
+      const r = modal._resolver;
+      modal._resolver = null;
+      r(keuze);
+    }
+  }
+  window.kiesAankoopOfVerkoopAfsluiten = kiesAankoopOfVerkoopAfsluiten;
+
+  // ── CLOZE KLANT-FLOW ─────────────────────────────────────────────────
+  // Maakt klant aan in Cloze als hij niet bestaat, of update segment/stage
+  // als hij wel bestaat. Gebruikt de nieuwe action 'klant_aanmaken_of_updaten'.
+  async function clozeKlantFlow(lead, aankoopOfVerkoop, leadStatus) {
+    const segment = aankoopOfVerkoop;  // "Aankoop" of "Verkoop" als string
+    const payload = {
+      action: 'klant_aanmaken_of_updaten',
+      data: {
+        naam: lead.naam,
+        email: lead.email,
+        telefoon: lead.telefoon,
+        adres: lead.adres,
+        segment: segment,
+        stage: 'current',  // actieve klant in Cloze
+        lead_status: leadStatus,
+        makelaar_email: huidigeMakelaar?.email || null,
+      }
+    };
+    try {
+      const res = await fetch('/.netlify/functions/cloze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (json.ok) {
+        const actieTekst = json.actie === 'aangemaakt'
+          ? `📋 Klant aangemaakt in Cloze (${segment})`
+          : `📋 Klant in Cloze bijgewerkt (${segment})`;
+        toonToast(actieTekst, 'succes');
+      } else {
+        toonToast(`Cloze-actie mislukt: ${json.error || 'onbekend'}`, 'fout');
+      }
+    } catch (e) {
+      toonToast(`Cloze-actie mislukt: ${e.message}`, 'fout');
     }
   }
 
@@ -4673,6 +4854,32 @@
     <div id="toewijzen-makelaars-lijst" style="display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow-y:auto"></div>
     <div class="talent-modal-acties" style="margin-top:14px">
       <button class="annuleer" onclick="sluitToewijzenModal()">Annuleren</button>
+    </div>
+  </div>
+</div>
+
+<!-- AANKOOP / VERKOOP KEUZE MODAL — bij Hot/Warm/Afspraak/Deal status -->
+<div class="talent-modal-bg" id="aankoop-verkoop-modal" onclick="if(event.target===this)kiesAankoopOfVerkoopAfsluiten(null)">
+  <div class="talent-modal" role="dialog" aria-labelledby="aankoop-verkoop-titel" style="max-width:340px">
+    <h3 id="aankoop-verkoop-titel">📋 Klant in Cloze</h3>
+    <p style="margin:0 0 6px;color:var(--navy);font-size:14px;font-weight:600" id="aankoop-verkoop-naam">Naam</p>
+    <p style="margin:0 0 14px;color:var(--grijs-tekst);font-size:13px">
+      Status: <strong id="aankoop-verkoop-status">Hot</strong> — wat voor klant is dit?
+    </p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="bevestig" onclick="kiesAankoopOfVerkoopAfsluiten('Aankoop')"
+        style="padding:14px;font-size:14px;text-align:left">
+        🏠 Aankoopklant
+        <div style="font-size:11px;font-weight:400;opacity:0.85;margin-top:2px">Zoekt iets om te kopen</div>
+      </button>
+      <button class="bevestig" onclick="kiesAankoopOfVerkoopAfsluiten('Verkoop')"
+        style="padding:14px;font-size:14px;text-align:left;background:var(--oranje)">
+        💰 Verkoopklant
+        <div style="font-size:11px;font-weight:400;opacity:0.85;margin-top:2px">Wil iets gaan verkopen</div>
+      </button>
+    </div>
+    <div class="talent-modal-acties" style="margin-top:14px">
+      <button class="annuleer" onclick="kiesAankoopOfVerkoopAfsluiten(null)" style="width:100%">Annuleren</button>
     </div>
   </div>
 </div>
