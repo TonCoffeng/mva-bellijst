@@ -1335,9 +1335,6 @@
       JOUW LEADS
     </div>
     <div class="bez-actiebalk-knoppen" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-      <button id="btn-leads-sorteer" class="btn-sorteer" onclick="toggleLeadsSortering()" title="Wissel sortering">
-        <span class="lbl-vol">↕ Hot eerst</span><span class="lbl-kort" style="display:none">↕ Hot</span>
-      </button>
       <button id="btn-leads-spiekbrief" class="btn-spiekbrief" onclick="toggleLeadsSpiekbrief()" title="Compacte weergave: alle kaarten als rijtjes (tap een rij om uit te klappen)">
         <span class="lbl-vol">📋 Compact</span><span class="lbl-kort" style="display:none">📋</span>
       </button>
@@ -4070,23 +4067,8 @@
   window.wisLeadsZoek = wisLeadsZoek;
 
   // ── SORTERING ────────────────────────────────────────────────────────
-  function toggleLeadsSortering() {
-    leadsSortering = leadsSortering === 'hot' ? 'datum' : 'hot';
-    const btn = document.getElementById('btn-leads-sorteer');
-    if (btn) {
-      const vol = btn.querySelector('.lbl-vol');
-      const kort = btn.querySelector('.lbl-kort');
-      if (leadsSortering === 'hot') {
-        if (vol)  vol.textContent  = '↕ Hot eerst';
-        if (kort) kort.textContent = '↕ Hot';
-      } else {
-        if (vol)  vol.textContent  = '↓ Nieuwste eerst';
-        if (kort) kort.textContent = '↓ Nieuw';
-      }
-    }
-    renderLeads();
-  }
-  window.toggleLeadsSortering = toggleLeadsSortering;
+  // ── SORTERING ────────────────────────────────────────────────────────
+  // Sortering is fixed op 'hot' — knop verwijderd 10 mei.
 
   // ── SPIEKBRIEF (inklap) ──────────────────────────────────────────────
   function toggleLeadsSpiekbrief() {
