@@ -13,6 +13,10 @@ De lead-status filter-pillen (Hot / Warm / Afspraak / Deal / Lost / Toegewezen) 
 
 Tegelijk: dubbele filter-rij die per ongeluk in een eerdere upload was ontstaan, opgeruimd.
 
+### Verwijderd — sorteer-knop "Hot eerst" in Leads bellen
+
+Sortering blijft fixed op "Hot eerst" — de toggle-knop ("↕ Hot eerst" / "↓ Nieuwste eerst") was overbodig. Gebruikers verwachten een vaste sortering en hadden er nooit naar gegrepen. Functie en state blijven intact zodat we later kunnen terugvallen mocht het toch gewenst zijn.
+
 ### Toegevoegd — lead-status filter-pillen + "Spiekbrief" hernoemd naar "Compact"
 
 **Tweede rij filter-pillen** in Leads bellen, onder de bestaande bel-status pillen:
