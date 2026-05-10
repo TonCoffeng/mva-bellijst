@@ -443,7 +443,7 @@ exports.handler = async (event) => {
       // Beide proberen voor robuustheid; eerste niet-leeg wint.
       const portableId = gevonden.portableId || gevonden.id || gevonden._id;
       const cloze_url = portableId
-        ? `https://app.cloze.com/app/#/people/${portableId}`
+        ? `https://www.cloze.com/in/person/${portableId}#section=people`
         : null;
 
       const a = gevonden.assignee || gevonden.assignedTo;
@@ -655,7 +655,7 @@ exports.handler = async (event) => {
             ok: !updateJson?.errorcode || updateJson.errorcode === 0,
             actie: 'bijgewerkt',
             portableId,
-            cloze_url: portableId ? `https://app.cloze.com/app/#/people/${portableId}` : null,
+            cloze_url: portableId ? `https://www.cloze.com/in/person/${portableId}#section=people` : null,
             cloze_response: updateJson,
           }),
         };
@@ -688,7 +688,7 @@ exports.handler = async (event) => {
           ok: !createJson?.errorcode || createJson.errorcode === 0,
           actie: 'aangemaakt',
           portableId: newPortableId,
-          cloze_url: newPortableId ? `https://app.cloze.com/app/#/people/${newPortableId}` : null,
+          cloze_url: newPortableId ? `https://www.cloze.com/in/person/${newPortableId}#section=people` : null,
           cloze_response: createJson,
         }),
       };
