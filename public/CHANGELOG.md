@@ -14,7 +14,7 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 **Stat-cards opgeschoond:**
 - "Vandaag" en "Afgerond" verwijderd (geen toegevoegde waarde — sortering en chips per kaart bieden de urgentie al).
 - "Openstaand" wordt klikbare filter-knop (default actief).
-- Nieuw: "📂 Ontvangen leads" — opent aparte pagina (placeholder voor nu, wordt in volgende sessie uitgewerkt).
+- Nieuw: "📂 Ontvangen leads" — opent aparte pagina met alle leads die jij vanuit de pool hebt gekregen, gesorteerd op in-pool datum (nieuwste eerst). Toont per lead: naam, adres, gevende makelaar (`bij_wie`), in-pool datum, bel-status en lead-status. Klik op een kaart opent dezelfde status-modal als op de hoofdpagina. Aparte view (`#ontvangen-screen`), met "← Terug" knop. Versie 1: geen filters — als de pagina vaak gebruikt wordt voegen we filters toe (datum-range, gevende makelaar, status) op basis van werkelijk gebruik.
 
 **Bel-status filter-pillen** onder de stat-cards: Alle / Nog niet gebeld / ✅ Bereikt / 📵 Niet bereikbaar / 📲 Bel later / 📬 Voicemail / 💤 Wellicht later / ❌ Niet geïnt. Klik op een pil om te filteren.
 
