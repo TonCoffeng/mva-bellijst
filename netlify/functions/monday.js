@@ -546,6 +546,7 @@ exports.handler = async (event) => {
           datum:              it.toegevoegd_op ? it.toegevoegd_op.split('T')[0] : '',
           status:             it.bel_status || 'nieuw',
           lead_status:        it.lead_status || null,
+          cloze_id:           it.cloze_id || null,
           warme_lead:         it.warme_lead ? 'true' : '',
           opmerkingen:        it.opmerking || '',
           bron:               it.bron, // 'zelf' of 'pool'
@@ -633,6 +634,25 @@ exports.handler = async (event) => {
       return {
         statusCode: 200, headers,
         body: JSON.stringify({ ok: true, item_id, lead_status, updated_count: updated.length }),
+      };
+    }
+
+    // ── KOPPEL CLOZE-ID AAN BELLIJST-ITEM ─────────────────────────────
+    // Frontend roept dit aan na succesvol klant_aanmaken_of_updaten,
+    // zodat we de Cloze portableId opslaan op het bellijst-item.
+    // Hiermee kan op de lead-kaart een persistente "🔗 Cloze" knop staan.
+    if (action === 'set_cloze_id') {
+      const { item_id, cloze_id } = data;
+      if (!item_id || !cloze_id) {
+        return {
+          statusCode: 400, headers,
+          body: JSON.stringify({ error: 'item_id en cloze_id zijn vereist' }),
+        };
+      }
+      const updated = await sbPatch(`bellijst_items?id=eq.${item_id}`, { cloze_id });
+      return {
+        statusCode: 200, headers,
+        body: JSON.stringify({ ok: true, item_id, cloze_id, updated_count: updated.length }),
       };
     }
 
