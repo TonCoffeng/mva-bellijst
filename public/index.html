@@ -346,6 +346,31 @@
     }
     .btn-status:active { background: var(--grijs-mid); }
 
+    /* Open in Cloze knop — verschijnt op kaart als lead.cloze_id gezet is */
+    .btn-cloze {
+      padding: 12px 14px;
+      background: #fff;
+      color: var(--oranje);
+      border: 1px solid var(--oranje);
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'Roboto', sans-serif;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+    .btn-cloze:hover {
+      background: var(--oranje);
+      color: #fff;
+    }
+    .btn-cloze:active {
+      transform: scale(0.97);
+    }
+
     /* ── STATUS MODAL ── */
     .modal-overlay {
       display: none;
@@ -1665,6 +1690,7 @@
           opmerkingen:        item.opmerkingen || '',
           email_makelaar:     item.email_makelaar || '',
           lead_status:        item.lead_status || '',
+          cloze_id:           item.cloze_id || '',
           belpogingen:        Number(item.belpogingen) || 0,
           bron:               item.bron || '',
         };
@@ -4007,6 +4033,11 @@
               <button class="btn-status" onclick="openModal('${lead.id}')">
                 Status →
               </button>
+              ${lead.cloze_id ? `
+                <a class="btn-cloze" href="https://app.cloze.com/app/#/people/${lead.cloze_id}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open klant in Cloze om te verrijken">
+                  🔗 Cloze
+                </a>
+              ` : ''}
             </div>
 
             <div class="leadstatus-knoppen" onclick="event.stopPropagation()" style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
@@ -4481,6 +4512,22 @@
         const actieTekst = json.actie === 'aangemaakt'
           ? `📋 Klant aangemaakt in Cloze (${segment})`
           : `📋 Klant in Cloze bijgewerkt (${segment})`;
+        // Sla cloze_id op zodat de "🔗 Cloze" knop persistent op de
+        // lead-kaart blijft staan, ook na page refresh.
+        if (json.portableId) {
+          lead.cloze_id = json.portableId;
+          // Async — niet awaiten, blokkeer UI niet
+          fetch('/.netlify/functions/monday', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'set_cloze_id',
+              data: { item_id: lead.id, cloze_id: json.portableId }
+            })
+          }).catch(e => console.warn('cloze_id opslaan faalde:', e));
+          // Forceer re-render zodat de knop direct verschijnt
+          renderLeads();
+        }
         // Voeg klikbare link toe naar de Cloze-kaart zodat makelaar
         // direct kan doorklikken om het record te verrijken.
         const actie = json.cloze_url
