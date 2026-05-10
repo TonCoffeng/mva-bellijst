@@ -5,6 +5,26 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-10
+
+### Veranderd — stage-check vervangt `lastChanged` proxy
+
+**Achtergrond:** gisteren bouwden we `pool_routing_check` met `lastChanged` als proxy voor "recent contact". Maar `pool_routing_debug` op Gerrit Jeuring (een actieve klant met stage="current" en visueel zichtbare call uit jul 2025) toonde dat `lastChanged` nog op nov 2018 staat. Cloze's `people/find` en `people/get` endpoints geven simpelweg geen activiteits-data terug — alleen het kale person-record met `firstSeen` en `lastChanged`. Beide tonen wanneer het record is aangemaakt/aangepast, niet wanneer er contact is geweest.
+
+**Gekozen alternatief:** stage-check. Cloze's `stage` veld onderhoudt de makelaar zelf en weerspiegelt of er een actieve relatie is.
+
+**Nieuwe regel-3 logica:**
+- `lead`, `current`, `future` → actieve relatie → `routing: "naar_makelaar"`
+- `out`, `closed`, leeg, of onbekende waarde → niet actief → `routing: "pool"`
+
+**Bijwerking:** response geeft nu ook `cloze_url` terug (`https://app.cloze.com/app/#/people/{portableId}`) zodat de modal in `index.html` straks rechtstreeks naar de klant in Cloze kan doorklikken. Velden `laatste_activiteit_datum` en `dagen_geleden` zijn vervangen door `stage`.
+
+**Verwijderd:** `VENSTER_DAGEN` constante (90 dagen-venster — niet meer relevant).
+
+**`pool_routing_debug` action blijft staan** tot frontend live is, voor diagnostiek bij twijfelgevallen.
+
+---
+
 ## 2026-05-09
 
 ### Toegevoegd — `pool_routing_check` action (Cloze-check vóór pool-routing)
