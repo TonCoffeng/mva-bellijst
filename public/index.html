@@ -2699,7 +2699,7 @@
           // direct de contactkaart opent (niet een zoekoverzicht).
           let clozeUrl = null;
           if (json.id) {
-            clozeUrl = `https://app.cloze.com/app/#/people/${json.id}`;
+            clozeUrl = `https://www.cloze.com/in/person/${json.id}#section=people`;
           } else if (b.email) {
             clozeUrl = `https://cloze.com/in/?contact=${encodeURIComponent(b.email)}`;
           } else if (b.telefoon) {
@@ -3235,7 +3235,7 @@
     const huidigeEmail = (huidigeMakelaar?.email || '').toLowerCase();
     if (eigenaarEmail === huidigeEmail) return null;  // ben zelf eigenaar
     const portableId = card.dataset.clozeId || '';
-    const clozeUrl = portableId ? `https://app.cloze.com/app/#/people/${portableId}` : null;
+    const clozeUrl = portableId ? `https://www.cloze.com/in/person/${portableId}#section=people` : null;
     return {
       email: eigenaarEmail,
       naam: card.dataset.clozeEigenaarNaam || eigenaarEmail.split('@')[0],
@@ -3785,7 +3785,7 @@
             // direct de contactkaart opent.
             let clozeUrl = null;
             if (json.id) {
-              clozeUrl = `https://app.cloze.com/app/#/people/${json.id}`;
+              clozeUrl = `https://www.cloze.com/in/person/${json.id}#section=people`;
             } else if (lead.email) {
               clozeUrl = `https://cloze.com/in/?contact=${encodeURIComponent(lead.email)}`;
             } else if (lead.telefoon) {
@@ -4034,7 +4034,7 @@
                 Status →
               </button>
               ${lead.cloze_id ? `
-                <a class="btn-cloze" href="https://app.cloze.com/app/#/people/${lead.cloze_id}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open klant in Cloze om te verrijken">
+                <a class="btn-cloze" href="https://www.cloze.com/in/person/${lead.cloze_id}#section=people" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open klant in Cloze om te verrijken">
                   🔗 Cloze
                 </a>
               ` : ''}
