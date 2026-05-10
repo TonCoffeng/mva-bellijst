@@ -276,7 +276,7 @@
     .chip-wacht { background: #f3f4f6; color: #6b7280; }
     .chip-datum { background: #f3f4f6; color: var(--navy); }
 
-    /* ── Lead-status chips (Toegewezen / Afspraak / Deal / Lost / Warm / Hot) ── */
+    /* ── Lead-status chips (Hot / Warm / Afspraak / Deal / Lost) ── */
     .chip-hot         { background: #fee2e2; color: #991b1b; }
     .chip-warm        { background: #fef3c7; color: #92400e; }
     .chip-toegewezen  { background: #dbeafe; color: #1e40af; }
@@ -1325,7 +1325,6 @@
       <option value="Afspraak">📅 Afspraak</option>
       <option value="Deal">✅ Deal</option>
       <option value="Lost">❌ Lost</option>
-      <option value="Toegewezen">📥 Toegewezen</option>
     </select>
   </div>
 
@@ -3810,7 +3809,7 @@
   // ── LEADS BELLEN — state voor filters/selectie/spiekbrief/sortering ──
   let leadsFilterModus       = 'openstaand'; // 'openstaand' / 'alles' (alleen openstaand+alles)
   let leadsStatusFilter      = 'alle';       // 'alle' / 'open' / 'bereikt_ja' / etc. (BEL-status)
-  let leadsLeadStatusFilter  = 'alle';       // 'alle' / 'Hot' / 'Warm' / 'Afspraak' / 'Deal' / 'Lost' / 'Toegewezen'
+  let leadsLeadStatusFilter  = 'alle';       // 'alle' / 'Hot' / 'Warm' / 'Afspraak' / 'Deal' / 'Lost'
   let leadsZoekTerm          = '';
   let leadsSpiekbriefAan     = false;
   let leadsSelectieModusAan  = false;
@@ -3827,10 +3826,11 @@
     const zichtbareDataset = leadsData.filter(l => l.lead_status !== 'Gearchiveerd');
 
     // ── 1. Sortering ───────────────────────────────────────────────────
+    // Hot/Warm bovenaan, dan leads zonder status (default 99 valt naar
+    // achter), dan Afspraak/Deal/Lost.
     const prioriteit = {
       'Hot': 1,
       'Warm': 2,
-      'Toegewezen': 3,
       'Afspraak': 4,
       'Deal': 5,
       'Lost': 6,
@@ -3838,8 +3838,8 @@
     let sorted = [...zichtbareDataset];
     if (leadsSortering === 'hot') {
       sorted.sort((a, b) => {
-        const pa = prioriteit[a.lead_status] || 99;
-        const pb = prioriteit[b.lead_status] || 99;
+        const pa = prioriteit[a.lead_status] || 3;  // geen status = priority 3 (na Warm, voor Afspraak)
+        const pb = prioriteit[b.lead_status] || 3;
         return pa - pb;
       });
     } else {
@@ -3858,7 +3858,11 @@
     if (headerBadge) headerBadge.textContent = openstaandHeleSet.length + ' leads';
 
     // ── 3. Filteren — modus-filter (openstaand/alles) ───────────────────
-    if (leadsFilterModus === 'openstaand') {
+    // Skip Openstaand-filter als gebruiker expliciet een lead-status filter
+    // heeft gekozen (anders verberg je leads die wel die status hebben maar
+    // ook al "afgehandeld" zijn op bel-status niveau).
+    const expliciteLeadStatusFilter = leadsLeadStatusFilter !== 'alle';
+    if (leadsFilterModus === 'openstaand' && !expliciteLeadStatusFilter) {
       sorted = sorted.filter(l => !['bereikt_ja','niet_geinteresseerd'].includes(l.status));
     }
 
@@ -3907,15 +3911,14 @@
     }
 
     container.innerHTML = sorted.map(lead => {
-      // Lead-status chip
+      // Lead-status chip — alleen tonen als lead_status gezet is
       const leadStatusChip = {
         'Hot':        { cls: 'chip-hot',        label: '🔥 Hot' },
         'Warm':       { cls: 'chip-warm',       label: '🌡️ Warm' },
-        'Toegewezen': { cls: 'chip-toegewezen', label: '📥 Toegewezen' },
         'Afspraak':   { cls: 'chip-afspraak',   label: '📅 Afspraak' },
         'Deal':       { cls: 'chip-deal',       label: '✅ Deal' },
         'Lost':       { cls: 'chip-lost',       label: '❌ Lost' },
-      }[lead.lead_status] || { cls: 'chip-toegewezen', label: '📥 Toegewezen' };
+      }[lead.lead_status] || null;
 
       // Bel-status chip
       const belChip = {
@@ -3957,7 +3960,7 @@
                 ${lead.adres || ''} ${lead.telefoon ? '· ' + lead.telefoon : ''}
               </div>
             </div>
-            <span class="lead-chip ${leadStatusChip.cls}" style="font-size:10px">${leadStatusChip.label}</span>
+            ${leadStatusChip ? `<span class="lead-chip ${leadStatusChip.cls}" style="font-size:10px">${leadStatusChip.label}</span>` : ''}
             ${belChip ? `<span class="lead-chip ${belChip.cls}" style="font-size:10px">${belChip.label}</span>` : ''}
           </div>
         `;
@@ -3979,7 +3982,7 @@
           ${lead.bij_wie ? `<div class="lead-adres" style="font-size:12px;margin-top:2px">📓 Bezichtigd bij: ${lead.bij_wie}</div>` : ''}
 
           <div class="lead-meta" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
-            <span class="lead-chip ${leadStatusChip.cls}">${leadStatusChip.label}</span>
+            ${leadStatusChip ? `<span class="lead-chip ${leadStatusChip.cls}">${leadStatusChip.label}</span>` : ''}
             ${belChip ? `<span class="lead-chip ${belChip.cls}">${belChip.label}</span>` : ''}
             ${lead.belpogingen > 0 ? `<span class="lead-chip chip-belpogingen">📞 ${lead.belpogingen}× geprobeerd</span>` : ''}
           </div>
@@ -4322,16 +4325,15 @@
     `;
 
     container.innerHTML = headerHtml + sorted.map(lead => {
-      // Lead-status chip (zelfde mapping als renderLeads)
+      // Lead-status chip (zelfde mapping als renderLeads) — null als geen status
       const leadStatusChip = {
         'Hot':         { cls: 'chip-hot',         label: '🔥 Hot' },
         'Warm':        { cls: 'chip-warm',        label: '🌡️ Warm' },
-        'Toegewezen':  { cls: 'chip-toegewezen',  label: '📥 Toegewezen' },
         'Afspraak':    { cls: 'chip-afspraak',    label: '📅 Afspraak' },
         'Deal':        { cls: 'chip-deal',        label: '✅ Deal' },
         'Lost':        { cls: 'chip-lost',        label: '❌ Lost' },
         'Gearchiveerd':{ cls: 'chip-wacht',       label: '📦 Gearchiveerd' },
-      }[lead.lead_status] || { cls: 'chip-toegewezen', label: '📥 Toegewezen' };
+      }[lead.lead_status] || null;
 
       // Bel-status chip
       const belChip = {
@@ -4352,7 +4354,7 @@
           ${lead.bij_wie ? `<div class="lead-adres" style="font-size:12px;margin-top:2px;color:var(--grijs-tekst)">📓 Bezichtigd bij: ${lead.bij_wie}</div>` : ''}
 
           <div class="lead-meta" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
-            <span class="lead-chip ${leadStatusChip.cls}">${leadStatusChip.label}</span>
+            ${leadStatusChip ? `<span class="lead-chip ${leadStatusChip.cls}">${leadStatusChip.label}</span>` : ''}
             ${belChip ? `<span class="lead-chip ${belChip.cls}">${belChip.label}</span>` : ''}
             ${lead.belpogingen > 0 ? `<span class="lead-chip chip-belpogingen">📞 ${lead.belpogingen}× geprobeerd</span>` : ''}
           </div>
@@ -4479,9 +4481,14 @@
         const actieTekst = json.actie === 'aangemaakt'
           ? `📋 Klant aangemaakt in Cloze (${segment})`
           : `📋 Klant in Cloze bijgewerkt (${segment})`;
-        toonToast(actieTekst, 'succes');
+        // Voeg klikbare link toe naar de Cloze-kaart zodat makelaar
+        // direct kan doorklikken om het record te verrijken.
+        const actie = json.cloze_url
+          ? { url: json.cloze_url, label: 'Open in Cloze →' }
+          : null;
+        toonToast(actieTekst, 'succes', actie);
       } else {
-        toonToast(`Cloze-actie mislukt: ${json.error || 'onbekend'}`, 'fout');
+        toonToast(`Cloze-actie mislukt: ${json.error || json.cloze_response?.message || 'onbekend'}`, 'fout');
       }
     } catch (e) {
       toonToast(`Cloze-actie mislukt: ${e.message}`, 'fout');
@@ -4663,11 +4670,28 @@
   }
 
   // ── TOAST ───────────────────────────────────────────────────────────
-  function toonToast(bericht, type = '') {
+  function toonToast(bericht, type = '', actie = null) {
     const toast = document.getElementById('toast');
-    toast.textContent = bericht;
+    // Reset
+    toast.innerHTML = '';
+    // Plaats bericht-tekst
+    const tekstEl = document.createElement('span');
+    tekstEl.textContent = bericht;
+    toast.appendChild(tekstEl);
+    // Optionele klikbare actie (bv. "Open in Cloze →")
+    if (actie && actie.url && actie.label) {
+      toast.appendChild(document.createTextNode(' '));
+      const link = document.createElement('a');
+      link.href = actie.url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = actie.label;
+      link.style.cssText = 'color:#fff;text-decoration:underline;font-weight:700;margin-left:8px;cursor:pointer';
+      toast.appendChild(link);
+    }
     toast.className = 'toast show ' + type;
-    setTimeout(() => { toast.className = 'toast'; }, 3000);
+    // Toast langer tonen als er een actie-link is (zodat gebruiker tijd heeft te klikken)
+    setTimeout(() => { toast.className = 'toast'; }, actie ? 6000 : 3000);
   }
 
   // ── SERVICE WORKER + PUSH ────────────────────────────────────────────
