@@ -7,6 +7,33 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ## 2026-05-10
 
+### Toegevoegd — Leads bellen tab uitgebreid met filters, selectie en bulk-acties
+
+**Aanleiding:** de Leads-bellen tab had alleen drie statische teller-cards (Vandaag/Openstaand/Afgerond) zonder verdere filters of bulk-acties. Lead doorgeven tab heeft die features wél, en die patronen hebben we hier toegepast.
+
+**Stat-cards opgeschoond:**
+- "Vandaag" en "Afgerond" verwijderd (geen toegevoegde waarde — sortering en chips per kaart bieden de urgentie al).
+- "Openstaand" wordt klikbare filter-knop (default actief).
+- Nieuw: "📂 Ontvangen leads" — opent aparte pagina (placeholder voor nu, wordt in volgende sessie uitgewerkt).
+
+**Bel-status filter-pillen** onder de stat-cards: Alle / Nog niet gebeld / ✅ Bereikt / 📵 Niet bereikbaar / 📲 Bel later / 📬 Voicemail / 💤 Wellicht later / ❌ Niet geïnt. Klik op een pil om te filteren.
+
+**Zoek-veld** boven de leads-lijst — zoekt op naam, adres, telefoon of email.
+
+**Sorteer-knop** — wisselt tussen "Hot eerst" (default, zoals voorheen) en "Nieuwste eerst".
+
+**Spiekbrief-modus** — klap alle kaarten in tot rijtjes. Tap een rij om individueel uit te klappen. Zelfde patroon als in Lead doorgeven.
+
+**Selectie-modus** — knop rechtsboven schakelt multi-selectie aan. Toont:
+- Checkbox per lead-kaart en "alles selecteren" balk
+- Bulk-actiebalk onderaan: **Lead-status zetten** (modal met Hot/Warm/Afspraak/Deal/Lost) en **📦 Archiveer**
+
+**Bulk archiveren via soft archive:** zet `lead_status='Gearchiveerd'` via de bestaande `update_lead_status` action (geen nieuwe backend-actie nodig). `renderLeads` filtert gearchiveerde leads automatisch uit het overzicht. Echte archief-view voor terugzien komt later.
+
+**Werkt voor:** alleen afgeronde leads (✅ Bereikt of ❌ Niet geïnt.). De archiveer-knop is uitgegrijsd als geen afgeronde leads geselecteerd zijn.
+
+**Modal-toevoeging:** `leads-bulk-status-modal` met de 5 lead-status knoppen, identiek aan de individuele lead-status knoppen op een kaart.
+
 ### Toegevoegd — doorklikken naar klant in Cloze vanuit waarschuwingsmodal
 
 In de modal die verschijnt als je een lead wilt doorzetten of zelf wilt bellen terwijl deze al een sterke klant is van een collega, staat nu een klikbare link **🔗 Bekijk klant in Cloze**. Opent in nieuw tabblad. Werkt voor zowel `geefNaarPool()` als `geefAanZichzelf()`. URL wordt opgebouwd uit `card.dataset.clozeId` (= portableId) — geen extra Cloze API-call nodig, want die data staat al klaar uit de `check_bestaand` aanroep bij pagina-build.
