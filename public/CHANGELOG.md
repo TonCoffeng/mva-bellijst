@@ -7,6 +7,15 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ## 2026-05-10
 
+### Toegevoegd — doorklikken naar klant in Cloze vanuit waarschuwingsmodal
+
+In de modal die verschijnt als je een lead wilt doorzetten of zelf wilt bellen terwijl deze al een sterke klant is van een collega, staat nu een klikbare link **🔗 Bekijk klant in Cloze**. Opent in nieuw tabblad. Werkt voor zowel `geefNaarPool()` als `geefAanZichzelf()`. URL wordt opgebouwd uit `card.dataset.clozeId` (= portableId) — geen extra Cloze API-call nodig, want die data staat al klaar uit de `check_bestaand` aanroep bij pagina-build.
+
+**Implementatie:**
+- `mvaConfirm()` accepteert optionele parameter `clozeUrl` — toont link onder de tekst als gevuld.
+- Modal HTML: extra `<p id="confirm-modal-cloze-link">` element (default verborgen).
+- `leesAndereEigenaar()` retourneert nu ook `clozeUrl`.
+
 ### Veranderd — stage-check vervangt `lastChanged` proxy
 
 **Achtergrond:** gisteren bouwden we `pool_routing_check` met `lastChanged` als proxy voor "recent contact". Maar `pool_routing_debug` op Gerrit Jeuring (een actieve klant met stage="current" en visueel zichtbare call uit jul 2025) toonde dat `lastChanged` nog op nov 2018 staat. Cloze's `people/find` en `people/get` endpoints geven simpelweg geen activiteits-data terug — alleen het kale person-record met `firstSeen` en `lastChanged`. Beide tonen wanneer het record is aangemaakt/aangepast, niet wanneer er contact is geweest.
