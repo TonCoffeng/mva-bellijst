@@ -545,7 +545,7 @@ exports.handler = async (event) => {
           datum_bezichtiging: it.datum_tijd ? it.datum_tijd.split('T')[0] : '',
           datum:              it.toegevoegd_op ? it.toegevoegd_op.split('T')[0] : '',
           status:             it.bel_status || 'nieuw',
-          lead_status:        it.lead_status || 'Toegewezen',
+          lead_status:        it.lead_status || null,
           warme_lead:         it.warme_lead ? 'true' : '',
           opmerkingen:        it.opmerking || '',
           bron:               it.bron, // 'zelf' of 'pool'
@@ -602,7 +602,7 @@ exports.handler = async (event) => {
 
     // ── UPDATE LEAD-STATUS (kwalificatie van de lead) ─────────────────
     // Frontend stuurt: { item_id, lead_status } met waarden als
-    // 'Hot' / 'Warm' / 'Afspraak' / 'Deal' / 'Lost' / 'Toegewezen' / 'Gearchiveerd'.
+    // 'Hot' / 'Warm' / 'Afspraak' / 'Deal' / 'Lost' / 'Gearchiveerd'.
     // Schrijft naar de aparte bellijst_items.lead_status kolom (toegevoegd 10 mei).
     // Bij 'Afspraak' / 'Deal' wordt ook de bijbehorende datum-kolom gevuld.
     if (action === 'update_lead_status') {
