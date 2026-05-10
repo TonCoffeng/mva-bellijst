@@ -539,6 +539,122 @@ exports.handler = async (event) => {
       };
     }
 
+    // ── KLANT AANMAKEN OF UPDATEN ────────────────────────────────────────
+    // Wordt aangeroepen wanneer makelaar een lead-status zet op
+    // Hot/Warm/Afspraak/Deal — dan moet de klant in Cloze actief worden.
+    // Stap 1: zoek of klant al bestaat (people/find op email/telefoon)
+    // Stap 2a: bestaat → people/update met segment+stage+assignee
+    // Stap 2b: bestaat niet → people/create met alle data
+    // Returns: { ok, actie: "aangemaakt"|"bijgewerkt", portableId, cloze_url }
+    if (action === "klant_aanmaken_of_updaten") {
+      const { naam, email, telefoon, adres, segment, stage, lead_status, makelaar_email } = data;
+
+      // Cloze indexeert telefoons in E.164
+      const telE164 = normalizeTelToE164NL(telefoon);
+
+      // STAP 1 — zoek bestaande klant via email/telefoon
+      const queries = [email, telE164].filter(Boolean);
+      let bestaand = null;
+
+      for (const q of queries) {
+        const findRes = await fetch(
+          `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(q)}&pagesize=3`
+        );
+        const findJson = await findRes.json();
+        const matches = Array.isArray(findJson?.people) ? findJson.people : [];
+        const valid = matches.find(p => {
+          if (email && Array.isArray(p.emails)) {
+            if (p.emails.some(e => (e.value || e || '').toLowerCase() === email.toLowerCase())) return true;
+          }
+          if (telE164 && Array.isArray(p.phones)) {
+            const stripPrefix = (s) => {
+              let d = String(s || '').replace(/\D/g, '');
+              if (d.startsWith('31')) d = d.slice(2);
+              if (d.startsWith('0'))  d = d.slice(1);
+              return d;
+            };
+            const tel = stripPrefix(telE164);
+            if (p.phones.some(ph => {
+              const v = stripPrefix(ph.value || ph);
+              return v && tel && (v === tel || v.endsWith(tel) || tel.endsWith(v));
+            })) return true;
+          }
+          return false;
+        });
+        if (valid) { bestaand = valid; break; }
+      }
+
+      // Notitie voor in Cloze (bouw 'm één keer)
+      const notitie = `Lead ${lead_status} via Bellijst${adres ? ` — bezichtigd ${adres}` : ''}`;
+
+      // STAP 2a — bestaat: update met nieuwe segment + stage + assignee
+      if (bestaand) {
+        const updateBody = {
+          // Cloze update vereist een unique identifier in body
+          ...(email    ? { emails: [{ value: email }] }
+            : telE164  ? { phones: [{ value: telE164 }] }
+            : {}),
+          ...(segment  && { segment }),
+          ...(stage    && { stage }),
+          ...(makelaar_email && { assignee: makelaar_email }),
+          atAGlanceNotes: notitie,
+        };
+        const updateRes = await fetch(
+          `https://api.cloze.com/v1/people/update?api_key=${CLOZE_API_KEY}&user_email=${encodeURIComponent(CLOZE_USER)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateBody)
+          }
+        );
+        const updateJson = await updateRes.json();
+        const portableId = bestaand.portableId || bestaand.id || null;
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            ok: !updateJson?.errorcode || updateJson.errorcode === 0,
+            actie: 'bijgewerkt',
+            portableId,
+            cloze_url: portableId ? `https://app.cloze.com/app/#/people/${portableId}` : null,
+            cloze_response: updateJson,
+          }),
+        };
+      }
+
+      // STAP 2b — bestaat niet: aanmaken
+      const createBody = {
+        name: naam || (email || telefoon || 'Onbekend'),
+        ...(email    && { emails: [{ value: email }] }),
+        ...(telE164  && { phones: [{ value: telE164, type: 'mobile' }] }),
+        ...(segment  && { segment }),
+        ...(stage    && { stage }),
+        ...(makelaar_email && { assignee: makelaar_email }),
+        atAGlanceNotes: notitie,
+      };
+      const createRes = await fetch(
+        `https://api.cloze.com/v1/people/create?api_key=${CLOZE_API_KEY}&user_email=${encodeURIComponent(CLOZE_USER)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(createBody)
+        }
+      );
+      const createJson = await createRes.json();
+      const newPortableId = createJson?.person?.portableId || createJson?.portableId || null;
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          ok: !createJson?.errorcode || createJson.errorcode === 0,
+          actie: 'aangemaakt',
+          portableId: newPortableId,
+          cloze_url: newPortableId ? `https://app.cloze.com/app/#/people/${newPortableId}` : null,
+          cloze_response: createJson,
+        }),
+      };
+    }
+
     // ── DEBUG (tijdelijk) — toon alle tijd-velden van een Cloze persoon ─
     // Doel: ontdekken welk veld de "laatste activiteit" weerspiegelt.
     // lastChanged blijkt te schuiven bij record-edits, niet bij activiteiten.
