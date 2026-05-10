@@ -1379,6 +1379,29 @@
   </div>
 </div>
 
+<!-- ONTVANGEN LEADS SCHERM — leads die jij vanuit de pool hebt gekregen -->
+<div id="ontvangen-screen" class="hidden" style="padding:16px;max-width:600px;margin:0 auto">
+  <!-- Terug-knop -->
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <button onclick="sluitOntvangenPagina()" title="Terug naar Leads bellen"
+            style="background:none;border:1px solid var(--grijs-mid);border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;font-family:inherit">
+      ← Terug
+    </button>
+    <h2 style="margin:0;font-size:18px;color:var(--navy)">📂 Ontvangen leads</h2>
+  </div>
+
+  <p style="font-size:13px;color:var(--grijs-tekst);margin:0 0 14px;line-height:1.5">
+    Alle leads die je via de pool hebt gekregen, gesorteerd op datum (nieuwste eerst).
+  </p>
+
+  <div id="ontvangen-leads-container">
+    <div class="loading">
+      <div class="spinner"></div>
+      Leads laden...
+    </div>
+  </div>
+</div>
+
 <!-- STATUS MODAL -->
 <div class="modal-overlay" id="status-modal" onclick="sluitModal(event)">
   <div class="modal-sheet">
@@ -1564,6 +1587,8 @@
     document.getElementById('header-naam').textContent = huidigeMakelaar.naam;
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('btn-terug').classList.remove('hidden');
+    // Reset eventuele open subpagina's
+    document.getElementById('ontvangen-screen')?.classList.add('hidden');
 
     // Registreer service worker en vraag push permissie
     registreerServiceWorker();
@@ -1661,6 +1686,7 @@
     leadsData = [];
     document.getElementById('geven-screen').classList.add('hidden');
     document.getElementById('overzicht-screen').classList.add('hidden');
+    document.getElementById('ontvangen-screen')?.classList.add('hidden');
     document.getElementById('login-screen').classList.remove('hidden');
     document.getElementById('btn-terug').classList.add('hidden');
     document.getElementById('header-naam').textContent = 'Welkom';
@@ -4240,11 +4266,101 @@
   }
   window.archiveerLeadsSelectie = archiveerLeadsSelectie;
 
-  // ── ONTVANGEN PAGINA — placeholder voor volgende sessie ──────────────
+  // ── ONTVANGEN PAGINA ──────────────────────────────────────────────────
+  // Aparte view die alle leads toont die jij ontvangen hebt vanuit de pool.
+  // Gesorteerd op in-pool datum, nieuwste eerst. Geen filters in versie 1.
   function openOntvangenPagina() {
-    toonToast('Ontvangen-leads pagina komt in een volgende sessie', 'fout');
+    document.getElementById('overzicht-screen').classList.add('hidden');
+    document.getElementById('ontvangen-screen').classList.remove('hidden');
+    renderOntvangenLeads();
   }
   window.openOntvangenPagina = openOntvangenPagina;
+
+  function sluitOntvangenPagina() {
+    document.getElementById('ontvangen-screen').classList.add('hidden');
+    document.getElementById('overzicht-screen').classList.remove('hidden');
+  }
+  window.sluitOntvangenPagina = sluitOntvangenPagina;
+
+  function renderOntvangenLeads() {
+    const container = document.getElementById('ontvangen-leads-container');
+    if (!container) return;
+
+    // Sorteer op in-pool datum (nieuwste eerst); fallback datum_bezichtiging
+    const sorted = [...leadsData].sort((a, b) => {
+      const da = a.datum || a.datum_bezichtiging || '';
+      const db = b.datum || b.datum_bezichtiging || '';
+      return db.localeCompare(da);
+    });
+
+    if (sorted.length === 0) {
+      container.innerHTML = `<div class="leeg">
+        <div class="leeg-icon">📭</div>
+        <h3>Nog geen ontvangen leads</h3>
+        <p>Je hebt nog geen leads vanuit de pool ontvangen.</p>
+      </div>`;
+      return;
+    }
+
+    // Subkop met telling
+    const headerHtml = `
+      <div style="font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em;margin-bottom:10px">
+        ${sorted.length} ${sorted.length === 1 ? 'LEAD' : 'LEADS'} TOTAAL
+      </div>
+    `;
+
+    container.innerHTML = headerHtml + sorted.map(lead => {
+      // Lead-status chip (zelfde mapping als renderLeads)
+      const leadStatusChip = {
+        'Hot':         { cls: 'chip-hot',         label: '🔥 Hot' },
+        'Warm':        { cls: 'chip-warm',        label: '🌡️ Warm' },
+        'Toegewezen':  { cls: 'chip-toegewezen',  label: '📥 Toegewezen' },
+        'Afspraak':    { cls: 'chip-afspraak',    label: '📅 Afspraak' },
+        'Deal':        { cls: 'chip-deal',        label: '✅ Deal' },
+        'Lost':        { cls: 'chip-lost',        label: '❌ Lost' },
+        'Gearchiveerd':{ cls: 'chip-wacht',       label: '📦 Gearchiveerd' },
+      }[lead.lead_status] || { cls: 'chip-toegewezen', label: '📥 Toegewezen' };
+
+      // Bel-status chip
+      const belChip = {
+        'niet_bereikbaar':    { cls: 'chip-urgent', label: 'Niet bereikbaar' },
+        'bereikt_later':      { cls: 'chip-later',  label: 'Bel terug' },
+        'voicemail':          { cls: 'chip-wacht',  label: 'Voicemail' },
+        'wellicht_later':     { cls: 'chip-wacht',  label: 'Wellicht later' },
+        'bereikt_ja':         { cls: 'chip-nieuw',  label: '✅ Bereikt' },
+        'niet_geinteresseerd':{ cls: 'chip-wacht',  label: '❌ Afgerond' },
+      }[lead.status];
+
+      const safeNaam = (lead.naam || '').replace(/'/g, "\\'");
+
+      return `
+        <div class="lead-card nieuw" style="margin-bottom:10px" onclick="openModal('${lead.id}')">
+          <div class="lead-naam">${lead.naam}</div>
+          ${lead.adres ? `<div class="lead-adres">📍 ${lead.adres}</div>` : ''}
+          ${lead.bij_wie ? `<div class="lead-adres" style="font-size:12px;margin-top:2px;color:var(--grijs-tekst)">📓 Bezichtigd bij: ${lead.bij_wie}</div>` : ''}
+
+          <div class="lead-meta" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+            <span class="lead-chip ${leadStatusChip.cls}">${leadStatusChip.label}</span>
+            ${belChip ? `<span class="lead-chip ${belChip.cls}">${belChip.label}</span>` : ''}
+            ${lead.belpogingen > 0 ? `<span class="lead-chip chip-belpogingen">📞 ${lead.belpogingen}× geprobeerd</span>` : ''}
+          </div>
+
+          <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;flex-wrap:wrap;color:var(--grijs-tekst)">
+            ${lead.datum ? `<span>📥 In pool: <strong style="color:var(--navy)">${lead.datum}</strong></span>` : ''}
+            ${lead.datum_bezichtiging ? `<span>🏠 Bezichtiging: <strong style="color:var(--navy)">${lead.datum_bezichtiging}</strong></span>` : ''}
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:6px;font-size:12px;color:var(--grijs-tekst)">
+            ${lead.telefoon ? `<span>📞 ${lead.telefoon}</span>` : ''}
+            ${lead.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">✉️ ${lead.email}</span>` : ''}
+          </div>
+
+          ${lead.opmerkingen ? `<div style="margin-top:6px;font-size:12px;color:var(--grijs-tekst);font-style:italic">💬 ${lead.opmerkingen}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+  window.renderOntvangenLeads = renderOntvangenLeads;
   }
   // ── LEAD STATUS WIJZIGEN (Hot / Warm / Afspraak / Deal / Lost) ──────
   async function zetLeadStatus(leadId, nieuweStatus) {
