@@ -7,6 +7,19 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ## 2026-05-10
 
+### Gefixt — `update_lead_status` schreef Hot/Warm naar verkeerde kolom
+
+**Probleem:** in `monday.js` waren de acties `update_status` (bel-status: bereikt/voicemail/etc) en `update_lead_status` (lead-kwalificatie: Hot/Warm/Afspraak/Deal/Lost) in één code-pad samengevoegd. Beide schreven naar de `bellijst_items.bel_status` kolom. Maar `bel_status` heeft een CHECK constraint die alleen waarden zoals `nieuw`/`bereikt`/`voicemail`/`afspraak`/`deal`/`lost` accepteert. Bij klik op 🔥 Hot of 🌡️ Warm faalde de update met:
+> *"new row for relation \"bellijst_items\" violates check constraint \"bellijst_status_check\""*
+
+**Oorzaak:** `bel_status` en `lead_status` zijn twee verschillende concepten; `lead_status` had geen eigen kolom in de tabel.
+
+**Fix:**
+1. **Database-wijziging** (Supabase): kolom `lead_status text NULL` toegevoegd aan `bellijst_items` (geen CHECK constraint, vrije waarden voor flexibiliteit).
+2. **Backend split** (`monday.js`): `update_status` en `update_lead_status` zijn nu twee aparte if-blokken. `update_lead_status` schrijft naar de nieuwe `lead_status` kolom (en synchroniseert `warme_lead` boolean + `afspraak_op`/`deal_op` data-velden).
+3. **`get_leads`**: retourneert nu ook `lead_status` per item (default `'Toegewezen'` als de kolom nog null is). Frontend toont de juiste chip en filter werkt.
+4. **`get_leads` filter**: gearchiveerde leads (`lead_status='Gearchiveerd'`) worden uitgesloten.
+
 ### Veranderd — lead-status filter is nu een dropdown
 
 De lead-status filter-pillen (Hot / Warm / Afspraak / Deal / Lost / Toegewezen) waren visueel te druk naast de bel-status pillen. Vervangen door een **dropdown** "Lead-status" onder de bel-status rij. Werkt functioneel hetzelfde, ziet er rustiger uit. Bel-status pillen blijven gewoon als pillen (vaker gebruikt, sneller filteren).
