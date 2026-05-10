@@ -520,9 +520,12 @@ exports.handler = async (event) => {
         return { statusCode: 200, headers, body: JSON.stringify({ leads: [] }) };
       }
 
-      // Filter: alleen actieve bellijst-items (niet deal/lost — die zijn weg uit werklijst)
+      // Filter: actieve bellijst-items
+      // - Verberg gearchiveerde leads (lead_status='Gearchiveerd')
+      // - Verberg afgesloten via bel_status (legacy: deal/lost via belstatus)
       let path = `bellijst_items?select=*&eigenaar_id=eq.${eigenaarId}` +
-        `&bel_status=not.in.(deal,lost)&order=toegevoegd_op.desc&limit=500`;
+        `&bel_status=not.in.(deal,lost)` +
+        `&order=toegevoegd_op.desc&limit=500`;
       // Optionele bron-filter (bv. alleen 'pool' tonen)
       if (bron === 'pool' || bron === 'zelf') {
         path += `&bron=eq.${bron}`;
@@ -530,34 +533,38 @@ exports.handler = async (event) => {
       const items = await sbGet(path);
 
       // Transformeer naar Monday-stijl shape voor frontend backwards compat
-      const leads = items.map(it => ({
-        id:                 String(it.id),
-        naam:               it.bezichtiger_naam || '',
-        telefoon:           it.bezichtiger_telefoon || '',
-        email:              it.bezichtiger_email || '',
-        adres:              it.adres || '',
-        datum_bezichtiging: it.datum_tijd ? it.datum_tijd.split('T')[0] : '',
-        datum:              it.toegevoegd_op ? it.toegevoegd_op.split('T')[0] : '',
-        status:             it.bel_status || 'nieuw',
-        warme_lead:         it.warme_lead ? 'true' : '',
-        opmerkingen:        it.opmerking || '',
-        bron:               it.bron, // 'zelf' of 'pool'
-        belpogingen:        it.belpogingen || 0,
-        afspraak_op:        it.afspraak_op || '',
-        deal_op:            it.deal_op || '',
-        bezichtiging_id:    it.bezichtiging_id, // referentie terug naar origineel
-      }));
+      const leads = items
+        // Filter Gearchiveerd weg (kan ook server-side via .neq= maar PostgREST or-syntax is fragiel met null)
+        .filter(it => it.lead_status !== 'Gearchiveerd')
+        .map(it => ({
+          id:                 String(it.id),
+          naam:               it.bezichtiger_naam || '',
+          telefoon:           it.bezichtiger_telefoon || '',
+          email:              it.bezichtiger_email || '',
+          adres:              it.adres || '',
+          datum_bezichtiging: it.datum_tijd ? it.datum_tijd.split('T')[0] : '',
+          datum:              it.toegevoegd_op ? it.toegevoegd_op.split('T')[0] : '',
+          status:             it.bel_status || 'nieuw',
+          lead_status:        it.lead_status || 'Toegewezen',
+          warme_lead:         it.warme_lead ? 'true' : '',
+          opmerkingen:        it.opmerking || '',
+          bron:               it.bron, // 'zelf' of 'pool'
+          belpogingen:        it.belpogingen || 0,
+          afspraak_op:        it.afspraak_op || '',
+          deal_op:            it.deal_op || '',
+          bezichtiging_id:    it.bezichtiging_id, // referentie terug naar origineel
+        }));
 
       return { statusCode: 200, headers, body: JSON.stringify({ leads }) };
     }
 
     // ── BELLIJST STATUS UPDATEN ──────────────────────────────────────
+    // ── UPDATE BEL-STATUS (resultaat van een telefoongesprek) ────────
     // Frontend stuurt: { item_id, status } waarbij status één van de oude
     // Monday-keys is (bereikt_ja, bereikt_later, niet_bereikbaar, ...).
     // Vertaal naar onze interne bel_status enum.
-    if (action === 'update_status' || action === 'update_lead_status') {
-      const { item_id, status, lead_status } = data;
-      const inputStatus = status || lead_status;
+    if (action === 'update_status') {
+      const { item_id, status } = data;
 
       // Mapping van oude Monday-keys naar nieuwe bel_status enum
       const statusMap = {
@@ -567,15 +574,8 @@ exports.handler = async (event) => {
         wellicht_later:      'wellicht_later',
         niet_geinteresseerd: 'niet_geinteresseerd',
         voicemail:           'voicemail',
-        // Lead-status keys (van leadpool flow)
-        Bereikt:             'bereikt',
-        BelTerug:            'bel_terug',
-        NietBereikt:         'niet_bereikbaar',
-        Afspraak:            'afspraak',
-        Deal:                'deal',
-        Lost:                'lost',
       };
-      const belStatus = statusMap[inputStatus] || inputStatus;
+      const belStatus = statusMap[status] || status;
 
       // Bouw update body
       const body = {
@@ -583,14 +583,8 @@ exports.handler = async (event) => {
         status_gewijzigd_op: new Date().toISOString(),
       };
 
-      // Status-specifieke bijwerkingen
-      const vandaag = new Date().toISOString().split('T')[0];
-      if (belStatus === 'afspraak') body.afspraak_op = vandaag;
-      if (belStatus === 'deal')     body.deal_op = vandaag;
-
       // Bij niet_bereikbaar / voicemail: belpogingen ophogen
       if (belStatus === 'niet_bereikbaar' || belStatus === 'voicemail') {
-        // Lees huidige teller eerst
         const cur = await sbGet(`bellijst_items?select=belpogingen&id=eq.${item_id}`);
         const huidig = cur[0]?.belpogingen || 0;
         body.belpogingen = huidig + 1;
@@ -603,6 +597,42 @@ exports.handler = async (event) => {
       return {
         statusCode: 200, headers,
         body: JSON.stringify({ ok: true, item_id, bel_status: belStatus, updated_count: updated.length }),
+      };
+    }
+
+    // ── UPDATE LEAD-STATUS (kwalificatie van de lead) ─────────────────
+    // Frontend stuurt: { item_id, lead_status } met waarden als
+    // 'Hot' / 'Warm' / 'Afspraak' / 'Deal' / 'Lost' / 'Toegewezen' / 'Gearchiveerd'.
+    // Schrijft naar de aparte bellijst_items.lead_status kolom (toegevoegd 10 mei).
+    // Bij 'Afspraak' / 'Deal' wordt ook de bijbehorende datum-kolom gevuld.
+    if (action === 'update_lead_status') {
+      const { item_id, lead_status } = data;
+      if (!item_id || !lead_status) {
+        return {
+          statusCode: 400, headers,
+          body: JSON.stringify({ error: 'item_id en lead_status zijn vereist' }),
+        };
+      }
+
+      const body = {
+        lead_status,
+        status_gewijzigd_op: new Date().toISOString(),
+      };
+
+      // Bij Afspraak/Deal ook de datum-kolommen vullen
+      const vandaag = new Date().toISOString().split('T')[0];
+      if (lead_status === 'Afspraak') body.afspraak_op = vandaag;
+      if (lead_status === 'Deal')     body.deal_op = vandaag;
+
+      // 'warme_lead' boolean ook netjes synchroniseren — true bij Hot/Warm/Afspraak/Deal
+      // (oude flow gebruikte deze, zo blijft die in sync voor backward compat).
+      const warmeStatussen = ['Hot', 'Warm', 'Afspraak', 'Deal'];
+      body.warme_lead = warmeStatussen.includes(lead_status);
+
+      const updated = await sbPatch(`bellijst_items?id=eq.${item_id}`, body);
+      return {
+        statusCode: 200, headers,
+        body: JSON.stringify({ ok: true, item_id, lead_status, updated_count: updated.length }),
       };
     }
 
