@@ -229,56 +229,6 @@
       border-color: var(--navy);
     }
 
-    /* Lead-status filter-pillen (Hot/Warm/etc) — iets andere kleur om visueel onderscheid te maken */
-    .leads-leadstatusfilter-pil {
-      background: var(--wit);
-      border: 1px solid var(--grijs-mid);
-      color: var(--grijs-tekst);
-      border-radius: 999px;
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all .15s;
-      font-family: inherit;
-      white-space: nowrap;
-    }
-    .leads-leadstatusfilter-pil:hover {
-      background: var(--grijs);
-      color: var(--oranje);
-      border-color: var(--oranje);
-    }
-    .leads-leadstatusfilter-pil.actief {
-      background: var(--oranje);
-      color: var(--wit);
-      border-color: var(--oranje);
-    }
-
-    /* Lead-status filter-pillen (Hot/Warm/Afspraak/Deal/Lost/Toegewezen) — oranje accent als actief */
-    .leads-leadstatusfilter-pil {
-      background: var(--wit);
-      border: 1px solid var(--grijs-mid);
-      color: var(--grijs-tekst);
-      border-radius: 999px;
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all .15s;
-      font-family: inherit;
-      white-space: nowrap;
-    }
-    .leads-leadstatusfilter-pil:hover {
-      background: var(--grijs);
-      color: var(--navy);
-      border-color: var(--oranje);
-    }
-    .leads-leadstatusfilter-pil.actief {
-      background: var(--oranje);
-      color: var(--wit);
-      border-color: var(--oranje);
-    }
-
     .section-title {
       font-size: 13px;
       font-weight: 600;
@@ -1364,26 +1314,19 @@
     <button class="leads-statusfilter-pil" data-status="niet_geinteresseerd" onclick="filterLeadsOpStatus('niet_geinteresseerd')">❌ Niet geïnt.</button>
   </div>
 
-  <!-- LEAD-STATUS FILTER PILLEN (Hot/Warm/Afspraak/Deal/Lost) -->
-  <div id="leads-leadstatusfilter" style="padding:0 16px 10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-    <button class="leads-leadstatusfilter-pil actief" data-leadstatus="alle" onclick="filterLeadsOpLeadStatus('alle')">Alle</button>
-    <button class="leads-leadstatusfilter-pil" data-leadstatus="Hot" onclick="filterLeadsOpLeadStatus('Hot')">🔥 Hot</button>
-    <button class="leads-leadstatusfilter-pil" data-leadstatus="Warm" onclick="filterLeadsOpLeadStatus('Warm')">🌡️ Warm</button>
-    <button class="leads-leadstatusfilter-pil" data-leadstatus="Afspraak" onclick="filterLeadsOpLeadStatus('Afspraak')">📅 Afspraak</button>
-    <button class="leads-leadstatusfilter-pil" data-leadstatus="Deal" onclick="filterLeadsOpLeadStatus('Deal')">✅ Deal</button>
-    <button class="leads-leadstatusfilter-pil" data-leadstatus="Lost" onclick="filterLeadsOpLeadStatus('Lost')">❌ Lost</button>
-    <button class="leads-leadstatusfilter-pil" data-leadstatus="Toegewezen" onclick="filterLeadsOpLeadStatus('Toegewezen')">📥 Toegewezen</button>
-  </div>
-
-  <!-- LEAD-STATUS FILTER PILLEN (Hot / Warm / Afspraak / Deal / Lost) -->
-  <div id="leads-leadstatus-filter" style="padding:0 16px 8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-    <button class="leads-leadstatusfilter-pil actief" data-leadstatus="alle" onclick="filterLeadsOpLeadStatus('alle')">Alle statussen</button>
-    <button class="leads-leadstatusfilter-pil" data-leadstatus="Hot" onclick="filterLeadsOpLeadStatus('Hot')">🔥 Hot</button>
-    <button class="leads-leadstatusfilter-pil" data-leadstatus="Warm" onclick="filterLeadsOpLeadStatus('Warm')">🌡️ Warm</button>
-    <button class="leads-leadstatusfilter-pil" data-leadstatus="Afspraak" onclick="filterLeadsOpLeadStatus('Afspraak')">📅 Afspraak</button>
-    <button class="leads-leadstatusfilter-pil" data-leadstatus="Deal" onclick="filterLeadsOpLeadStatus('Deal')">✅ Deal</button>
-    <button class="leads-leadstatusfilter-pil" data-leadstatus="Lost" onclick="filterLeadsOpLeadStatus('Lost')">❌ Lost</button>
-    <button class="leads-leadstatusfilter-pil" data-leadstatus="Toegewezen" onclick="filterLeadsOpLeadStatus('Toegewezen')">📥 Toegewezen</button>
+  <!-- LEAD-STATUS FILTER (dropdown) -->
+  <div id="leads-leadstatusfilter" style="padding:0 16px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <label for="leads-leadstatus-select" style="font-size:12px;color:var(--grijs-tekst);font-weight:600">Lead-status:</label>
+    <select id="leads-leadstatus-select" onchange="filterLeadsOpLeadStatus(this.value)"
+            style="padding:6px 12px;border:1px solid var(--grijs-mid);border-radius:999px;font-size:12px;font-weight:600;color:var(--navy);background:var(--wit);cursor:pointer;font-family:inherit">
+      <option value="alle">Alle statussen</option>
+      <option value="Hot">🔥 Hot</option>
+      <option value="Warm">🌡️ Warm</option>
+      <option value="Afspraak">📅 Afspraak</option>
+      <option value="Deal">✅ Deal</option>
+      <option value="Lost">❌ Lost</option>
+      <option value="Toegewezen">📥 Toegewezen</option>
+    </select>
   </div>
 
   <!-- ACTIEBALK: SECTIE-LABEL + SORTEER + SPIEKBRIEF + SELECTIE -->
@@ -4100,22 +4043,11 @@
   }
   window.filterLeadsOpStatus = filterLeadsOpStatus;
 
-  // ── FILTER: lead-status pillen (Hot/Warm/Afspraak/Deal/Lost) ────────
+  // ── FILTER: lead-status dropdown (Hot/Warm/Afspraak/Deal/Lost) ──────
   function filterLeadsOpLeadStatus(leadStatus) {
     leadsLeadStatusFilter = leadStatus;
-    document.querySelectorAll('.leads-leadstatusfilter-pil').forEach(p => {
-      p.classList.toggle('actief', p.dataset.leadstatus === leadStatus);
-    });
-    renderLeads();
-  }
-  window.filterLeadsOpLeadStatus = filterLeadsOpLeadStatus;
-
-  // ── FILTER: lead-status pillen (Hot/Warm/Afspraak/Deal/Lost) ────────
-  function filterLeadsOpLeadStatus(leadStatus) {
-    leadsLeadStatusFilter = leadStatus;
-    document.querySelectorAll('.leads-leadstatusfilter-pil').forEach(p => {
-      p.classList.toggle('actief', p.dataset.leadstatus === leadStatus);
-    });
+    const select = document.getElementById('leads-leadstatus-select');
+    if (select && select.value !== leadStatus) select.value = leadStatus;
     renderLeads();
   }
   window.filterLeadsOpLeadStatus = filterLeadsOpLeadStatus;
