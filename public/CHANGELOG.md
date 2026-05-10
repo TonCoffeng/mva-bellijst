@@ -7,6 +7,50 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ## 2026-05-10
 
+### Toegevoegd — lead-status filter-pillen + "Spiekbrief" hernoemd naar "Compact"
+
+**Tweede rij filter-pillen** in Leads bellen, onder de bestaande bel-status pillen:
+
+```
+Alle / 🔥 Hot / 🌡️ Warm / 📅 Afspraak / ✅ Deal / ❌ Lost / 📥 Toegewezen
+```
+
+Werkt onafhankelijk van de bel-status filters: je kunt combineren "Alle bel-status + alleen Hot" of "Bereikt + Deal".
+
+Visueel onderscheid: bel-status pillen actief = **navy**, lead-status pillen actief = **oranje**.
+
+**Spiekbrief-knop hernoemd naar "📋 Compact"** in de Leads-bellen tab (functioneel identiek, maar passendere naam voor deze context).
+
+### Toegevoegd — Lead-status zetten maakt klant aan in Cloze (Hot/Warm/Afspraak/Deal)
+
+**Aanleiding:** elke kwalificatie hoort een Cloze-record te zijn (Cloze is het CRM, lijn van 10 mei). Tot nu toe stond een Hot/Warm/Afspraak/Deal alleen in de leadpool, niet in Cloze.
+
+**Werking:**
+- Bij klik op **🔥 Hot / 🌡️ Warm / 📅 Afspraak / ✅ Deal** verschijnt direct een mini-modal met de keuze **🏠 Aankoopklant** of **💰 Verkoopklant**.
+- Na keuze wordt:
+  1. **Lead-status in Supabase** geüpdatet (zoals voorheen)
+  2. **Klant in Cloze** aangemaakt of bijgewerkt — backend doet eerst een `people/find` op email/telefoon: bestaat al → `people/update` met nieuwe `segment`, `stage='current'`, `assignee=makelaar`. Bestaat niet → `people/create`.
+- Bij **❌ Lost** gebeurt **niets** met Cloze (alleen lead-status update).
+- Cloze-actie wordt op de achtergrond uitgevoerd; de status-update voelt direct.
+
+**Backend `cloze.js`:** nieuwe action `klant_aanmaken_of_updaten`. Returns `{ ok, actie: "aangemaakt"|"bijgewerkt", portableId, cloze_url, cloze_response }`.
+
+**Frontend `index.html`:**
+- Modal `aankoop-verkoop-modal` (HTML)
+- `kiesAankoopOfVerkoop()` Promise-based dropdown
+- `clozeKlantFlow()` doet de API-call en toast
+- `zetLeadStatus()` is uitgebreid: triggert dropdown vóór update
+
+### Toegevoegd — Lead-status filter-pillen rij
+
+Onder de bel-status filter-pillen staat nu een tweede rij met filters op **lead-status**: Alle / 🔥 Hot / 🌡️ Warm / 📅 Afspraak / ✅ Deal / ❌ Lost / 📥 Toegewezen. Oranje accent als actief (vs. navy bij bel-status pillen).
+
+State: `leadsLeadStatusFilter`. Functie: `filterLeadsOpLeadStatus()`. Renderfilter stap 4b in `renderLeads()`.
+
+### Veranderd — "Spiekbrief" knop hernoemd naar "Compact"
+
+Spiekbrief paste niet zo goed bij de Leads-bellen flow (minder leads dan bezichtigingen, minder behoefte aan snel scannen). "📋 Compact" past beter — alleen labelwijziging, alle JS blijft hetzelfde (state-variabele `leadsSpiekbriefAan` blijft intern zo heten voor consistentie).
+
 ### Toegevoegd — Leads bellen tab uitgebreid met filters, selectie en bulk-acties
 
 **Aanleiding:** de Leads-bellen tab had alleen drie statische teller-cards (Vandaag/Openstaand/Afgerond) zonder verdere filters of bulk-acties. Lead doorgeven tab heeft die features wél, en die patronen hebben we hier toegepast.
