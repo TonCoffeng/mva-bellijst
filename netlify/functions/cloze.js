@@ -574,6 +574,20 @@ exports.handler = async (event) => {
     if (action === "klant_aanmaken_of_updaten") {
       const { naam, email, telefoon, adres, segment, stage, lead_status, makelaar_email } = data;
 
+      // Mapping van user-friendly segment-naam naar Cloze interne key.
+      // Lijst opgehaald via /v1/segments op 10 mei 2026 voor account toncoffeng@makelaarsvan.nl.
+      const SEGMENT_MAP = {
+        'Aankoop':       'custom1',  // Aankoopklant
+        'Verkoop':       'custom2',  // Verkoopklant
+        'Aankoopklant':  'custom1',
+        'Verkoopklant':  'custom2',
+        'Verhuur':       'project2',
+        'Aanhuur':       'project3',
+        'Verhuurder':    'custom3',
+        'Huurder':       'custom4',
+      };
+      const segmentKey = SEGMENT_MAP[segment] || segment;
+
       // Cloze indexeert telefoons in E.164
       const telE164 = normalizeTelToE164NL(telefoon);
 
@@ -619,8 +633,8 @@ exports.handler = async (event) => {
           ...(email    ? { emails: [{ value: email }] }
             : telE164  ? { phones: [{ value: telE164 }] }
             : {}),
-          ...(segment  && { segment }),
-          ...(stage    && { stage }),
+          ...(segmentKey && { segment: segmentKey }),
+          ...(stage     && { stage }),
           ...(makelaar_email && { assignee: makelaar_email }),
           atAGlanceNotes: notitie,
         };
@@ -652,8 +666,8 @@ exports.handler = async (event) => {
         name: naam || (email || telefoon || 'Onbekend'),
         ...(email    && { emails: [{ value: email }] }),
         ...(telE164  && { phones: [{ value: telE164, type: 'mobile' }] }),
-        ...(segment  && { segment }),
-        ...(stage    && { stage }),
+        ...(segmentKey && { segment: segmentKey }),
+        ...(stage     && { stage }),
         ...(makelaar_email && { assignee: makelaar_email }),
         atAGlanceNotes: notitie,
       };
