@@ -405,10 +405,12 @@ exports.handler = async (event) => {
       }
 
       // Maak bellijst_item voor de gekozen ontvanger (snapshot van bezichtiger)
+      // Bron blijft 'pool' ook bij direct-assign — CHECK constraint accepteert
+      // alleen 'zelf'/'pool'. Onderscheid Direct vs RR zit in toewijzingen-tabel
+      // en in via_cloze_routing in de response.
       let bellijstItem;
       try {
-        const bron = useDirectAssign ? 'cloze_direct' : 'pool';
-        const created = await createBellijstItem(bez, rr.gekozen_id, bron);
+        const created = await createBellijstItem(bez, rr.gekozen_id, 'pool');
         bellijstItem = created[0];
       } catch (e) {
         return { statusCode: 500, headers, body: JSON.stringify({ error: `Bellijst-item aanmaken faalde: ${e.message}` }) };
