@@ -215,27 +215,43 @@ exports.handler = async (event) => {
 
     // ── 4. UPDATE PERSOON STAGE ────────────────────────────────────────
     if (action === "update_stage") {
-      const { telefoon, email, stage } = data;
-      // stage: "lead" | "current" | "out" | "future"
+      const { telefoon, email, portableId, stage } = data;
+      // stage: "lead" (Warm) | "future" (Hot) | "current" (In Contract) | "out" / "lost"
 
-      const identifier = email || telefoon;
-      const stageBody = { stage };
+      // Cloze accepteert portableId als identifier in de body
+      const idBody = portableId
+        ? { portableId }
+        : email
+          ? { emails: [{ value: email }] }
+          : telefoon
+            ? { phones: [{ value: telefoon }] }
+            : null;
+
+      if (!idBody || !stage) {
+        return {
+          statusCode: 400, headers,
+          body: JSON.stringify({ error: 'portableId/email/telefoon en stage zijn vereist' }),
+        };
+      }
 
       const res = await fetch(
-        `https://api.cloze.com/v1/people/update?api_key=${CLOZE_API_KEY}`,
+        `https://api.cloze.com/v1/people/update?api_key=${CLOZE_API_KEY}&user_email=${encodeURIComponent(CLOZE_USER)}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...stageBody,
-            ...(email
-              ? { emails: [{ value: email }] }
-              : { phones: [{ value: telefoon }] }),
-          }),
+          body: JSON.stringify({ ...idBody, stage }),
         }
       );
       const result = await res.json();
-      return { statusCode: 200, headers, body: JSON.stringify(result) };
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          ok: !result?.errorcode || result.errorcode === 0,
+          stage,
+          ...result,
+        }),
+      };
     }
 
     // ── CHECK OF PERSOON AL IN CLOZE STAAT ────────────────────────────
@@ -613,36 +629,42 @@ exports.handler = async (event) => {
       // Cloze indexeert telefoons in E.164
       const telE164 = normalizeTelToE164NL(telefoon);
 
-      // STAP 1 — zoek bestaande klant via email/telefoon
-      const queries = [email, telE164].filter(Boolean);
+      // STAP 1 — zoek bestaande klant via email
+      // Match-criterium (besloten 11 mei 2026): vereist EMAIL + NAAM beide match.
+      // Mensen geven vaak niet de juiste info door — daarom geen fuzzy match
+      // op telefoon of alleen email. Bij twijfel: nieuwe record aanmaken,
+      // duplicaten kunnen later in Cloze gemerged worden.
       let bestaand = null;
 
-      for (const q of queries) {
+      const normalizeNaam = (s) => String(s || '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+      const zoekNaam = normalizeNaam(naam);
+
+      if (email && zoekNaam) {
         const findRes = await fetch(
-          `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(q)}&pagesize=3`
+          `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(email)}&pagesize=5`
         );
         const findJson = await findRes.json();
         const matches = Array.isArray(findJson?.people) ? findJson.people : [];
+
         const valid = matches.find(p => {
-          if (email && Array.isArray(p.emails)) {
-            if (p.emails.some(e => (e.value || e || '').toLowerCase() === email.toLowerCase())) return true;
-          }
-          if (telE164 && Array.isArray(p.phones)) {
-            const stripPrefix = (s) => {
-              let d = String(s || '').replace(/\D/g, '');
-              if (d.startsWith('31')) d = d.slice(2);
-              if (d.startsWith('0'))  d = d.slice(1);
-              return d;
-            };
-            const tel = stripPrefix(telE164);
-            if (p.phones.some(ph => {
-              const v = stripPrefix(ph.value || ph);
-              return v && tel && (v === tel || v.endsWith(tel) || tel.endsWith(v));
-            })) return true;
-          }
+          // 1) Email moet kloppen
+          const emailMatch = Array.isArray(p.emails) && p.emails.some(
+            e => (e.value || e || '').toLowerCase() === email.toLowerCase()
+          );
+          if (!emailMatch) return false;
+
+          // 2) Naam moet ook kloppen (volledige naam, hoofdletter-ongevoelig)
+          const clozeFullName = normalizeNaam(p.name || `${p.first || ''} ${p.last || ''}`);
+          if (clozeFullName === zoekNaam) return true;
+          // Soms is Cloze-naam langer (bv "Luis Alberto De Cecco" vs bellijst "de Cecco")
+          // — accepteer als de zoeknaam volledig in Cloze-naam zit OF andersom
+          if (clozeFullName.includes(zoekNaam) || zoekNaam.includes(clozeFullName)) return true;
           return false;
         });
-        if (valid) { bestaand = valid; break; }
+        if (valid) bestaand = valid;
       }
 
       // Notitie voor in Cloze (bouw 'm één keer)
