@@ -146,6 +146,7 @@
 
     /* ── OVERZICHT SCHERM ── */
     #overzicht-screen { padding: 16px; max-width: 600px; margin: 0 auto; }
+    #overzicht-screen.breed { max-width: 1400px; }
 
     .stats-bar {
       display: flex;
@@ -1416,7 +1417,7 @@
 </div>
 
 <!-- ONTVANGEN LEADS SCHERM — leads die jij vanuit de pool hebt gekregen -->
-<div id="ontvangen-screen" class="hidden" style="padding:16px;max-width:600px;margin:0 auto">
+<div id="ontvangen-screen" class="hidden" style="padding:16px;max-width:1400px;margin:0 auto">
   <!-- Terug-knop -->
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
     <button onclick="sluitOntvangenPagina()" title="Terug naar Leads bellen"
@@ -1961,6 +1962,8 @@
     // Zorg dat hoofd-container weer zichtbaar is (na evt. doorgegeven-pagina)
     document.getElementById('geven-container').style.display = '';
     document.getElementById('doorgegeven-container')?.remove();
+    // Haal breed-modus weg
+    document.getElementById('overzicht-screen')?.classList.remove('breed');
 
     const zoekTerm = (document.getElementById('filter-adres')?.value || '').toLowerCase().trim();
     const datumFilter = window._datumFilter || null;  // YYYY-MM-DD of null = alle datums
@@ -2020,6 +2023,8 @@
   async function openDoorgegevenPagina() {
     document.querySelectorAll('.filter-knop').forEach(el => el.classList.remove('actief'));
     document.getElementById('filter-doorgegeven')?.classList.add('actief');
+    // Activeer breed-modus zodat de tabel meer ruimte krijgt
+    document.getElementById('overzicht-screen')?.classList.add('breed');
 
     // Verberg actuele lijst
     const gevenContainer = document.getElementById('geven-container');
@@ -2213,9 +2218,20 @@
         </div>
       </div>
       <style>
+        #doorgegeven-container { max-width: none; width: 100%; }
         #doorgegeven-container table tbody tr { border-bottom: 1px solid var(--rand); }
         #doorgegeven-container table tbody tr:last-child { border-bottom: none; }
-        #doorgegeven-container table tbody td { padding: 10px 8px; vertical-align: middle; }
+        #doorgegeven-container table tbody td { padding: 10px 8px; vertical-align: middle; white-space: nowrap; }
+        #doorgegeven-container table tbody td:nth-child(3) {
+          white-space: normal;
+          min-width: 180px;
+          max-width: 280px;
+        }
+        #doorgegeven-container table { min-width: 900px; }
+        @media (max-width: 768px) {
+          #doorgegeven-container table { font-size: 12px; }
+          #doorgegeven-container table tbody td { padding: 8px 6px; }
+        }
       </style>
     `;
   }
@@ -4695,9 +4711,20 @@
         </div>
       </div>
       <style>
+        #ontvangen-leads-container { max-width: none; width: 100%; }
         #ontvangen-leads-container table tbody tr { border-bottom: 1px solid var(--rand); }
         #ontvangen-leads-container table tbody tr:last-child { border-bottom: none; }
-        #ontvangen-leads-container table tbody td { padding: 10px 8px; vertical-align: middle; }
+        #ontvangen-leads-container table tbody td { padding: 10px 8px; vertical-align: middle; white-space: nowrap; }
+        #ontvangen-leads-container table tbody td:nth-child(3) {
+          white-space: normal;
+          min-width: 180px;
+          max-width: 280px;
+        }
+        #ontvangen-leads-container table { min-width: 900px; }
+        @media (max-width: 768px) {
+          #ontvangen-leads-container table { font-size: 12px; }
+          #ontvangen-leads-container table tbody td { padding: 8px 6px; }
+        }
       </style>
     `;
   }
