@@ -559,6 +559,83 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ leads }) };
     }
 
+    // ── DOORGEGEVEN LEADS OPHALEN (voor "gevende kant" dashboard) ───
+    // Geeft alle bezichtigingen van deze makelaar die zijn doorgegeven aan
+    // de pool, samen met het bijbehorende bellijst_item (= status bij
+    // ontvanger). Optionele filters: van/tot (datum), lead_status, ontvanger_id.
+    if (action === 'get_doorgegeven_leads') {
+      const { makelaar_email, makelaar_naam, van, tot, lead_status, ontvanger_id } = data;
+
+      // 1. Resolve gever-id
+      let geverId = null;
+      if (makelaar_email) {
+        const u = await sbGet(`gebruikers?select=id,naam&email=eq.${encodeURIComponent(makelaar_email.toLowerCase())}`);
+        if (u[0]) geverId = u[0].id;
+      }
+      if (!geverId && makelaar_naam) {
+        const u = await sbGet(`gebruikers?select=id,naam&naam=eq.${encodeURIComponent(makelaar_naam)}`);
+        if (u[0]) geverId = u[0].id;
+      }
+      if (!geverId) {
+        return { statusCode: 200, headers, body: JSON.stringify({ doorgegeven: [], info: 'gebruiker niet gevonden' }) };
+      }
+
+      // 2. Haal bezichtigingen op die deze makelaar heeft doorgegeven aan de pool
+      let bezPath = `bezichtigingen?select=*&gevende_makelaar_id=eq.${geverId}&actie_status=eq.pool` +
+        `&order=datum_tijd.desc&limit=500`;
+      if (van) bezPath += `&datum_tijd=gte.${van}`;
+      if (tot) bezPath += `&datum_tijd=lte.${tot}T23:59:59`;
+      const bezichtigingen = await sbGet(bezPath);
+
+      if (bezichtigingen.length === 0) {
+        return { statusCode: 200, headers, body: JSON.stringify({ doorgegeven: [] }) };
+      }
+
+      // 3. Haal alle bijbehorende bellijst_items op in één query (via in.())
+      const bezIds = bezichtigingen.map(b => b.id).join(',');
+      let belPath = `bellijst_items?select=*&bezichtiging_id=in.(${bezIds})&bron=eq.pool`;
+      if (lead_status) belPath += `&lead_status=eq.${encodeURIComponent(lead_status)}`;
+      if (ontvanger_id) belPath += `&eigenaar_id=eq.${ontvanger_id}`;
+      const bellijstItems = await sbGet(belPath);
+
+      // 4. Haal namen van alle ontvangers op in één query
+      const ontvangerIds = [...new Set(bellijstItems.map(i => i.eigenaar_id).filter(Boolean))];
+      let gebruikersMap = {};
+      if (ontvangerIds.length > 0) {
+        const gebruikers = await sbGet(`gebruikers?select=id,naam,email&id=in.(${ontvangerIds.join(',')})`);
+        gebruikersMap = Object.fromEntries(gebruikers.map(g => [g.id, g]));
+      }
+
+      // 5. Combineer: per bezichtiging het bijbehorende bellijst_item + ontvanger-naam
+      const itemMap = Object.fromEntries(bellijstItems.map(i => [i.bezichtiging_id, i]));
+      const doorgegeven = bezichtigingen
+        .map(b => {
+          const item = itemMap[b.id];
+          if (!item) return null;  // geen bellijst_item? Skip (filter on lead_status/ontvanger_id liet 'm vallen)
+          const ontvanger = gebruikersMap[item.eigenaar_id] || null;
+          return {
+            bezichtiging_id:    b.id,
+            bellijst_item_id:   item.id,
+            datum_bezichtiging: b.datum_tijd,
+            doorgegeven_op:     item.toegevoegd_op,
+            naam:               b.bezichtiger_naam || '',
+            adres:              b.adres || '',
+            telefoon:           b.bezichtiger_telefoon || '',
+            email:              b.bezichtiger_email || '',
+            ontvanger_id:       item.eigenaar_id,
+            ontvanger_naam:     ontvanger?.naam || '(onbekend)',
+            ontvanger_email:    ontvanger?.email || '',
+            bel_status:         item.bel_status || 'nieuw',
+            lead_status:        item.lead_status || null,
+            cloze_id:           item.cloze_id || null,
+            belpogingen:        item.belpogingen || 0,
+          };
+        })
+        .filter(Boolean);
+
+      return { statusCode: 200, headers, body: JSON.stringify({ doorgegeven }) };
+    }
+
     // ── BELLIJST STATUS UPDATEN ──────────────────────────────────────
     // ── UPDATE BEL-STATUS (resultaat van een telefoongesprek) ────────
     // Frontend stuurt: { item_id, status } waarbij status één van de oude
