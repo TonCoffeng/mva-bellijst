@@ -4412,10 +4412,18 @@
     const lead = leadsData.find(l => l.id === leadId);
     if (!lead) return;
 
-    // Voor Hot/Warm/Afspraak/Deal: eerst Aankoop/Verkoop kiezen, dan Cloze-flow
-    const TRIGGERS_CLOZE = ['Hot', 'Warm', 'Afspraak', 'Deal'];
+    // Bij 'Lost': Cloze niet aanraken, alleen Supabase lead_status updaten
+    const LOST = nieuweStatus === 'Lost';
+
+    // Bij Hot/Warm/Afspraak/Deal:
+    //   - Eerste keer (geen cloze_id) → vraag Aankoop/Verkoop, maak Cloze klant aan
+    //   - Volgende keer (al cloze_id) → SKIP modal, schuif alleen Cloze stage door
+    const CLOZE_STAGE_UPDATES = ['Hot', 'Warm', 'Afspraak', 'Deal'];
+    const moetClozeKlantAanmaken = CLOZE_STAGE_UPDATES.includes(nieuweStatus) && !lead.cloze_id;
+    const moetAlleenStageBijwerken = CLOZE_STAGE_UPDATES.includes(nieuweStatus) && lead.cloze_id;
+
     let aankoopOfVerkoop = null;
-    if (TRIGGERS_CLOZE.includes(nieuweStatus)) {
+    if (moetClozeKlantAanmaken) {
       aankoopOfVerkoop = await kiesAankoopOfVerkoop(lead, nieuweStatus);
       if (!aankoopOfVerkoop) return;  // gebruiker heeft geannuleerd
     }
@@ -4438,15 +4446,22 @@
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error || 'Update mislukt');
 
-      // 2. Indien Hot/Warm/Afspraak/Deal: klant in Cloze aanmaken/updaten
-      if (aankoopOfVerkoop) {
-        // Niet awaiten — Cloze-flow loopt op de achtergrond, falen daar mag de
-        // lead-status update niet omgooien (die is al geslaagd).
+      // 2a. Eerste keer: Cloze klant aanmaken/zoeken (achter de schermen)
+      if (moetClozeKlantAanmaken) {
         clozeKlantFlow(lead, aankoopOfVerkoop, nieuweStatus).catch(e => {
           console.warn('Cloze-flow faalde:', e);
         });
         toonToast(`✅ Status: ${nieuweStatus} — Cloze-klant wordt bijgewerkt…`, 'succes');
-      } else {
+      }
+      // 2b. Vervolgkeer: alleen Cloze stage doorschuiven (geen modal, geen aanmaak)
+      else if (moetAlleenStageBijwerken) {
+        clozeStageUpdate(lead, nieuweStatus).catch(e => {
+          console.warn('Cloze-stage-update faalde:', e);
+        });
+        toonToast(`✅ Status: ${nieuweStatus} — Cloze stage wordt bijgewerkt…`, 'succes');
+      }
+      // 2c. Lost of geen Cloze-link: alleen Supabase
+      else {
         toonToast(`✅ Status: ${nieuweStatus}`, 'succes');
       }
     } catch (err) {
@@ -4454,6 +4469,45 @@
       lead.lead_status = oudeStatus;
       renderLeads();
       toonToast('Status updaten mislukt: ' + err.message, 'fout');
+    }
+  }
+
+  // ── CLOZE STAGE UPDATE (zonder klant aan te maken) ──────────────────
+  // Voor leads die al een cloze_id hebben: schuif alleen de stage door
+  // op basis van de nieuwe lead-status. Geen modal, geen aanmaak.
+  async function clozeStageUpdate(lead, nieuweLeadStatus) {
+    // Stage-mapping bellijst-status → Cloze API stage key
+    // (intern Cloze: 'lead'=Warm, 'future'=Hot, 'current'=In Contract)
+    const STAGE_MAP = {
+      'Warm':     'lead',
+      'Afspraak': 'lead',
+      'Hot':      'future',
+      'Deal':     'current',
+    };
+    const stage = STAGE_MAP[nieuweLeadStatus];
+    if (!stage) return;  // bv. Lost — Cloze niet aanraken
+
+    const payload = {
+      action: 'update_stage',
+      data: {
+        portableId: lead.cloze_id,
+        stage,
+      }
+    };
+    const res = await fetch('/.netlify/functions/cloze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (json.ok || json.errorcode === 0) {
+      const clozeUrl = lead.cloze_id
+        ? `https://www.cloze.com/in/person/${lead.cloze_id}#section=people`
+        : null;
+      const actie = clozeUrl ? { url: clozeUrl, label: 'Open in Cloze →' } : null;
+      toonToast(`📋 Cloze stage bijgewerkt (${nieuweLeadStatus})`, 'succes', actie);
+    } else {
+      toonToast(`Cloze stage updaten faalde: ${json.error || json.message || 'onbekend'}`, 'fout');
     }
   }
 
@@ -4488,6 +4542,15 @@
   // als hij wel bestaat. Gebruikt de nieuwe action 'klant_aanmaken_of_updaten'.
   async function clozeKlantFlow(lead, aankoopOfVerkoop, leadStatus) {
     const segment = aankoopOfVerkoop;  // "Aankoop" of "Verkoop" als string
+    // Stage-mapping bellijst-status → Cloze API stage key
+    // (intern Cloze: 'lead'=Warm, 'future'=Hot, 'current'=In Contract)
+    const STAGE_MAP = {
+      'Warm':     'lead',
+      'Afspraak': 'lead',
+      'Hot':      'future',
+      'Deal':     'current',
+    };
+    const stage = STAGE_MAP[leadStatus] || 'lead';
     const payload = {
       action: 'klant_aanmaken_of_updaten',
       data: {
@@ -4496,7 +4559,7 @@
         telefoon: lead.telefoon,
         adres: lead.adres,
         segment: segment,
-        stage: 'current',  // actieve klant in Cloze
+        stage,
         lead_status: leadStatus,
         makelaar_email: huidigeMakelaar?.email || null,
       }
