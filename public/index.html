@@ -4496,10 +4496,30 @@
   // ── ONTVANGEN PAGINA ──────────────────────────────────────────────────
   // Aparte view die alle leads toont die jij ontvangen hebt vanuit de pool.
   // Gesorteerd op in-pool datum, nieuwste eerst. Geen filters in versie 1.
-  function openOntvangenPagina() {
+  // ── ONTVANGEN LEADS — dashboard voor ontvangende kant ───────────────
+  // Tabel met alle leads die deze makelaar uit de pool heeft ontvangen,
+  // inclusief wie de gever was, bel-status en lead-status.
+  // Filters: datumbereik, lead-status, gever.
+  let ontvangenData = [];
+  let ontvangenFilters = {
+    van: null,
+    tot: null,
+    lead_status: 'alle',
+    gever_id: 'alle',
+  };
+
+  async function openOntvangenPagina() {
     document.getElementById('overzicht-screen').classList.add('hidden');
     document.getElementById('ontvangen-screen').classList.remove('hidden');
-    renderOntvangenLeads();
+
+    const container = document.getElementById('ontvangen-leads-container');
+    if (container) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:40px;color:var(--grijs-tekst)">
+          ⏳ Ontvangen leads laden…
+        </div>`;
+    }
+    await laadEnRenderOntvangen();
   }
   window.openOntvangenPagina = openOntvangenPagina;
 
@@ -4509,84 +4529,181 @@
   }
   window.sluitOntvangenPagina = sluitOntvangenPagina;
 
+  async function laadEnRenderOntvangen() {
+    if (!huidigeMakelaar) return;
+    try {
+      const params = {
+        makelaar_email: huidigeMakelaar.email,
+        makelaar_naam:  huidigeMakelaar.naam,
+      };
+      if (ontvangenFilters.van) params.van = ontvangenFilters.van;
+      if (ontvangenFilters.tot) params.tot = ontvangenFilters.tot;
+      if (ontvangenFilters.lead_status !== 'alle') params.lead_status = ontvangenFilters.lead_status;
+      if (ontvangenFilters.gever_id !== 'alle') params.gever_id = ontvangenFilters.gever_id;
+
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get_ontvangen_leads', data: params })
+      });
+      const json = await res.json();
+      ontvangenData = json.ontvangen || [];
+      renderOntvangenLeads();
+    } catch (e) {
+      console.error('Ontvangen laden faalde:', e);
+      const container = document.getElementById('ontvangen-leads-container');
+      if (container) container.innerHTML = `
+        <div style="background:#fee;border:1px solid #f99;border-radius:8px;padding:14px;color:#900">
+          Ontvangen leads laden faalde: ${e.message}
+        </div>`;
+    }
+  }
+
   function renderOntvangenLeads() {
     const container = document.getElementById('ontvangen-leads-container');
     if (!container) return;
 
-    // Sorteer op in-pool datum (nieuwste eerst); fallback datum_bezichtiging
-    const sorted = [...leadsData].sort((a, b) => {
-      const da = a.datum || a.datum_bezichtiging || '';
-      const db = b.datum || b.datum_bezichtiging || '';
-      return db.localeCompare(da);
-    });
+    // Unieke gevers voor dropdown
+    const uniekeGevers = [...new Map(
+      ontvangenData
+        .filter(d => d.gever_id)
+        .map(d => [d.gever_id, { id: d.gever_id, naam: d.gever_naam }])
+    ).values()];
 
-    if (sorted.length === 0) {
-      container.innerHTML = `<div class="leeg">
-        <div class="leeg-icon">📭</div>
-        <h3>Nog geen ontvangen leads</h3>
-        <p>Je hebt nog geen leads vanuit de pool ontvangen.</p>
-      </div>`;
-      return;
-    }
+    // Default datums: laatste 30 dagen
+    const vandaag = new Date();
+    const dertigDagenGeleden = new Date(vandaag.getTime() - 30*24*60*60*1000);
+    const defVan = ontvangenFilters.van || dertigDagenGeleden.toISOString().split('T')[0];
+    const defTot = ontvangenFilters.tot || vandaag.toISOString().split('T')[0];
 
-    // Subkop met telling
-    const headerHtml = `
-      <div style="font-size:11px;font-weight:600;color:var(--grijs-tekst);letter-spacing:.05em;margin-bottom:10px">
-        ${sorted.length} ${sorted.length === 1 ? 'LEAD' : 'LEADS'} TOTAAL
-      </div>
-    `;
+    // Status chip-mappings (zelfde als gevende kant)
+    const belStatusChips = {
+      nieuw:               { cls: 'chip-wacht',         label: '⏳ Nog niet gebeld' },
+      bereikt:             { cls: 'chip-bereikt',       label: '✅ Bereikt' },
+      niet_bereikbaar:     { cls: 'chip-niet-bereikt',  label: '🚫 Niet bereikbaar' },
+      bel_terug:           { cls: 'chip-bel-terug',     label: '📲 Bel later' },
+      voicemail:           { cls: 'chip-voicemail',     label: '📭 Voicemail' },
+      wellicht_later:      { cls: 'chip-wellicht',      label: '💤 Wellicht later' },
+      niet_geinteresseerd: { cls: 'chip-niet-bereikt',  label: '❌ Niet geïnt.' },
+    };
+    const leadStatusChips = {
+      'Hot':       { cls: 'chip-hot',       label: '🔥 Hot' },
+      'Warm':      { cls: 'chip-warm',      label: '🌡️ Warm' },
+      'Afspraak':  { cls: 'chip-afspraak',  label: '📅 Afspraak' },
+      'Deal':      { cls: 'chip-deal',      label: '✅ Deal' },
+      'Lost':      { cls: 'chip-lost',      label: '❌ Lost' },
+    };
 
-    container.innerHTML = headerHtml + sorted.map(lead => {
-      // Lead-status chip (zelfde mapping als renderLeads) — null als geen status
-      const leadStatusChip = {
-        'Hot':         { cls: 'chip-hot',         label: '🔥 Hot' },
-        'Warm':        { cls: 'chip-warm',        label: '🌡️ Warm' },
-        'Afspraak':    { cls: 'chip-afspraak',    label: '📅 Afspraak' },
-        'Deal':        { cls: 'chip-deal',        label: '✅ Deal' },
-        'Lost':        { cls: 'chip-lost',        label: '❌ Lost' },
-        'Gearchiveerd':{ cls: 'chip-wacht',       label: '📦 Gearchiveerd' },
-      }[lead.lead_status] || null;
+    const fmtDatum = (iso) => {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      const dag = String(d.getDate()).padStart(2,'0');
+      const mnd = String(d.getMonth()+1).padStart(2,'0');
+      const uu = String(d.getHours()).padStart(2,'0');
+      const mm = String(d.getMinutes()).padStart(2,'0');
+      return `${dag}-${mnd} ${uu}:${mm}`;
+    };
 
-      // Bel-status chip
-      const belChip = {
-        'niet_bereikbaar':    { cls: 'chip-urgent', label: 'Niet bereikbaar' },
-        'bereikt_later':      { cls: 'chip-later',  label: 'Bel terug' },
-        'voicemail':          { cls: 'chip-wacht',  label: 'Voicemail' },
-        'wellicht_later':     { cls: 'chip-wacht',  label: 'Wellicht later' },
-        'bereikt_ja':         { cls: 'chip-nieuw',  label: '✅ Bereikt' },
-        'niet_geinteresseerd':{ cls: 'chip-wacht',  label: '❌ Afgerond' },
-      }[lead.status];
+    const geverOpties = uniekeGevers
+      .map(g => `<option value="${g.id}" ${ontvangenFilters.gever_id == g.id ? 'selected' : ''}>${g.naam}</option>`)
+      .join('');
 
-      const safeNaam = (lead.naam || '').replace(/'/g, "\\'");
+    const tableRows = ontvangenData.length === 0
+      ? `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--grijs-tekst)">
+           Geen ontvangen leads gevonden voor deze filters.
+         </td></tr>`
+      : ontvangenData.map(d => {
+          const bel = belStatusChips[d.bel_status] || { cls: 'chip-wacht', label: d.bel_status };
+          const leadChip = d.lead_status ? leadStatusChips[d.lead_status] : null;
+          return `
+            <tr>
+              <td>${fmtDatum(d.ontvangen_op)}</td>
+              <td><strong>${d.naam || '(geen naam)'}</strong></td>
+              <td style="color:var(--grijs-tekst);font-size:12px">${d.adres || '—'}</td>
+              <td>${d.gever_naam}</td>
+              <td><span class="lead-chip ${bel.cls}" style="font-size:11px">${bel.label}</span></td>
+              <td>${leadChip ? `<span class="lead-chip ${leadChip.cls}" style="font-size:11px">${leadChip.label}</span>` : '<span style="color:var(--grijs-tekst);font-size:12px">—</span>'}</td>
+              <td>${d.cloze_id ? `<a class="btn-cloze" href="https://www.cloze.com/in/person/${d.cloze_id}#section=people" target="_blank" rel="noopener" style="padding:6px 10px;font-size:12px">🔗</a>` : ''}</td>
+            </tr>`;
+        }).join('');
 
-      return `
-        <div class="lead-card nieuw" style="margin-bottom:10px" onclick="openModal('${lead.id}')">
-          <div class="lead-naam">${lead.naam}</div>
-          ${lead.adres ? `<div class="lead-adres">📍 ${lead.adres}</div>` : ''}
-          ${lead.bij_wie ? `<div class="lead-adres" style="font-size:12px;margin-top:2px;color:var(--grijs-tekst)">📓 Bezichtigd bij: ${lead.bij_wie}</div>` : ''}
-
-          <div class="lead-meta" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
-            ${leadStatusChip ? `<span class="lead-chip ${leadStatusChip.cls}">${leadStatusChip.label}</span>` : ''}
-            ${belChip ? `<span class="lead-chip ${belChip.cls}">${belChip.label}</span>` : ''}
-            ${lead.belpogingen > 0 ? `<span class="lead-chip chip-belpogingen">📞 ${lead.belpogingen}× geprobeerd</span>` : ''}
-          </div>
-
-          <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;flex-wrap:wrap;color:var(--grijs-tekst)">
-            ${lead.datum ? `<span>📥 In pool: <strong style="color:var(--navy)">${lead.datum}</strong></span>` : ''}
-            ${lead.datum_bezichtiging ? `<span>🏠 Bezichtiging: <strong style="color:var(--navy)">${lead.datum_bezichtiging}</strong></span>` : ''}
-          </div>
-
-          <div style="display:flex;gap:8px;margin-top:6px;font-size:12px;color:var(--grijs-tekst)">
-            ${lead.telefoon ? `<span>📞 ${lead.telefoon}</span>` : ''}
-            ${lead.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">✉️ ${lead.email}</span>` : ''}
-          </div>
-
-          ${lead.opmerkingen ? `<div style="margin-top:6px;font-size:12px;color:var(--grijs-tekst);font-style:italic">💬 ${lead.opmerkingen}</div>` : ''}
+    container.innerHTML = `
+      <div style="background:#fff;border:1px solid var(--rand);border-radius:14px;padding:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+          <div style="font-weight:700;color:var(--navy);font-size:18px">📥 Ontvangen leads</div>
         </div>
-      `;
-    }).join('');
+
+        <!-- Filters -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding:12px;background:var(--licht);border-radius:10px">
+          <div style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+            <label style="color:var(--grijs-tekst);font-weight:600">Van</label>
+            <input type="date" id="ontvangen-van" value="${defVan}"
+              onchange="ontvangenFilters.van=this.value;laadEnRenderOntvangen()"
+              style="padding:6px 10px;border:1px solid var(--rand);border-radius:6px;font-size:13px">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+            <label style="color:var(--grijs-tekst);font-weight:600">Tot</label>
+            <input type="date" id="ontvangen-tot" value="${defTot}"
+              onchange="ontvangenFilters.tot=this.value;laadEnRenderOntvangen()"
+              style="padding:6px 10px;border:1px solid var(--rand);border-radius:6px;font-size:13px">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+            <label style="color:var(--grijs-tekst);font-weight:600">Lead-status</label>
+            <select id="ontvangen-lead-status"
+              onchange="ontvangenFilters.lead_status=this.value;laadEnRenderOntvangen()"
+              style="padding:6px 10px;border:1px solid var(--rand);border-radius:6px;font-size:13px">
+              <option value="alle" ${ontvangenFilters.lead_status === 'alle' ? 'selected' : ''}>Alle statussen</option>
+              <option value="Hot" ${ontvangenFilters.lead_status === 'Hot' ? 'selected' : ''}>🔥 Hot</option>
+              <option value="Warm" ${ontvangenFilters.lead_status === 'Warm' ? 'selected' : ''}>🌡️ Warm</option>
+              <option value="Afspraak" ${ontvangenFilters.lead_status === 'Afspraak' ? 'selected' : ''}>📅 Afspraak</option>
+              <option value="Deal" ${ontvangenFilters.lead_status === 'Deal' ? 'selected' : ''}>✅ Deal</option>
+              <option value="Lost" ${ontvangenFilters.lead_status === 'Lost' ? 'selected' : ''}>❌ Lost</option>
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+            <label style="color:var(--grijs-tekst);font-weight:600">Doorgegeven door</label>
+            <select id="ontvangen-gever"
+              onchange="ontvangenFilters.gever_id=this.value;laadEnRenderOntvangen()"
+              style="padding:6px 10px;border:1px solid var(--rand);border-radius:6px;font-size:13px;min-width:160px">
+              <option value="alle">Alle gevers</option>
+              ${geverOpties}
+            </select>
+          </div>
+        </div>
+
+        <!-- Aantal indicator -->
+        <div style="color:var(--grijs-tekst);font-size:13px;margin-bottom:10px">
+          ${ontvangenData.length} ${ontvangenData.length === 1 ? 'lead' : 'leads'} gevonden
+        </div>
+
+        <!-- Tabel -->
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead>
+              <tr style="background:var(--licht);text-align:left">
+                <th style="padding:10px 8px;font-weight:600;color:var(--navy)">Ontvangen</th>
+                <th style="padding:10px 8px;font-weight:600;color:var(--navy)">Naam</th>
+                <th style="padding:10px 8px;font-weight:600;color:var(--navy)">Adres</th>
+                <th style="padding:10px 8px;font-weight:600;color:var(--navy)">Doorgegeven door</th>
+                <th style="padding:10px 8px;font-weight:600;color:var(--navy)">Bel-status</th>
+                <th style="padding:10px 8px;font-weight:600;color:var(--navy)">Lead-status</th>
+                <th style="padding:10px 8px;font-weight:600;color:var(--navy)"></th>
+              </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </div>
+      </div>
+      <style>
+        #ontvangen-leads-container table tbody tr { border-bottom: 1px solid var(--rand); }
+        #ontvangen-leads-container table tbody tr:last-child { border-bottom: none; }
+        #ontvangen-leads-container table tbody td { padding: 10px 8px; vertical-align: middle; }
+      </style>
+    `;
   }
   window.renderOntvangenLeads = renderOntvangenLeads;
+  window.ontvangenFilters = ontvangenFilters;
+  window.laadEnRenderOntvangen = laadEnRenderOntvangen;
 
   // ── LEAD STATUS WIJZIGEN (Hot / Warm / Afspraak / Deal / Lost) ──────
   async function zetLeadStatus(leadId, nieuweStatus) {
