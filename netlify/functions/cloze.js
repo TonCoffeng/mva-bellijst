@@ -546,6 +546,28 @@ exports.handler = async (event) => {
     // Stap 2a: bestaat → people/update met segment+stage+assignee
     // Stap 2b: bestaat niet → people/create met alle data
     // Returns: { ok, actie: "aangemaakt"|"bijgewerkt", portableId, cloze_url }
+    // ── DIAGNOSE — toon beschikbare stages voor people contacts ─────
+    if (action === "lijst_stages") {
+      const tests = [
+        'https://api.cloze.com/v1/stages',
+        'https://api.cloze.com/v1/people/stages',
+        'https://api.cloze.com/v1/contact/stages',
+        'https://api.cloze.com/v1/stages/list',
+        'https://api.cloze.com/v1/people/contact_stages',
+      ];
+      const results = {};
+      for (const url of tests) {
+        try {
+          const r = await fetch(`${url}?api_key=${CLOZE_API_KEY}&user_email=${encodeURIComponent(CLOZE_USER)}`);
+          const j = await r.json();
+          results[url] = { status: r.status, body: j };
+        } catch (e) {
+          results[url] = { error: e.message };
+        }
+      }
+      return { statusCode: 200, headers, body: JSON.stringify(results, null, 2) };
+    }
+
     // ── DIAGNOSE — toon beschikbare segments en stages voor dit account ─
     // Cloze accepteert geen vrije strings als segment; alleen vooraf
     // gedefinieerde keys. Deze action probeert verschillende endpoints
