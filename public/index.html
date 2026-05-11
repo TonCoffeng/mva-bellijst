@@ -3228,24 +3228,25 @@
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:flex-end;justify-content:center';
 
     // Bouw bestemming-selector: pool / zelf / specifieke makelaar dropdown
+    // VERPLICHT: gebruiker moet een keuze maken (geen default checked).
     // De huidige makelaar wordt later uitgefilterd uit de dropdown.
     const bestemmingHtml = `
-      <div style="padding:12px 16px;background:#fff;border-bottom:1px solid var(--grijs-mid)">
-        <div style="font-size:11px;font-weight:700;color:var(--grijs-tekst);letter-spacing:.05em;margin-bottom:8px">BESTEMMING</div>
+      <div style="padding:14px 16px;background:#fff5e6;border-bottom:2px solid var(--oranje);position:sticky;top:0;z-index:5">
+        <div style="font-size:11px;font-weight:700;color:var(--oranje);letter-spacing:.05em;margin-bottom:8px">⚠️ KIES BESTEMMING (verplicht)</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <label class="bulk-bestemming-optie" style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:2px solid var(--oranje);border-radius:10px;background:#fff5e6;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy)">
-            <input type="radio" name="bulk-bestemming" value="pool" checked
+          <label class="bulk-bestemming-optie" style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:2px solid var(--grijs-mid);border-radius:10px;background:#fff;cursor:pointer;font-size:13px;font-weight:500;color:var(--navy)">
+            <input type="radio" name="bulk-bestemming" value="pool"
               onchange="bulkBestemmingChange(this)"
               style="accent-color:var(--oranje);cursor:pointer">
             📤 Leadpool
           </label>
-          <label class="bulk-bestemming-optie" style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:2px solid var(--grijs-mid);border-radius:10px;cursor:pointer;font-size:13px;font-weight:500;color:var(--navy)">
+          <label class="bulk-bestemming-optie" style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:2px solid var(--grijs-mid);border-radius:10px;background:#fff;cursor:pointer;font-size:13px;font-weight:500;color:var(--navy)">
             <input type="radio" name="bulk-bestemming" value="zelf"
               onchange="bulkBestemmingChange(this)"
               style="accent-color:var(--oranje);cursor:pointer">
             ☎️ Zelf bellen
           </label>
-          <label class="bulk-bestemming-optie" style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:2px solid var(--grijs-mid);border-radius:10px;cursor:pointer;font-size:13px;font-weight:500;color:var(--navy)">
+          <label class="bulk-bestemming-optie" style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:2px solid var(--grijs-mid);border-radius:10px;background:#fff;cursor:pointer;font-size:13px;font-weight:500;color:var(--navy)">
             <input type="radio" name="bulk-bestemming" value="makelaar"
               onchange="bulkBestemmingChange(this)"
               style="accent-color:var(--oranje);cursor:pointer">
@@ -3253,7 +3254,7 @@
           </label>
           <select id="bulk-makelaar-select" disabled
             onchange="bulkMakelaarChange(this)"
-            style="padding:8px 10px;border:1px solid var(--grijs-mid);border-radius:8px;font-size:13px;flex:1;min-width:160px">
+            style="padding:8px 10px;border:1px solid var(--grijs-mid);border-radius:8px;font-size:13px;flex:1;min-width:160px;background:#fff">
             <option value="">— Kies makelaar —</option>
           </select>
         </div>
@@ -3348,9 +3349,23 @@
     const modal = document.getElementById('bulk-modal');
     if (!modal) return;
 
-    // Lees gekozen bestemming
+    // Lees gekozen bestemming — VERPLICHT, geen default
     const bestemmingRadio = modal.querySelector('input[name="bulk-bestemming"]:checked');
-    const bestemming = bestemmingRadio?.value || 'pool';
+    if (!bestemmingRadio) {
+      toonToast('⚠️ Maak eerst een keuze in de bestemming bovenaan (Leadpool / Zelf bellen / Toewijzen)', 'fout');
+      // Scroll modal naar boven zodat de keuze-balk in beeld komt
+      const modalScroll = modal.querySelector('div[style*="overflow-y:auto"]');
+      if (modalScroll) modalScroll.scrollTop = 0;
+      // Tijdelijke knipper-highlight op de keuze-balk
+      const stickyHeader = modal.querySelector('div[style*="position:sticky"]');
+      if (stickyHeader) {
+        stickyHeader.style.transition = 'background 0.2s';
+        stickyHeader.style.background = '#fed7aa';
+        setTimeout(() => { stickyHeader.style.background = '#fff5e6'; }, 600);
+      }
+      return;
+    }
+    const bestemming = bestemmingRadio.value;
     const makelaarEmail = document.getElementById('bulk-makelaar-select')?.value || '';
     if (bestemming === 'makelaar' && !makelaarEmail) {
       toonToast('Kies eerst een makelaar in de dropdown.', 'fout');
