@@ -3226,12 +3226,46 @@
       : '';
     modal.id = 'bulk-modal';
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:flex-end;justify-content:center';
+
+    // Bouw bestemming-selector: pool / zelf / specifieke makelaar dropdown
+    // De huidige makelaar wordt later uitgefilterd uit de dropdown.
+    const bestemmingHtml = `
+      <div style="padding:12px 16px;background:#fff;border-bottom:1px solid var(--grijs-mid)">
+        <div style="font-size:11px;font-weight:700;color:var(--grijs-tekst);letter-spacing:.05em;margin-bottom:8px">BESTEMMING</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <label class="bulk-bestemming-optie" style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:2px solid var(--oranje);border-radius:10px;background:#fff5e6;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy)">
+            <input type="radio" name="bulk-bestemming" value="pool" checked
+              onchange="bulkBestemmingChange(this)"
+              style="accent-color:var(--oranje);cursor:pointer">
+            📤 Leadpool
+          </label>
+          <label class="bulk-bestemming-optie" style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:2px solid var(--grijs-mid);border-radius:10px;cursor:pointer;font-size:13px;font-weight:500;color:var(--navy)">
+            <input type="radio" name="bulk-bestemming" value="zelf"
+              onchange="bulkBestemmingChange(this)"
+              style="accent-color:var(--oranje);cursor:pointer">
+            ☎️ Zelf bellen
+          </label>
+          <label class="bulk-bestemming-optie" style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:2px solid var(--grijs-mid);border-radius:10px;cursor:pointer;font-size:13px;font-weight:500;color:var(--navy)">
+            <input type="radio" name="bulk-bestemming" value="makelaar"
+              onchange="bulkBestemmingChange(this)"
+              style="accent-color:var(--oranje);cursor:pointer">
+            👤 Toewijzen aan…
+          </label>
+          <select id="bulk-makelaar-select" disabled
+            onchange="bulkMakelaarChange(this)"
+            style="padding:8px 10px;border:1px solid var(--grijs-mid);border-radius:8px;font-size:13px;flex:1;min-width:160px">
+            <option value="">— Kies makelaar —</option>
+          </select>
+        </div>
+      </div>`;
+
     modal.innerHTML = '<div style="background:var(--grijs);width:100%;max-width:600px;max-height:92vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column">'+
       '<div style="padding:16px 20px;background:var(--navy);color:white;border-radius:18px 18px 0 0;display:flex;justify-content:space-between;align-items:center">'+
         '<div><div style="font-size:11px;opacity:0.8;letter-spacing:.05em">BULK DOORZETTEN</div>'+
         '<div style="font-size:16px;font-weight:700">'+items.length+' bezichtiging'+(items.length===1?'':'en')+'</div></div>'+
         '<button onclick="sluitBulkModal()" style="background:none;border:none;color:white;font-size:22px;cursor:pointer;padding:4px 8px">\u2715</button>'+
       '</div>'+
+      bestemmingHtml +
       blokkadeWaarschuwing +
       '<div style="padding:14px 16px 6px;font-size:11px;color:var(--grijs-tekst);line-height:1.4">Kies per bezichtiging de feedback. Leeg laten = overslaan. Druk \u00E9\u00E9n keer op Verstuur alles.</div>'+
       '<div style="flex:1;overflow-y:auto;padding:6px 16px">'+kaartHtml+'</div>'+
@@ -3241,6 +3275,64 @@
       '</div>'+
     '</div>';
     document.body.appendChild(modal);
+
+    // Laad makelaars in dropdown (async, niet blokkerend)
+    laadMakelaarsInBulkDropdown();
+  }
+
+  // Bestemming-selector helpers
+  function bulkBestemmingChange(radio) {
+    // Visuele highlighting van de actieve optie
+    document.querySelectorAll('.bulk-bestemming-optie').forEach(lbl => {
+      const inp = lbl.querySelector('input[type="radio"]');
+      if (inp?.checked) {
+        lbl.style.border = '2px solid var(--oranje)';
+        lbl.style.background = '#fff5e6';
+        lbl.style.fontWeight = '600';
+      } else {
+        lbl.style.border = '2px solid var(--grijs-mid)';
+        lbl.style.background = 'transparent';
+        lbl.style.fontWeight = '500';
+      }
+    });
+    // Dropdown enablen alleen bij "makelaar"
+    const sel = document.getElementById('bulk-makelaar-select');
+    if (sel) {
+      sel.disabled = (radio.value !== 'makelaar');
+      if (radio.value !== 'makelaar') sel.value = '';
+    }
+  }
+  window.bulkBestemmingChange = bulkBestemmingChange;
+
+  function bulkMakelaarChange(sel) {
+    // Selecteer automatisch de "makelaar" radio als gebruiker een makelaar kiest
+    if (sel.value) {
+      const radio = document.querySelector('input[name="bulk-bestemming"][value="makelaar"]');
+      if (radio) { radio.checked = true; bulkBestemmingChange(radio); }
+    }
+  }
+  window.bulkMakelaarChange = bulkMakelaarChange;
+
+  async function laadMakelaarsInBulkDropdown() {
+    const sel = document.getElementById('bulk-makelaar-select');
+    if (!sel) return;
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get_alle_makelaars', data: {} })
+      });
+      const json = await res.json();
+      const makelaars = (json.makelaars || [])
+        // Filter de huidige makelaar uit (kan jezelf niet zijn)
+        .filter(m => m.email?.toLowerCase() !== huidigeMakelaar?.email?.toLowerCase())
+        .sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
+      sel.innerHTML = '<option value="">— Kies makelaar —</option>' +
+        makelaars.map(m => `<option value="${m.email}">${m.naam}</option>`).join('');
+    } catch (e) {
+      console.warn('Makelaars laden faalde:', e);
+      sel.innerHTML = '<option value="">— Laden mislukt —</option>';
+    }
   }
 
   function sluitBulkModal() {
@@ -3255,6 +3347,16 @@
   async function bulkVerstuurAlles() {
     const modal = document.getElementById('bulk-modal');
     if (!modal) return;
+
+    // Lees gekozen bestemming
+    const bestemmingRadio = modal.querySelector('input[name="bulk-bestemming"]:checked');
+    const bestemming = bestemmingRadio?.value || 'pool';
+    const makelaarEmail = document.getElementById('bulk-makelaar-select')?.value || '';
+    if (bestemming === 'makelaar' && !makelaarEmail) {
+      toonToast('Kies eerst een makelaar in de dropdown.', 'fout');
+      return;
+    }
+
     const kaarten = modal.querySelectorAll('.bulk-kaart');
     const verstuurBtn = document.getElementById('bulk-verstuur-btn');
     const taken = [];
@@ -3283,18 +3385,39 @@
       statusEl.style.color = 'var(--grijs-tekst)';
       const feedbackTekst = t.feedback.map(function(k){return labels[k];}).join(', ') + (t.opmerking ? ' \u2014 \u2014 ' + t.opmerking : '');
       try {
+        // 1. Feedback opslaan
         await fetch('/.netlify/functions/monday', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'sla_feedback_op', data: { item_id: t.id, feedback: t.feedback.join(','), feedback_tekst: feedbackTekst, opmerking: t.opmerking || '' } })
         });
-        const poolRes = await fetch('/.netlify/functions/monday', {
+
+        // 2. Doorzetten op basis van gekozen bestemming
+        let doorzetAction, doorzetData;
+        if (bestemming === 'zelf') {
+          doorzetAction = 'push_naar_eigen_bellijst';
+          doorzetData = { item_id: t.id, makelaar_naam: huidigeMakelaar.naam };
+        } else if (bestemming === 'makelaar') {
+          // Direct toewijzen aan specifieke makelaar (bypass Round Robin)
+          doorzetAction = 'push_naar_pool';
+          doorzetData = {
+            item_id: t.id,
+            makelaar_naam: huidigeMakelaar.naam,
+            direct_naar_email: makelaarEmail,
+          };
+        } else {
+          // Default: pool (Round Robin)
+          doorzetAction = 'push_naar_pool';
+          doorzetData = { item_id: t.id, makelaar_naam: huidigeMakelaar.naam };
+        }
+
+        const doorzetRes = await fetch('/.netlify/functions/monday', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'push_naar_pool', data: { item_id: t.id, makelaar_naam: huidigeMakelaar.naam } })
+          body: JSON.stringify({ action: doorzetAction, data: doorzetData })
         });
-        const poolJson = await poolRes.json();
-        if (poolJson.error) throw new Error(poolJson.error);
+        const doorzetJson = await doorzetRes.json();
+        if (doorzetJson.error) throw new Error(doorzetJson.error);
         statusEl.textContent = '\u2705 Verstuurd';
         statusEl.style.color = 'var(--groen)';
         gelukt++;
