@@ -636,6 +636,91 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ doorgegeven }) };
     }
 
+    // ── ONTVANGEN LEADS OPHALEN (voor "ontvangende kant" dashboard) ─
+    // Geeft alle leads die deze makelaar uit de pool heeft ontvangen,
+    // samen met de naam van de oorspronkelijke gever.
+    // Optionele filters: van/tot (datum), lead_status, gever_id.
+    if (action === 'get_ontvangen_leads') {
+      const { makelaar_email, makelaar_naam, van, tot, lead_status, gever_id } = data;
+
+      // 1. Resolve ontvanger-id
+      let ontvangerId = null;
+      if (makelaar_email) {
+        const u = await sbGet(`gebruikers?select=id,naam&email=eq.${encodeURIComponent(makelaar_email.toLowerCase())}`);
+        if (u[0]) ontvangerId = u[0].id;
+      }
+      if (!ontvangerId && makelaar_naam) {
+        const u = await sbGet(`gebruikers?select=id,naam&naam=eq.${encodeURIComponent(makelaar_naam)}`);
+        if (u[0]) ontvangerId = u[0].id;
+      }
+      if (!ontvangerId) {
+        return { statusCode: 200, headers, body: JSON.stringify({ ontvangen: [], info: 'gebruiker niet gevonden' }) };
+      }
+
+      // 2. Haal bellijst_items op die deze makelaar uit de pool heeft ontvangen
+      let belPath = `bellijst_items?select=*&eigenaar_id=eq.${ontvangerId}&bron=eq.pool` +
+        `&order=toegevoegd_op.desc&limit=500`;
+      if (van) belPath += `&toegevoegd_op=gte.${van}`;
+      if (tot) belPath += `&toegevoegd_op=lte.${tot}T23:59:59`;
+      if (lead_status) belPath += `&lead_status=eq.${encodeURIComponent(lead_status)}`;
+      const bellijstItems = await sbGet(belPath);
+
+      // Filter Gearchiveerd weg
+      const actiefItems = bellijstItems.filter(i => i.lead_status !== 'Gearchiveerd');
+
+      if (actiefItems.length === 0) {
+        return { statusCode: 200, headers, body: JSON.stringify({ ontvangen: [] }) };
+      }
+
+      // 3. Haal bijbehorende bezichtigingen op (om de gever te vinden)
+      const bezIds = actiefItems.map(i => i.bezichtiging_id).filter(Boolean).join(',');
+      let bezichtigingen = [];
+      if (bezIds) {
+        let bezPath = `bezichtigingen?select=id,gevende_makelaar_id&id=in.(${bezIds})`;
+        if (gever_id) bezPath += `&gevende_makelaar_id=eq.${gever_id}`;
+        bezichtigingen = await sbGet(bezPath);
+      }
+      const bezMap = Object.fromEntries(bezichtigingen.map(b => [b.id, b]));
+
+      // 4. Filter items op gever_id indien opgegeven
+      const itemsGefilterd = gever_id
+        ? actiefItems.filter(i => bezMap[i.bezichtiging_id])
+        : actiefItems;
+
+      // 5. Haal namen van alle gevers op in één query
+      const geverIds = [...new Set(bezichtigingen.map(b => b.gevende_makelaar_id).filter(Boolean))];
+      let gebruikersMap = {};
+      if (geverIds.length > 0) {
+        const gebruikers = await sbGet(`gebruikers?select=id,naam,email&id=in.(${geverIds.join(',')})`);
+        gebruikersMap = Object.fromEntries(gebruikers.map(g => [g.id, g]));
+      }
+
+      // 6. Combineer
+      const ontvangen = itemsGefilterd.map(item => {
+        const bez = bezMap[item.bezichtiging_id];
+        const gever = bez ? gebruikersMap[bez.gevende_makelaar_id] : null;
+        return {
+          bellijst_item_id:   item.id,
+          bezichtiging_id:    item.bezichtiging_id,
+          ontvangen_op:       item.toegevoegd_op,
+          datum_bezichtiging: item.datum_tijd,
+          naam:               item.bezichtiger_naam || '',
+          adres:              item.adres || '',
+          telefoon:           item.bezichtiger_telefoon || '',
+          email:              item.bezichtiger_email || '',
+          gever_id:           bez?.gevende_makelaar_id || null,
+          gever_naam:         gever?.naam || '(onbekend)',
+          gever_email:        gever?.email || '',
+          bel_status:         item.bel_status || 'nieuw',
+          lead_status:        item.lead_status || null,
+          cloze_id:           item.cloze_id || null,
+          belpogingen:        item.belpogingen || 0,
+        };
+      });
+
+      return { statusCode: 200, headers, body: JSON.stringify({ ontvangen }) };
+    }
+
     // ── BELLIJST STATUS UPDATEN ──────────────────────────────────────
     // ── UPDATE BEL-STATUS (resultaat van een telefoongesprek) ────────
     // Frontend stuurt: { item_id, status } waarbij status één van de oude
