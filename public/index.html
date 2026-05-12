@@ -1492,7 +1492,7 @@
     </div>
 
     <button class="btn-opslaan" id="btn-opslaan" disabled onclick="slaOpEnSluit()">
-      Opslaan in Cloze →
+      Opslaan
     </button>
     <button class="btn-annuleer" onclick="sluitModalDirect()">Annuleren</button>
   </div>
@@ -5232,13 +5232,13 @@
 
       const bericht = gekozenStatus === 'bereikt_ja' && huidigeLead.bij_wie
         ? `✅ Opgeslagen — bedankmail verstuurd naar ${huidigeLead.bij_wie}`
-        : '✅ Opgeslagen in Cloze';
+        : '✅ Opgeslagen';
       toonToast(bericht, 'succes');
 
     } catch (err) {
       toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
       btn.disabled = false;
-      btn.textContent = 'Opslaan in Cloze →';
+      btn.textContent = 'Opslaan';
     }
   }
 
