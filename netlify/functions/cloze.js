@@ -799,6 +799,135 @@ exports.handler = async (event) => {
       };
     }
 
+    // ── REQUEST OVERNAME ──────────────────────────────────────────────
+    // Verstuurt een vriendelijke email aan Ton met het verzoek om een
+    // Cloze-klant over te zetten van makelaar A naar makelaar B.
+    // Ton is de enige die klanten kan omzetten (afgesproken 12 mei 2026).
+    //
+    // Aanroep: { action: "request_overname", data: {
+    //   verzoeker_naam,           // bv "Pelle Freijsen"
+    //   verzoeker_email,          // bv "pellefreijsen@makelaarsvan.nl"
+    //   klant_naam,               // bv "Devika Blok"
+    //   klant_email,              // bv "devikablok@gmail.com"
+    //   klant_telefoon,           // optioneel
+    //   huidige_eigenaar_naam,    // bv "Maurits van Leeuwen"
+    //   huidige_eigenaar_email,   // optioneel
+    //   cloze_id,                 // portableId van de klant in Cloze
+    //   adres,                    // bv "Boterdiepstraat 8 H"
+    //   datum_bezichtiging,       // bv "2026-05-12"
+    // }}
+    if (action === "request_overname") {
+      const {
+        verzoeker_naam,
+        verzoeker_email,
+        klant_naam,
+        klant_email,
+        klant_telefoon,
+        huidige_eigenaar_naam,
+        huidige_eigenaar_email,
+        cloze_id,
+        adres,
+        datum_bezichtiging,
+      } = data;
+
+      const RESEND_API_KEY = process.env.RESEND_API_KEY;
+      if (!RESEND_API_KEY) {
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ ok: false, error: 'RESEND_API_KEY niet ingesteld in Netlify env vars' }),
+        };
+      }
+
+      const TON_EMAIL = 'toncoffeng@makelaarsvan.nl';
+      const clozeUrl = cloze_id
+        ? `https://www.cloze.com/in/person/${cloze_id}#section=people`
+        : null;
+
+      const subject = `Overnameverzoek: ${klant_naam || 'klant'}`;
+      const htmlBody = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a2540;">
+          <p style="margin: 0 0 12px;">Hoi Ton,</p>
+          <p style="margin: 0 0 12px;">
+            <strong>${verzoeker_naam || 'Een makelaar'}</strong> zou graag de Cloze-klant
+            <strong>${klant_naam || '(onbekend)'}</strong> overnemen van
+            <strong>${huidige_eigenaar_naam || '(onbekend)'}</strong>.
+          </p>
+          <div style="background:#f5f5f3; border-radius:8px; padding:14px 18px; margin:0 0 16px; font-size:14px; line-height:1.6;">
+            <div><strong>Klant:</strong> ${klant_naam || '—'}</div>
+            ${klant_email    ? `<div><strong>Email:</strong> ${klant_email}</div>` : ''}
+            ${klant_telefoon ? `<div><strong>Telefoon:</strong> ${klant_telefoon}</div>` : ''}
+            <div><strong>Huidige eigenaar:</strong> ${huidige_eigenaar_naam || '—'}${huidige_eigenaar_email ? ` (${huidige_eigenaar_email})` : ''}</div>
+            <div><strong>Verzoek door:</strong> ${verzoeker_naam || '—'}${verzoeker_email ? ` (${verzoeker_email})` : ''}</div>
+            ${adres                ? `<div><strong>Object:</strong> ${adres}</div>` : ''}
+            ${datum_bezichtiging   ? `<div><strong>Bezichtiging:</strong> ${datum_bezichtiging}</div>` : ''}
+          </div>
+          ${clozeUrl ? `
+            <p style="margin: 0 0 12px;">
+              <a href="${clozeUrl}" style="display:inline-block; background:#1a2540; color:#fff; padding:10px 18px; border-radius:6px; text-decoration:none; font-weight:500;">
+                Open klant in Cloze
+              </a>
+            </p>
+          ` : ''}
+          <p style="margin: 16px 0 4px; color:#666;">Kun je hier even naar kijken?</p>
+          <p style="margin: 0; color:#666;">Groet,<br>MVA Bellijst</p>
+          <p style="margin: 24px 0 0; font-size:11px; color:#999; border-top:1px solid #e5e5e5; padding-top:10px;">
+            Automatisch verzonden via mvaleadpool.netlify.app
+          </p>
+        </div>
+      `;
+
+      const plainText = [
+        `Hoi Ton,`,
+        ``,
+        `${verzoeker_naam || 'Een makelaar'} zou graag de Cloze-klant ${klant_naam || '(onbekend)'} overnemen van ${huidige_eigenaar_naam || '(onbekend)'}.`,
+        ``,
+        `Klant: ${klant_naam || '—'}`,
+        klant_email    ? `Email: ${klant_email}` : null,
+        klant_telefoon ? `Telefoon: ${klant_telefoon}` : null,
+        `Huidige eigenaar: ${huidige_eigenaar_naam || '—'}${huidige_eigenaar_email ? ` (${huidige_eigenaar_email})` : ''}`,
+        `Verzoek door: ${verzoeker_naam || '—'}${verzoeker_email ? ` (${verzoeker_email})` : ''}`,
+        adres                ? `Object: ${adres}` : null,
+        datum_bezichtiging   ? `Bezichtiging: ${datum_bezichtiging}` : null,
+        ``,
+        clozeUrl ? `Open in Cloze: ${clozeUrl}` : null,
+        ``,
+        `Kun je hier even naar kijken?`,
+        ``,
+        `Groet,`,
+        `MVA Bellijst`,
+      ].filter(Boolean).join('\n');
+
+      const resendRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+        },
+        body: JSON.stringify({
+          from: 'MVA Bellijst <noreply@makelaarsvan.nl>',
+          to: [TON_EMAIL],
+          ...(verzoeker_email ? { reply_to: verzoeker_email } : {}),
+          subject,
+          html: htmlBody,
+          text: plainText,
+        }),
+      });
+
+      const resendJson = await resendRes.json();
+      const okStatus = resendRes.status >= 200 && resendRes.status < 300;
+
+      return {
+        statusCode: okStatus ? 200 : 500,
+        headers,
+        body: JSON.stringify({
+          ok: okStatus,
+          email_id: resendJson?.id || null,
+          error: okStatus ? null : (resendJson?.message || resendJson?.error || 'Verzenden mislukt'),
+        }),
+      };
+    }
+
     return {
       statusCode: 400,
       headers,
