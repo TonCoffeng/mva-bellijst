@@ -1675,7 +1675,10 @@
       };
 
       leadsData = items.map(item => {
-        const rawStatus = (item.status || '').toLowerCase();
+        // bel_status komt direct uit Supabase met de juiste waarden
+        // (bereikt_ja, niet_bereikbaar, voicemail, etc. — zie CHECK constraint).
+        // Fallback op item.status voor legacy/demo data en oude Nederlandse labels.
+        const rawStatus = (item.bel_status || item.status || '').toLowerCase();
         return {
           id: item.id,
           naam: item.naam || item.name || '(geen naam)',
@@ -1686,7 +1689,7 @@
           datum:              item.datum || '',
           datum_bezichtiging: item.datum_bezichtiging || '',
           adres_klant:        item.adres_klant || '',
-          status:             statusMap[rawStatus] ?? '',
+          status:             statusMap[rawStatus] ?? rawStatus,
           warme_lead:         item.warme_lead === 'true' || item.warme_lead === 'v',
           opmerkingen:        item.opmerkingen || '',
           email_makelaar:     item.email_makelaar || '',
@@ -4223,7 +4226,11 @@
     // heeft gekozen (anders verberg je leads die wel die status hebben maar
     // ook al "afgehandeld" zijn op bel-status niveau).
     const expliciteLeadStatusFilter = leadsLeadStatusFilter !== 'alle';
-    if (leadsFilterModus === 'openstaand' && !expliciteLeadStatusFilter) {
+    // Als de gebruiker expliciet een bel-status kiest die normaal weggefilterd
+    // zou worden door Openstaand (bereikt_ja / niet_geinteresseerd), dan moet
+    // het Openstaand-filter wijken — anders zie je nooit iets bij die pil.
+    const expliciteAfgehandeldeBelStatus = ['bereikt_ja','niet_geinteresseerd'].includes(leadsStatusFilter);
+    if (leadsFilterModus === 'openstaand' && !expliciteLeadStatusFilter && !expliciteAfgehandeldeBelStatus) {
       sorted = sorted.filter(l => !['bereikt_ja','niet_geinteresseerd'].includes(l.status));
     }
 
