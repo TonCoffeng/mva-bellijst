@@ -5,6 +5,88 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-12
+
+### Gefixt — bel-status chips kwamen niet op de kaart na opslaan
+
+**Probleem:** na het zetten van een bel-status (bereikt, niet bereikbaar, voicemail, etc.) bleef de chip onzichtbaar op de leadkaart. Storing in de UI bij Rogier, daarna ook bij Mathias bevestigd.
+
+**Oorzaak:** de Netlify `monday`-functie hernoemt de DB-kolom `bel_status` naar `status` in de API-response. Frontend las `item.status` maar de mapping via `statusMap` werkte alleen voor oude Nederlandse legacy-labels en gaf een lege string voor de nieuwe enum-waarden (`bereikt_ja`, `niet_bereikbaar`, etc).
+
+**Fix:** frontend leest nu `(item.bel_status || item.status)` en de `statusMap` fallback `?? rawStatus` houdt onbekende waarden intact. Bel_status enum-waarden komen correct als chip op de kaart.
+
+### Gefixt — knoppen op mobiel zonder zichtbare tekst
+
+**Probleem:** op telefoons (iPhone 14, Pixel 7, etc., 360–430px breed) waren de tekst-labels op Pool / Zelf / Naar archief / Toewijzen onzichtbaar. Knoppen leken leeg.
+
+**Oorzaak:** de `lbl-kort` spans hadden inline `style="display:none"` die de media query met gelijke specificiteit niet overschreef. Bovendien stond de media-query drempel op 420px (alleen iPhone SE en kleiner).
+
+**Fix:**
+1. Inline `display:none` op `lbl-kort` verwijderd; default in CSS gezet (`.actiebalk .lbl-kort { display:none }`).
+2. Media-query drempel verhoogd: **420px → 640px**. Dekt nu alle telefoons inclusief grote Android.
+
+### Gefixt — app opent niet op vandaag bij bezichtigingen-tab
+
+**Probleem:** Rogier vroeg om bij open standaard alleen vandaag te zien, maar app toonde alle datums.
+
+**Oorzaak:** `window._datumFilter` werd wel op `vandaagISO()` geïnitialiseerd, maar `filterBezichtigingen()` werd niet aangeroepen na het laden van kaarten. De DOM kreeg dus alle bezichtigingen te zien.
+
+**Fix:** `filterBezichtigingen()` wordt nu altijd aan het einde van `laadBezichtigingen()` aangeroepen, ook zonder zoekterm. Datum-filter wordt direct toegepast op de DOM.
+
+### Gefixt — archief-bezichtigingen verstopt na reset
+
+**Probleem:** na de Supabase-reset (testdata terugzetten) bleven veel bezichtigingen verstopt; app toonde 2 ipv 13 voor vandaag bij Rogier.
+
+**Oorzaak:** `gearchiveerd = true` was tijdens tests gezet en bleef staan; reset-SQL had die kolom niet teruggezet.
+
+**Fix:** `UPDATE bezichtigingen SET gearchiveerd = false` toegevoegd aan reset-procedure. Reset-script verder ongewijzigd.
+
+### Toegevoegd — Cloze match-modal V1: waarschuwing bij andermans klant
+
+Bij klik op Warm/Hot/Afspraak/Deal doet de app eerst een `check_bestaand` call naar Cloze. Drie gedragingen:
+
+1. **Geen match** → originele flow (Aankoop/Verkoop modal → nieuwe Cloze-record).
+2. **Match, eigen of zonder eigenaar** → `cloze_id` opslaan in Supabase, stage doorschuiven, geen modal.
+3. **Match, andere makelaar** → waarschuwingsmodal: "Klant staat op naam van [naam]". Knoppen:
+   - **📧 Verzoek aan Ton** → email naar `toncoffeng@makelaarsvan.nl` via Resend
+   - **🔗 Bekijk klant in Cloze**
+   - **Annuleren**
+   Stage-update wordt niet uitgevoerd; afgesproken regel: alleen Ton mag Cloze-eigenaarschap omzetten.
+
+**Backend (`cloze.js`):** nieuwe action `request_overname` toegevoegd — stuurt vriendelijke HTML+plaintext mail via Resend API met verzoeker, klant en huidige eigenaar info, plus een directe Cloze-link.
+
+**Netlify env var:** `RESEND_API_KEY` vereist; was al ingesteld door Ton+Claude.
+
+### Toegevoegd — chip "⏳ Nog niet gebeld" en straatnaam in compact-view
+
+- Nieuwe leads krijgen op de kaart een gele chip "⏳ Nog niet gebeld" zolang `bel_status='nieuw'`.
+- Bezichtiging-rijen in compact-view (spiekbrief) tonen nu `naam · adres · telefoon` ipv alleen `naam · telefoon` — adres is op desktop volledig zichtbaar, op smal scherm verkort.
+- "Niet geïnt." filterpil **verwijderd** uit Openstaand-tab (hoort op Ontvangen leads).
+
+### Veranderd — UI-conventies overal
+
+- Lead-status volgorde overal **Warm → Hot → Afspraak → Deal → Lost** (was Hot eerst). Funnel-logica: Warm urgenter qua actie, Hot al goed bezig.
+- Sortering toont Warm-leads bovenaan.
+- "Alle" filterpil toont nu alle 6 actieve bel-statussen (inclusief Bereikt). Alleen `niet_geinteresseerd` wordt verborgen op Openstaand.
+- Teller "Openstaand" rekent met dezelfde nieuwe logica.
+- Grijze "afgerond" kaart-styling verwijderd — alle kaarten zelfde uiterlijk, alleen chip toont status.
+- Bel-modal: knoptekst "Opslaan in Cloze →" → **"Opslaan"**. Toast "✅ Opgeslagen in Cloze" → "✅ Opgeslagen".
+- Naamloze leads tonen `Geen naam (bezichtiging #79)` ipv `(geen naam)`.
+
+### Database
+
+- Supabase `bellijst_items.bel_status` heeft DEFAULT `'nieuw'`, NOT NULL — geverifieerd.
+- Reset uitgevoerd: backup `_backup_bellijst_items`, pool-leads verwijderd, alle leads gereset (`bel_status='nieuw'`, geen lead_status, geen cloze_id), toewijzingen leeg, volgnummers gereset, bezichtigingen `actie_status='open'` + `gearchiveerd=false`. Database staat klaar voor opnieuw testen.
+
+### Bekend / open
+
+- **Mathias Cloze assignTo**: `mathiaselias@makelaarsvan.nl is not a member of the user's team`. Cloze sub-team setup, geen code-bug. Mathias toevoegen aan Cloze team óf assignTo strategie herzien.
+- **Cloze match-bug**: huidige match check werkt alleen op email/telefoon. Bij gedeelde bedrijfsemails fout-match (Holwerda → Monique Klein via `info@zeker-wonen.nl`). Strikt op email+naam moet later.
+- **500 error** op één Netlify endpoint tijdens tests — endpoint nog niet geïdentificeerd.
+- **Knoppen bezichtigingen-tab** (Volledig / Selectie / Nieuwste eerst) — UX zou kunnen worden vereenvoudigd. Sparring-fase, nog niet gebouwd.
+
+---
+
 ## 2026-05-10
 
 ### Gefixt — `update_lead_status` schreef Hot/Warm naar verkeerde kolom
