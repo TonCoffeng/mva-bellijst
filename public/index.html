@@ -1679,9 +1679,13 @@
         // (bereikt_ja, niet_bereikbaar, voicemail, etc. — zie CHECK constraint).
         // Fallback op item.status voor legacy/demo data en oude Nederlandse labels.
         const rawStatus = (item.bel_status || item.status || '').toLowerCase();
+        const ruweNaam = (item.naam || item.name || '').trim();
+        const naamFallback = item.bezichtiging_id
+          ? `Geen naam (bezichtiging #${item.bezichtiging_id})`
+          : '(geen naam)';
         return {
           id: item.id,
-          naam: item.naam || item.name || '(geen naam)',
+          naam: ruweNaam || naamFallback,
           telefoon:           item.telefoon || '',
           email:              item.email || '',
           adres:              item.adres || '',
@@ -1697,6 +1701,7 @@
           cloze_id:           item.cloze_id || '',
           belpogingen:        Number(item.belpogingen) || 0,
           bron:               item.bron || '',
+          bezichtiging_id:    item.bezichtiging_id || null,
         };
       });
 
