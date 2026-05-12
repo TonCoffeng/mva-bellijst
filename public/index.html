@@ -1663,7 +1663,7 @@
       // Parse monday items naar lead objecten
       // Status mapping van monday labels naar app-statussen
       const statusMap = {
-        'nog niet gebeld': '',
+        'nog niet gebeld': 'nieuw',
         'niet bereikbaar': 'niet_bereikbaar',
         'bel terug': 'bereikt_later',
         'voicemail': 'voicemail',
@@ -4246,7 +4246,10 @@
 
     // ── 4. Filteren — bel-status pillen ─────────────────────────────────
     if (leadsStatusFilter === 'open') {
-      sorted = sorted.filter(l => !l.status);
+      // 'Nog niet gebeld' = leads die nog geen belactie hebben gehad.
+      // Sinds de DB-default 'nieuw' is, matchen we daar primair op,
+      // met fallback op lege string voor legacy/demo data.
+      sorted = sorted.filter(l => !l.status || l.status === 'nieuw');
     } else if (leadsStatusFilter !== 'alle') {
       sorted = sorted.filter(l => l.status === leadsStatusFilter);
     }
@@ -4300,6 +4303,7 @@
 
       // Bel-status chip
       const belChip = {
+        'nieuw':              { cls: 'chip-wacht',  label: '⏳ Nog niet gebeld' },
         'niet_bereikbaar':    { cls: 'chip-urgent', label: 'Niet bereikbaar' },
         'bereikt_later':      { cls: 'chip-later',  label: 'Bel terug' },
         'voicemail':          { cls: 'chip-wacht',  label: 'Voicemail' },
