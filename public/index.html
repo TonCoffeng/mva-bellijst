@@ -1337,7 +1337,6 @@
     <button class="leads-statusfilter-pil" data-status="bereikt_later" onclick="filterLeadsOpStatus('bereikt_later')">📲 Bel later</button>
     <button class="leads-statusfilter-pil" data-status="voicemail" onclick="filterLeadsOpStatus('voicemail')">📬 Voicemail</button>
     <button class="leads-statusfilter-pil" data-status="wellicht_later" onclick="filterLeadsOpStatus('wellicht_later')">💤 Wellicht later</button>
-    <button class="leads-statusfilter-pil" data-status="niet_geinteresseerd" onclick="filterLeadsOpStatus('niet_geinteresseerd')">❌ Niet geïnt.</button>
   </div>
 
   <!-- LEAD-STATUS FILTER (dropdown) -->
@@ -4221,7 +4220,8 @@
     }
 
     // ── 2. Tellers — op zichtbare dataset (zonder gearchiveerde) ────────
-    const openstaandHeleSet = zichtbareDataset.filter(l => !['bereikt_ja','niet_geinteresseerd'].includes(l.status));
+    // Openstaand = alle actieve leads, alleen 'niet_geinteresseerd' valt af.
+    const openstaandHeleSet = zichtbareDataset.filter(l => l.status !== 'niet_geinteresseerd');
     document.getElementById('stat-totaal').textContent = openstaandHeleSet.length;
     const headerBadge = document.getElementById('header-badge');
     if (headerBadge) headerBadge.textContent = openstaandHeleSet.length + ' leads';
@@ -4231,12 +4231,15 @@
     // heeft gekozen (anders verberg je leads die wel die status hebben maar
     // ook al "afgehandeld" zijn op bel-status niveau).
     const expliciteLeadStatusFilter = leadsLeadStatusFilter !== 'alle';
-    // Als de gebruiker expliciet een bel-status kiest die normaal weggefilterd
-    // zou worden door Openstaand (bereikt_ja / niet_geinteresseerd), dan moet
-    // het Openstaand-filter wijken — anders zie je nooit iets bij die pil.
-    const expliciteAfgehandeldeBelStatus = ['bereikt_ja','niet_geinteresseerd'].includes(leadsStatusFilter);
+    // Op het Openstaand-tabblad verbergen we alleen 'niet_geinteresseerd'
+    // (= echt afgehandeld, hoort op Ontvangen leads). 'bereikt_ja' valt onder
+    // 'Alle' want de makelaar wil zien wat er onder de pillen rechts ervan valt.
+    // Uitzondering: als gebruiker expliciet op 'niet_geinteresseerd' filtert,
+    // moet die wel zichtbaar zijn (alleen relevant als die pil ergens hergebruikt
+    // wordt — voor nu staat ie alleen op Ontvangen leads).
+    const expliciteAfgehandeldeBelStatus = ['niet_geinteresseerd'].includes(leadsStatusFilter);
     if (leadsFilterModus === 'openstaand' && !expliciteLeadStatusFilter && !expliciteAfgehandeldeBelStatus) {
-      sorted = sorted.filter(l => !['bereikt_ja','niet_geinteresseerd'].includes(l.status));
+      sorted = sorted.filter(l => l.status !== 'niet_geinteresseerd');
     }
 
     // ── 4. Filteren — bel-status pillen ─────────────────────────────────
