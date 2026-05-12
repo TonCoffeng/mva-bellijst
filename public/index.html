@@ -789,8 +789,10 @@
         text-align: center;
       }
     }
-    /* Echt smal (≤420px): toon korte labels (lbl-kort) ipv volle, en flex-basis groter */
-    @media (max-width: 420px) {
+    /* Smal scherm (≤640px): korte labels (lbl-kort) zichtbaar, lange (lbl-vol) verborgen.
+       Dit dekt alle telefoons incl. iPhone 14 staand (390px), iPhone 12 (390px),
+       Pixel 7 (411px), grotere Android (~430px). */
+    @media (max-width: 640px) {
       .actiebalk .btn-naar-pool .lbl-vol,
       .actiebalk .btn-zichzelf .lbl-vol,
       .actiebalk .btn-afgehandeld .lbl-vol,
@@ -2985,6 +2987,9 @@
     }
     const filterInput = document.getElementById('filter-adres');
     if (filterInput && filterInput.value) filterBezichtigingen();
+    // Pas het datum-filter altijd toe na laden — anders blijven alle datums zichtbaar
+    // bij opstart, ook al staat window._datumFilter op vandaag.
+    filterBezichtigingen();
   }
 
   // Zoek-input filter — wordt aangeroepen vanuit de zoekbalk (oninput)
