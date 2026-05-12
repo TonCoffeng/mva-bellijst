@@ -1345,8 +1345,8 @@
     <select id="leads-leadstatus-select" onchange="filterLeadsOpLeadStatus(this.value)"
             style="padding:6px 12px;border:1px solid var(--grijs-mid);border-radius:999px;font-size:12px;font-weight:600;color:var(--navy);background:var(--wit);cursor:pointer;font-family:inherit">
       <option value="alle">Alle statussen</option>
-      <option value="Hot">🔥 Hot</option>
       <option value="Warm">🌡️ Warm</option>
+      <option value="Hot">🔥 Hot</option>
       <option value="Afspraak">📅 Afspraak</option>
       <option value="Deal">✅ Deal</option>
       <option value="Lost">❌ Lost</option>
@@ -2183,8 +2183,8 @@
               onchange="doorgegevenFilters.lead_status=this.value;laadEnRenderDoorgegeven()"
               style="padding:6px 10px;border:1px solid var(--rand);border-radius:6px;font-size:13px">
               <option value="alle" ${doorgegevenFilters.lead_status === 'alle' ? 'selected' : ''}>Alle statussen</option>
-              <option value="Hot" ${doorgegevenFilters.lead_status === 'Hot' ? 'selected' : ''}>🔥 Hot</option>
               <option value="Warm" ${doorgegevenFilters.lead_status === 'Warm' ? 'selected' : ''}>🌡️ Warm</option>
+              <option value="Hot" ${doorgegevenFilters.lead_status === 'Hot' ? 'selected' : ''}>🔥 Hot</option>
               <option value="Afspraak" ${doorgegevenFilters.lead_status === 'Afspraak' ? 'selected' : ''}>📅 Afspraak</option>
               <option value="Deal" ${doorgegevenFilters.lead_status === 'Deal' ? 'selected' : ''}>✅ Deal</option>
               <option value="Lost" ${doorgegevenFilters.lead_status === 'Lost' ? 'selected' : ''}>❌ Lost</option>
@@ -4196,9 +4196,11 @@
     // ── 1. Sortering ───────────────────────────────────────────────────
     // Hot/Warm bovenaan, dan leads zonder status (default 99 valt naar
     // achter), dan Afspraak/Deal/Lost.
+    // Funnel-volgorde: Warm-leads eerst (vroegste fase, urgenter qua actie),
+    // dan Hot (al goed bezig), daarna Afspraak/Deal/Lost.
     const prioriteit = {
-      'Hot': 1,
-      'Warm': 2,
+      'Warm': 1,
+      'Hot': 2,
       'Afspraak': 4,
       'Deal': 5,
       'Lost': 6,
@@ -4306,11 +4308,12 @@
         'niet_geinteresseerd':{ cls: 'chip-wacht',  label: '❌ Afgerond' },
       }[lead.status];
 
+      // Alle kaarten krijgen dezelfde 'nieuw' (default) styling.
+      // Status wordt via de chip getoond, niet via grijze kaart-tint —
+      // dat verwarde makelaars (afgehandeld voelde als 'kapot').
       const cardClass = {
         'niet_bereikbaar':     'urgent',
         'bereikt_later':       'later',
-        'bereikt_ja':          'afgerond',
-        'niet_geinteresseerd': 'afgerond',
       }[lead.status] || 'nieuw';
 
       const isGeselecteerd  = leadsGeselecteerd.has(String(lead.id));
@@ -4391,8 +4394,8 @@
             </div>
 
             <div class="leadstatus-knoppen" onclick="event.stopPropagation()" style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-              <button class="btn-leadstatus btn-hot"        onclick="zetLeadStatus('${lead.id}', 'Hot')">🔥 Hot</button>
               <button class="btn-leadstatus btn-warm"       onclick="zetLeadStatus('${lead.id}', 'Warm')">🌡️ Warm</button>
+              <button class="btn-leadstatus btn-hot"        onclick="zetLeadStatus('${lead.id}', 'Hot')">🔥 Hot</button>
               <button class="btn-leadstatus btn-afspraak"   onclick="zetLeadStatus('${lead.id}', 'Afspraak')">📅 Afspraak</button>
               <button class="btn-leadstatus btn-deal"       onclick="zetLeadStatus('${lead.id}', 'Deal')">✅ Deal</button>
               <button class="btn-leadstatus btn-lost"       onclick="zetLeadStatus('${lead.id}', 'Lost')">❌ Lost</button>
@@ -4822,8 +4825,8 @@
               onchange="ontvangenFilters.lead_status=this.value;laadEnRenderOntvangen()"
               style="padding:6px 10px;border:1px solid var(--rand);border-radius:6px;font-size:13px">
               <option value="alle" ${ontvangenFilters.lead_status === 'alle' ? 'selected' : ''}>Alle statussen</option>
-              <option value="Hot" ${ontvangenFilters.lead_status === 'Hot' ? 'selected' : ''}>🔥 Hot</option>
               <option value="Warm" ${ontvangenFilters.lead_status === 'Warm' ? 'selected' : ''}>🌡️ Warm</option>
+              <option value="Hot" ${ontvangenFilters.lead_status === 'Hot' ? 'selected' : ''}>🔥 Hot</option>
               <option value="Afspraak" ${ontvangenFilters.lead_status === 'Afspraak' ? 'selected' : ''}>📅 Afspraak</option>
               <option value="Deal" ${ontvangenFilters.lead_status === 'Deal' ? 'selected' : ''}>✅ Deal</option>
               <option value="Lost" ${ontvangenFilters.lead_status === 'Lost' ? 'selected' : ''}>❌ Lost</option>
@@ -5418,8 +5421,8 @@
       Voor <strong id="leads-bulk-status-aantal">0 leads</strong>
     </p>
     <div style="display:flex;flex-direction:column;gap:8px">
-      <button class="btn-leadstatus btn-hot"      onclick="pasLeadsBulkStatusToe('Hot')"      style="text-align:left;padding:12px 14px;font-size:14px">🔥 Hot</button>
       <button class="btn-leadstatus btn-warm"     onclick="pasLeadsBulkStatusToe('Warm')"     style="text-align:left;padding:12px 14px;font-size:14px">🌡️ Warm</button>
+      <button class="btn-leadstatus btn-hot"      onclick="pasLeadsBulkStatusToe('Hot')"      style="text-align:left;padding:12px 14px;font-size:14px">🔥 Hot</button>
       <button class="btn-leadstatus btn-afspraak" onclick="pasLeadsBulkStatusToe('Afspraak')" style="text-align:left;padding:12px 14px;font-size:14px">📅 Afspraak</button>
       <button class="btn-leadstatus btn-deal"     onclick="pasLeadsBulkStatusToe('Deal')"     style="text-align:left;padding:12px 14px;font-size:14px">✅ Deal</button>
       <button class="btn-leadstatus btn-lost"     onclick="pasLeadsBulkStatusToe('Lost')"     style="text-align:left;padding:12px 14px;font-size:14px">❌ Lost</button>
