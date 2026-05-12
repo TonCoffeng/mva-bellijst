@@ -652,9 +652,18 @@
       min-width: 42px;
     }
     .spiekbrief-rij .sb-naam {
-      flex: 1 1 auto;
+      flex: 0 1 auto;
       min-width: 0;
       font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .spiekbrief-rij .sb-adres {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-size: 12px;
+      color: var(--grijs-tekst);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -693,6 +702,7 @@
       .spiekbrief-rij { padding: 8px 10px; gap: 6px; font-size: 13px; }
       .spiekbrief-rij .sb-tel { display: none; }
       .spiekbrief-rij .sb-datum { display: none; }
+      .spiekbrief-rij .sb-adres { font-size: 11px; }
     }
 
     /* Spiekbrief-toggle-knop in actiebalk bovenaan */
@@ -725,6 +735,9 @@
 
     /* ── ACTIEBALK responsive (Pool / Zelf / Naar archief / Toewijzen) ── */
     /* Alle 4 actie-knoppen identiek formaat, 1 rij gelijk verdeeld */
+    /* Korte labels (lbl-kort) zijn standaard verborgen, worden zichtbaar
+       in de media query ≤420px (waar lbl-vol verborgen wordt). */
+    .actiebalk .lbl-kort { display: none; }
     .actiebalk {
       display: flex;
       flex-wrap: wrap;
@@ -1746,15 +1759,16 @@
   }
 
   // ── DATUM-NAVIGATIE ──────────────────────────────────────────────────
-  // Gebruiker kan met pijltjes door dagen bladeren. Default = alle datums tonen.
+  // Gebruiker kan met pijltjes door dagen bladeren. Default = vandaag tonen.
+  // Rogier vroeg expliciet: app moet bij open altijd op vandaag staan.
   // window._datumFilter = null → toon alle, anders 'YYYY-MM-DD'
-  window._datumFilter = null;
-
   function vandaagISO() {
     const d = new Date();
     // Lokale datum als YYYY-MM-DD (Europe/Amsterdam)
     return d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' });
   }
+
+  window._datumFilter = vandaagISO();
 
   function datumNav(dagDelta) {
     // Bepaal startpunt: huidige filter, of vandaag als geen filter actief
@@ -2708,6 +2722,7 @@
               ${b.datum ? `<span class="sb-datum">${(b.datum.split('-')[2] || '')}/${(b.datum.split('-')[1] || '')}</span>` : ''}
               <span class="sb-tijd">${b.tijdstip || '—'}</span>
               <span class="sb-naam">${b.naam}</span>
+              ${b.adres ? `<span class="sb-adres">${esc(b.adres)}</span>` : ''}
               ${b.telefoon ? `<span class="sb-tel">${b.telefoon}</span>` : ''}
               <span class="sb-status ${heeftFeedback ? 'is-feedback' : (alGedeeld ? 'is-doorgezet' : '')}">${heeftFeedback ? '✓' : (alGedeeld ? '↗' : '●')}</span>
             </div>
@@ -2808,7 +2823,7 @@
                 onclick="geefNaarPool('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
                 ${actieStatus==='pool' ? 'disabled' : ''}
                 ${alGedeeld && actieStatus !== 'pool' ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
-                <span class="lbl-vol">${actieStatus==='pool' ? '✅ Al in de pool' : '📤 Geef door aan pool'}</span><span class="lbl-kort" style="display:none">${actieStatus==='pool' ? '✅ Pool' : '📤 Pool'}</span>
+                <span class="lbl-vol">${actieStatus==='pool' ? '✅ Al in de pool' : '📤 Geef door aan pool'}</span><span class="lbl-kort">${actieStatus==='pool' ? '✅ Pool' : '📤 Pool'}</span>
               </button>
               <button
                 class="btn-zichzelf ${actieStatus==='zelf' ? 'gedeeld' : ''}"
@@ -2816,7 +2831,7 @@
                 onclick="geefAanZichzelf('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
                 ${actieStatus==='zelf' ? 'disabled' : ''}
                 ${alGedeeld && actieStatus !== 'zelf' ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
-                <span class="lbl-vol">${actieStatus==='zelf' ? '✅ Staat bij jou!' : '👤 Zelf bellen'}</span><span class="lbl-kort" style="display:none">${actieStatus==='zelf' ? '✅ Zelf' : '👤 Zelf'}</span>
+                <span class="lbl-vol">${actieStatus==='zelf' ? '✅ Staat bij jou!' : '👤 Zelf bellen'}</span><span class="lbl-kort">${actieStatus==='zelf' ? '✅ Zelf' : '👤 Zelf'}</span>
               </button>
               <button
                 class="btn-afgehandeld"
@@ -2824,7 +2839,7 @@
                 onclick="markeerAfgehandeld('${b.id}', '${b.naam.replace(/'/g, "\'")}', '${b.adres?.replace(/'/g, "\'") || ''}')"
                 title="Naar archief — bezichtiging is afgerond, gaat uit de actieve lijst"
                 ${alGedeeld ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
-                <span class="lbl-vol">📦 Naar archief</span><span class="lbl-kort" style="display:none">📦 Archief</span>
+                <span class="lbl-vol">📦 Naar archief</span><span class="lbl-kort">📦 Archief</span>
               </button>
               <button
                 class="btn-toewijzen"
@@ -2832,7 +2847,7 @@
                 onclick="openToewijzenModal('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
                 title="Direct toewijzen aan een collega — Round Robin overslaan"
                 ${alGedeeld ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
-                <span class="lbl-vol">→ Toewijzen</span><span class="lbl-kort" style="display:none">→ Toew.</span>
+                <span class="lbl-vol">→ Toewijzen</span><span class="lbl-kort">→ Toew.</span>
               </button>
             </div>
           </div>`;
