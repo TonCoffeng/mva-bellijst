@@ -4907,8 +4907,89 @@
     const moetClozeKlantAanmaken = CLOZE_STAGE_UPDATES.includes(nieuweStatus) && !lead.cloze_id;
     const moetAlleenStageBijwerken = CLOZE_STAGE_UPDATES.includes(nieuweStatus) && lead.cloze_id;
 
+    // ── CLOZE MATCH-CHECK (V1 — 12 mei 2026) ─────────────────────────
+    // Voorkomt dubbele Cloze-records: voor we een nieuwe klant aanmaken,
+    // checken we eerst of er al een match bestaat (op email + naam).
+    // Drie uitkomsten:
+    //   - Geen match → originele flow (Aankoop/Verkoop modal)
+    //   - Match, eigen of zonder eigenaar → direct doorgaan met cloze_id, geen modal
+    //   - Match, andere makelaar → waarschuwing + "Verzoek aan Ton" knop, STOP
+    // Alleen relevant als we Cloze-actie willen doen én cloze_id nog niet bekend is.
+    if (moetClozeKlantAanmaken && (lead.email || lead.telefoon)) {
+      try {
+        const matchRes = await fetch('/.netlify/functions/cloze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'check_bestaand',
+            data: { email: lead.email, telefoon: lead.telefoon, naam: lead.naam }
+          })
+        });
+        const matchJson = await matchRes.json();
+
+        if (matchJson?.bestaand) {
+          // Match gevonden. Bepaal eigenaarschap.
+          const eigenaarEmail = (matchJson.eigenaar_email || '').toLowerCase();
+          const huidigeEmail  = (huidigeMakelaar?.email   || '').toLowerCase();
+          const heeftEigenaar         = !!eigenaarEmail;
+          const benIkZelfEigenaar     = heeftEigenaar && eigenaarEmail === huidigeEmail;
+          const heeftAndereEigenaar   = heeftEigenaar && eigenaarEmail !== huidigeEmail;
+
+          if (heeftAndereEigenaar) {
+            // Andermans klant — toon waarschuwing, BLOKKEER de actie
+            const clozeUrl = matchJson.id
+              ? `https://www.cloze.com/in/person/${matchJson.id}#section=people`
+              : null;
+            const eigenaarTekst = matchJson.eigenaar_naam || eigenaarEmail || 'een andere makelaar';
+
+            const verzoekSturen = await mvaConfirm({
+              titel: 'Klant staat op naam van iemand anders',
+              tekst:
+                `${matchJson.naam || lead.naam} staat in Cloze op naam van ${eigenaarTekst}.\n\n` +
+                `Wil je deze klant overnemen? Dat regelt Ton voor je — ` +
+                `stuur 'm een verzoekje.\n\n` +
+                `Alleen Ton Coffeng kan klanten omzetten tussen makelaars.`,
+              okTekst: '📧 Verzoek aan Ton',
+              annuleerTekst: 'Annuleren',
+              clozeUrl: clozeUrl,
+            });
+
+            if (verzoekSturen === true) {
+              await stuurOvernameVerzoek(lead, matchJson);
+            }
+            // Of "Verzoek aan Ton" of "Annuleren" of weggeklikt — in alle gevallen
+            // stoppen we de stage-update (geen overname, geen aanmaak).
+            // De lead-status in de app wordt ook NIET veranderd.
+            return;
+          }
+
+          // Eigen klant of klant zonder eigenaar — gebruik bestaande Cloze-record.
+          // Sla cloze_id op zodat de "Cloze" knop voortaan op de kaart verschijnt
+          // en de tweede klik via "moetAlleenStageBijwerken" loopt (geen dubbele aanmaak).
+          if (matchJson.id) {
+            lead.cloze_id = matchJson.id;
+            fetch('/.netlify/functions/monday', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'set_cloze_id',
+                data: { item_id: lead.id, cloze_id: matchJson.id }
+              })
+            }).catch(e => console.warn('cloze_id opslaan na match faalde:', e));
+          }
+          // Skip de Aankoop/Verkoop modal — klant bestaat al, segment is al gezet.
+          // Zet flag-flow om naar "alleen stage bijwerken" voor de rest van deze functie.
+          // (We overschrijven moetClozeKlantAanmaken effectief door aankoopOfVerkoop op
+          // null te laten en de modal te skippen via deze conditie hieronder.)
+        }
+      } catch (e) {
+        console.warn('Cloze match-check faalde, val terug op originele flow:', e);
+      }
+    }
+
     let aankoopOfVerkoop = null;
-    if (moetClozeKlantAanmaken) {
+    // Alleen Aankoop/Verkoop vragen als er nog steeds geen cloze_id is (geen match gevonden)
+    if (moetClozeKlantAanmaken && !lead.cloze_id) {
       aankoopOfVerkoop = await kiesAankoopOfVerkoop(lead, nieuweStatus);
       if (!aankoopOfVerkoop) return;  // gebruiker heeft geannuleerd
     }
@@ -5021,6 +5102,45 @@
     }
   }
   window.kiesAankoopOfVerkoopAfsluiten = kiesAankoopOfVerkoopAfsluiten;
+
+  // ── OVERNAME-VERZOEK NAAR TON ────────────────────────────────────────
+  // Wordt aangeroepen als een makelaar in de match-modal kiest om Ton een
+  // overnameverzoek te sturen voor een klant die op naam van iemand anders staat.
+  // Verstuurt een email via Resend (backend action 'request_overname').
+  // Toont toast met succes/fout-melding.
+  async function stuurOvernameVerzoek(lead, match) {
+    try {
+      const res = await fetch('/.netlify/functions/cloze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'request_overname',
+          data: {
+            verzoeker_naam:         huidigeMakelaar?.naam  || '',
+            verzoeker_email:        huidigeMakelaar?.email || '',
+            klant_naam:             match?.naam || lead.naam || '',
+            klant_email:            lead.email || '',
+            klant_telefoon:         lead.telefoon || '',
+            huidige_eigenaar_naam:  match?.eigenaar_naam  || '',
+            huidige_eigenaar_email: match?.eigenaar_email || '',
+            cloze_id:               match?.id || '',
+            adres:                  lead.adres || '',
+            datum_bezichtiging:     lead.datum_bezichtiging || '',
+          }
+        })
+      });
+      const json = await res.json();
+      if (json?.ok) {
+        toonToast('✅ Verzoek aan Ton verzonden');
+      } else {
+        toonToast('⚠️ Verzoek versturen mislukt: ' + (json?.error || 'onbekend'));
+      }
+    } catch (e) {
+      console.warn('Overname-verzoek faalde:', e);
+      toonToast('⚠️ Verzoek versturen mislukt — probeer opnieuw');
+    }
+  }
+  window.stuurOvernameVerzoek = stuurOvernameVerzoek;
 
   // ── CLOZE KLANT-FLOW ─────────────────────────────────────────────────
   // Maakt klant aan in Cloze als hij niet bestaat, of update segment/stage
