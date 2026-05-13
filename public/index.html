@@ -1269,6 +1269,10 @@
       <div class="stat-number">📂</div>
       <div class="stat-label">Doorgegeven aan leadpool</div>
     </div>
+    <div class="stat-card filter-knop" id="filter-archief" onclick="laadArchief()" title="Bekijk gearchiveerde bezichtigingen">
+      <div class="stat-number" id="stat-geven-archief">0</div>
+      <div class="stat-label">📦 Archief</div>
+    </div>
   </div>
   <!-- DATUM-NAVIGATOR — pijltjes om door dagen te bladeren -->
   <div class="datum-nav" id="datum-nav">
@@ -1648,6 +1652,7 @@
       document.getElementById('geven-screen').classList.remove('hidden');
       document.getElementById('header-badge').textContent = 'Bezichtigingen';
       laadBezichtigingen();
+      laadArchiefTeller();
     } else {
       document.getElementById('overzicht-screen').classList.remove('hidden');
       laadLeads();
@@ -2372,6 +2377,13 @@
 
       if (items.length === 0) {
         archiefContainer.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0;flex-wrap:wrap;gap:10px">
+            <div style="font-weight:700;color:var(--navy);font-size:18px">📦 Archief</div>
+            <button onclick="sluitArchief()"
+                    style="background:var(--grijs);color:var(--navy);border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500;font-size:13px">
+              ← Terug naar bezichtigingen
+            </button>
+          </div>
           <div style="padding:40px 20px;text-align:center;color:var(--grijs-tekst);background:white;border-radius:12px;margin-top:10px">
             <div style="font-size:32px;margin-bottom:10px">📦</div>
             <div style="font-weight:600;color:var(--navy);margin-bottom:6px">Archief is leeg</div>
@@ -2381,7 +2393,15 @@
       }
 
       const esc = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-      archiefContainer.innerHTML = items.map(b => `
+      const headerHtml = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0;flex-wrap:wrap;gap:10px">
+          <div style="font-weight:700;color:var(--navy);font-size:18px">📦 Archief (${items.length})</div>
+          <button onclick="sluitArchief()"
+                  style="background:var(--grijs);color:var(--navy);border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500;font-size:13px">
+            ← Terug naar bezichtigingen
+          </button>
+        </div>`;
+      archiefContainer.innerHTML = headerHtml + items.map(b => `
         <div class="bez-card al-gedeeld" id="archief-${b.id}" style="margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
             <div style="flex:1;min-width:0">
@@ -2404,6 +2424,17 @@
       archiefContainer.innerHTML = `<div style="padding:30px;text-align:center;color:var(--rood)">⚠️ Kon archief niet laden: ${err.message}</div>`;
     }
   }
+  window.laadArchief = laadArchief;
+
+  // Sluit het archief en toon weer de actieve bezichtigingen-lijst
+  function sluitArchief() {
+    document.getElementById('archief-container')?.remove();
+    document.getElementById('geven-container').style.display = '';
+    document.querySelectorAll('.filter-knop').forEach(el => el.classList.remove('actief'));
+    document.getElementById('filter-open')?.classList.add('actief');
+    filterBezichtigingen('open');
+  }
+  window.sluitArchief = sluitArchief;
 
   async function herstelUitArchief(itemId) {
     const card = document.getElementById('archief-' + itemId);
