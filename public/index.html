@@ -2326,6 +2326,9 @@
   }
 
   // Helper: vraag archief-aantal op (lichte query) zonder de UI te blokkeren
+  // Cache voor archief-zoeken — eenmaal laden, daarna lokaal filteren
+  window._archiefCache = null;
+
   async function laadArchiefTeller() {
     try {
       const res = await fetch('/.netlify/functions/monday', {
@@ -2337,16 +2340,18 @@
         })
       });
       const json = await res.json();
-      const aantal = (json.bezichtigingen || []).length;
+      const items = json.bezichtigingen || [];
+      window._archiefCache = items;            // Cache voor zoek-doorzoek
       const el = document.getElementById('stat-geven-archief');
-      if (el) el.textContent = aantal;
-    } catch (e) { /* stille fout — teller blijft 0 */ }
+      if (el) el.textContent = items.length;
+    } catch (e) { /* stille fout — teller blijft 0, cache blijft null */ }
   }
 
   // ── ARCHIEF LADEN EN TONEN ────────────────────────────────────────────
   async function laadArchief() {
-    // Verberg de actuele lijst, toon archief-container
+    // Verberg de actuele lijst én eventuele zoek-archief-sectie, toon archief-container
     document.getElementById('geven-container').style.display = 'none';
+    document.getElementById('zoek-archief-sectie')?.remove();
     let archiefContainer = document.getElementById('archief-container');
     if (!archiefContainer) {
       archiefContainer = document.createElement('div');
@@ -2437,7 +2442,10 @@
   window.sluitArchief = sluitArchief;
 
   async function herstelUitArchief(itemId) {
-    const card = document.getElementById('archief-' + itemId);
+    // Kaart kan in twee locaties staan: dedicated archief-pagina (archief-XXX)
+    // óf in zoek-resultaten op de hoofdpagina (zoek-archief-XXX)
+    const card = document.getElementById('archief-' + itemId)
+              || document.getElementById('zoek-archief-' + itemId);
     const naam = card?.querySelector('.bez-naam')?.textContent || 'lead';
     const ok = await mvaConfirm({
       titel: 'Herstellen uit archief?',
@@ -2456,6 +2464,10 @@
       if (json.error) throw new Error(json.error);
       card?.remove();
       werkArchiefTellerBij(-1);
+      // Cache bijwerken — record uit archief halen zodat zoekresultaten kloppen
+      if (Array.isArray(window._archiefCache)) {
+        window._archiefCache = window._archiefCache.filter(b => String(b.id) !== String(itemId));
+      }
       toonToast(`♻️ ${naam} hersteld — herlaad de pagina om in de actieve lijst te zien`, 'succes');
     } catch (err) {
       toonToast('Herstellen mislukt: ' + err.message, 'fout');
@@ -3047,8 +3059,88 @@
       }
     }
     updateBulkTeller();
+    // Ook archief doorzoeken zodra er een zoekterm is (debounce 250ms)
+    if (window._archiefZoekTimer) clearTimeout(window._archiefZoekTimer);
+    if (term.length >= 2) {
+      window._archiefZoekTimer = setTimeout(() => toonArchiefTreffers(term), 250);
+    } else {
+      verbergArchiefTreffers();
+    }
   }
   window.zoekFilter = zoekFilter;
+
+  // Toon archief-treffers in een aparte sectie onder de actieve lijst
+  function toonArchiefTreffers(term) {
+    const archiefData = window._archiefCache;
+    // Als cache nog niet geladen is, fetch nu (eenmalig)
+    if (!archiefData) {
+      laadArchiefTeller().then(() => {
+        if ((document.getElementById('filter-adres')?.value || '').trim().toLowerCase() === term) {
+          toonArchiefTreffers(term);
+        }
+      });
+      return;
+    }
+    const treffers = archiefData.filter(b => {
+      const adres = (b.adres || '').toLowerCase();
+      const naam  = (b.naam || '').toLowerCase();
+      const datum = (b.datum || '').toLowerCase();
+      return adres.includes(term) || naam.includes(term) || datum.includes(term);
+    }).slice(0, 200);
+
+    // Container vinden of aanmaken — onder de actieve bezichtigingen-lijst
+    let zoekArchief = document.getElementById('zoek-archief-sectie');
+    if (treffers.length === 0) {
+      if (zoekArchief) zoekArchief.style.display = 'none';
+      return;
+    }
+    if (!zoekArchief) {
+      zoekArchief = document.createElement('div');
+      zoekArchief.id = 'zoek-archief-sectie';
+      zoekArchief.style.padding = '0 16px 20px';
+      const gevenContainer = document.getElementById('geven-container');
+      gevenContainer.parentNode.insertBefore(zoekArchief, gevenContainer.nextSibling);
+    }
+    zoekArchief.style.display = '';
+    const esc = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const totaal = archiefData.filter(b => {
+      const adres = (b.adres || '').toLowerCase();
+      const naam  = (b.naam || '').toLowerCase();
+      const datum = (b.datum || '').toLowerCase();
+      return adres.includes(term) || naam.includes(term) || datum.includes(term);
+    }).length;
+    const meerLabel = totaal > treffers.length ? ` (eerste ${treffers.length} van ${totaal})` : ` (${treffers.length})`;
+    zoekArchief.innerHTML = `
+      <div style="border-top:2px solid var(--grijs-mid);margin:20px 0 12px;padding-top:14px">
+        <div style="font-weight:700;color:var(--navy);font-size:14px;margin-bottom:10px">
+          📦 Uit archief${meerLabel}
+        </div>
+      </div>
+      ` + treffers.map(b => `
+        <div class="bez-card al-gedeeld" id="zoek-archief-${b.id}" style="margin-bottom:8px;opacity:0.85">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+            <div style="flex:1;min-width:0">
+              <div class="bez-naam" style="font-weight:600;color:var(--navy);margin-bottom:4px">${esc(b.naam || '(geen naam)')}</div>
+              <div class="bez-adres" style="font-size:13px;color:var(--grijs-tekst);margin-bottom:6px">📍 ${esc(b.adres || '')}</div>
+              <div style="font-size:12px;color:var(--grijs-tekst)">
+                📅 ${esc(b.datum||'')}${b.tijdstip ? ' om ' + esc(b.tijdstip) : ''}
+                ${b.feedback ? ' &middot; <span style="color:var(--navy);font-weight:500">' + esc(b.feedback.replace(/,/g,', ')) + '</span>' : ''}
+              </div>
+            </div>
+            <button onclick="herstelUitArchief('${b.id}')"
+              style="background:none;border:1px solid var(--grijs-mid);color:var(--navy);padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap"
+              title="Terug naar actieve lijst">
+              ♻️ Herstel
+            </button>
+          </div>
+        </div>
+      `).join('');
+  }
+
+  function verbergArchiefTreffers() {
+    const sectie = document.getElementById('zoek-archief-sectie');
+    if (sectie) sectie.style.display = 'none';
+  }
 
   function wisFilter() {
     const input = document.getElementById('filter-adres');
