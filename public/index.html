@@ -2555,12 +2555,13 @@
     opslaanBtn.textContent = 'Opslaan...';
 
     const feedbackLabels = {
-      serieus:    '🔥 Serieuze koper',
-      verkoop:    '💰 Verkoopprospect',
-      aankoop:    '🏠 Aankoopprospect',
-      makelaar:   '✋ Heeft makelaar',
-      geen_beeld: '💭 Geen beeld',
-      noshow:     '🚫 No-show',
+      serieus:        '🔥 Serieuze koper',
+      verkoop:        '💰 Verkoopprospect',
+      aankoop:        '🏠 Aankoopprospect',
+      makelaar:       '✋ Heeft makelaar',
+      aankoopmakelaar:'🏢 Aankoopmakelaar',
+      geen_beeld:     '💭 Geen beeld',
+      noshow:         '🚫 No-show',
     };
     const feedbackTekst = actief.map(k => feedbackLabels[k]).join(', ') + (opmerking ? ` — ${opmerking}` : '');
 
@@ -2692,6 +2693,45 @@
       });
       const json = await res.json();
       const items = json?.bezichtigingen || [];
+
+      // ── NAAM-FALLBACK voor lege namen ──
+      // Makelaarskantoren plannen bezichtigingen soms in zonder persoonsnaam
+      // (alleen "Bedrijf" in Realworks). Dan toont onze app niets bij naam.
+      // Als naam ontbreekt → ontleen een leesbare label uit het email-domein.
+      // Bv. info@aardenhoutmakelaardij.nl → "Aardenhout Makelaardij"
+      function naamUitEmail(email) {
+        if (!email || typeof email !== 'string') return '';
+        // Persoonlijke email-providers leveren geen bruikbare bedrijfsnaam op
+        const persoonlijk = /@(gmail|hotmail|outlook|live|icloud|me|yahoo|ziggo|kpnmail|xs4all|planet|home|upcmail|chello|casema|quicknet|telfort|tele2|online)\./i;
+        if (persoonlijk.test(email)) return '';
+        const m = email.match(/@([^.]+)\./);
+        if (!m) return '';
+        // Streepjes en underscores in domein → spaties voor leesbaarheid
+        let domein = m[1].replace(/[-_]+/g, ' ').trim();
+        const termen = ['makelaardij','makelaars','makelaar','vastgoed','realestate','realtors','immobilien','homes'];
+        for (const t of termen) {
+          const idx = domein.toLowerCase().indexOf(t);
+          if (idx > 0) {
+            const prefix = domein.substring(0, idx).trim();
+            const term = domein.substring(idx).trim();
+            return cap(prefix) + ' ' + cap(term);
+          }
+        }
+        return cap(domein);
+      }
+      function cap(s) {
+        if (!s) return '';
+        return s.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      }
+      // Pas fallback toe per item — bewaar origineel in `_naamLeeg` voor optionele markering
+      items.forEach(b => {
+        if (!b.naam || !String(b.naam).trim()) {
+          const fallback = naamUitEmail(b.email);
+          b.naam = fallback ? fallback : '(geen naam)';
+          b._naamUitEmail = !!fallback;  // markeer als gegenereerd
+        }
+      });
+
            // Sortering: datum+tijd volgens voorkeur (Nieuwste = meest recent
            // bovenaan, Oudste = vroegste bovenaan). Binnen dezelfde dag werkt
            // de knop ook (consistent met hersorteerZichtbareKaarten).
@@ -2739,12 +2779,13 @@
         const actieStatus = b.actie_status || '';
         const alGedeeld = !!actieStatus;  // elke status anders dan '' = afgesloten
         const feedbackOpties = [
-          { key: 'serieus',    emoji: '🔥', label: 'Serieuze koper' },
-          { key: 'verkoop',    emoji: '💰', label: 'Verkoopprospect' },
-          { key: 'aankoop',   emoji: '🏠', label: 'Aankoopprospect' },
-          { key: 'makelaar',  emoji: '✋', label: 'Heeft makelaar' },
-          { key: 'geen_beeld',emoji: '💭', label: 'Geen beeld' },
-          { key: 'noshow',    emoji: '🚫', label: 'No-show' },
+          { key: 'serieus',         emoji: '🔥', label: 'Serieuze koper' },
+          { key: 'verkoop',         emoji: '💰', label: 'Verkoopprospect' },
+          { key: 'aankoop',         emoji: '🏠', label: 'Aankoopprospect' },
+          { key: 'makelaar',        emoji: '✋', label: 'Heeft makelaar' },
+          { key: 'aankoopmakelaar', emoji: '🏢', label: 'Aankoopmakelaar' },
+          { key: 'geen_beeld',      emoji: '💭', label: 'Geen beeld' },
+          { key: 'noshow',          emoji: '🚫', label: 'No-show' },
         ];
         const huidigeFeedback = b.feedback ? b.feedback.split(',').filter(Boolean) : [];
         const heeftFeedback = huidigeFeedback.length > 0;
@@ -3346,12 +3387,13 @@
       };
     });
     const opts = [
-      { k:'serieus',    e:'\uD83D\uDD25', l:'Serieuze koper' },
-      { k:'verkoop',    e:'\uD83D\uDCB0', l:'Verkoopprospect' },
-      { k:'aankoop',    e:'\uD83C\uDFE0', l:'Aankoopprospect' },
-      { k:'makelaar',   e:'\u270B',       l:'Heeft makelaar' },
-      { k:'geen_beeld', e:'\uD83D\uDCAD', l:'Geen beeld' },
-      { k:'noshow',     e:'\uD83D\uDEAB', l:'No-show' }
+      { k:'serieus',         e:'\uD83D\uDD25', l:'Serieuze koper' },
+      { k:'verkoop',         e:'\uD83D\uDCB0', l:'Verkoopprospect' },
+      { k:'aankoop',         e:'\uD83C\uDFE0', l:'Aankoopprospect' },
+      { k:'makelaar',        e:'\u270B',       l:'Heeft makelaar' },
+      { k:'aankoopmakelaar', e:'\uD83C\uDFE2', l:'Aankoopmakelaar' },
+      { k:'geen_beeld',      e:'\uD83D\uDCAD', l:'Geen beeld' },
+      { k:'noshow',          e:'\uD83D\uDEAB', l:'No-show' }
     ];
     const kaartHtml = items.map(function(it){
       const opties = opts.map(function(f){
@@ -3541,7 +3583,7 @@
     }
     verstuurBtn.disabled = true;
     verstuurBtn.textContent = 'Bezig... (0/' + taken.length + ')';
-    const labels = { serieus:'\uD83D\uDD25 Serieuze koper', verkoop:'\uD83D\uDCB0 Verkoopprospect', aankoop:'\uD83C\uDFE0 Aankoopprospect', makelaar:'\u270B Heeft makelaar', geen_beeld:'\uD83D\uDCAD Geen beeld', noshow:'\uD83D\uDEAB No-show' };
+    const labels = { serieus:'\uD83D\uDD25 Serieuze koper', verkoop:'\uD83D\uDCB0 Verkoopprospect', aankoop:'\uD83C\uDFE0 Aankoopprospect', makelaar:'\u270B Heeft makelaar', aankoopmakelaar:'\uD83C\uDFE2 Aankoopmakelaar', geen_beeld:'\uD83D\uDCAD Geen beeld', noshow:'\uD83D\uDEAB No-show' };
     let gelukt = 0, mislukt = 0;
     for (let i = 0; i < taken.length; i++) {
       const t = taken[i];
