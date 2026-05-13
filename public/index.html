@@ -3815,25 +3815,29 @@
           }
         })
       });
-      // Persistente status — markeer als 'niet naar pool' op bezichtigingen-board
-      await fetch('/.netlify/functions/monday', {
+      // Persistente archivering — gebruikt dezelfde flow als bulk-archief
+      // zodat de kaart écht uit de actieve lijst verdwijnt (vindbaar in Archief).
+      const archiefRes = await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'markeer_afgehandeld',
-          data: { item_id: itemId }
+          action: 'archiveer_bezichtiging',
+          data: { item_id: itemId, archiveer: true }
         })
       });
+      const archiefJson = await archiefRes.json();
+      if (archiefJson.error) throw new Error(archiefJson.error);
 
-      vergrendelAndereActies(itemId, 'afgehandeld');
-      // Kaart niet meer verwijderen — blijft zichtbaar in "Alles" filter
-      // maar verdwijnt uit "Open feedback" zodat je lijst schoon blijft
-      if (btn) {
-        btn.textContent = '📦 Gearchiveerd';
-        btn.disabled = true;
-        btn.style.background = '#2e7d32';
+      // Kaart direct uit de DOM verwijderen — naar archief = weg uit werklijst
+      document.getElementById('bez-' + itemId)?.remove();
+      // Archief-teller in stats-bar bijwerken
+      if (typeof werkArchiefTellerBij === 'function') werkArchiefTellerBij(+1);
+      // Open-feedback teller bijwerken (kaart was open)
+      const nieuwEl = document.getElementById('stat-geven-nieuw');
+      if (nieuwEl) {
+        const huidig = parseInt(nieuwEl.textContent || '0', 10);
+        nieuwEl.textContent = Math.max(0, huidig - 1);
       }
-      markeerKaartAfgesloten(itemId, "afgehandeld");
       toonToast(`📦 ${naam} gearchiveerd${stage_override ? ' (Cloze: ' + stage_override + ')' : ''}`, 'succes');
     } catch (err) {
       if (btn) { btn.disabled = false; btn.textContent = '📦 Naar archief'; }
