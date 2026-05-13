@@ -3774,8 +3774,17 @@
 
   // Daadwerkelijke verwerking — wordt aangeroepen vanuit sluitAfhandelModal(true)
   async function verwerkAfhandeling(itemId, naam, stage_override, opmerking) {
-    const lead = leadsData.find(l => String(l.id) === String(itemId));
-    if (!lead) { toonToast('Lead niet gevonden.', 'fout'); return; }
+    // Lees lead-data uit de DOM (op de kaart zelf), niet uit leadsData —
+    // dat is een andere lijst (bellijst-pagina) en bevat geen bezichtigingen.
+    const card = document.getElementById('bez-' + itemId);
+    if (!card) { toonToast('Lead niet gevonden.', 'fout'); return; }
+    const fbo = document.getElementById('fbo-' + itemId);
+    const lead = {
+      naam:     naam,
+      email:    fbo?.dataset.email    || '',
+      telefoon: fbo?.dataset.telefoon || '',
+      adres:    fbo?.dataset.adres    || card.dataset.adres || ''
+    };
 
     const btn = document.getElementById(`btn-afgehandeld-${itemId}`);
     if (btn) { btn.disabled = true; btn.textContent = 'Bezig...'; }
