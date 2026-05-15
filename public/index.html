@@ -1368,7 +1368,7 @@
       <option value="Hot">🔥 Hot</option>
       <option value="Afspraak">📅 Afspraak</option>
       <option value="Deal">✅ Deal</option>
-      <option value="Lost">❌ Lost</option>
+      <option value="Lost">📦 Archief</option>
     </select>
   </div>
 
@@ -2137,7 +2137,7 @@
       'Warm':      { cls: 'chip-warm',      label: '🌡️ Warm' },
       'Afspraak':  { cls: 'chip-afspraak',  label: '📅 Afspraak' },
       'Deal':      { cls: 'chip-deal',      label: '✅ Deal' },
-      'Lost':      { cls: 'chip-lost',      label: '❌ Lost' },
+      'Lost':      { cls: 'chip-lost',      label: '📦 Archief' },
     };
 
     // Format datum compact
@@ -2208,7 +2208,7 @@
               <option value="Hot" ${doorgegevenFilters.lead_status === 'Hot' ? 'selected' : ''}>🔥 Hot</option>
               <option value="Afspraak" ${doorgegevenFilters.lead_status === 'Afspraak' ? 'selected' : ''}>📅 Afspraak</option>
               <option value="Deal" ${doorgegevenFilters.lead_status === 'Deal' ? 'selected' : ''}>✅ Deal</option>
-              <option value="Lost" ${doorgegevenFilters.lead_status === 'Lost' ? 'selected' : ''}>❌ Lost</option>
+              <option value="Lost" ${doorgegevenFilters.lead_status === 'Lost' ? 'selected' : ''}>📦 Archief</option>
             </select>
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;font-size:12px">
@@ -4496,7 +4496,7 @@
         'Warm':       { cls: 'chip-warm',       label: '🌡️ Warm' },
         'Afspraak':   { cls: 'chip-afspraak',   label: '📅 Afspraak' },
         'Deal':       { cls: 'chip-deal',       label: '✅ Deal' },
-        'Lost':       { cls: 'chip-lost',       label: '❌ Lost' },
+        'Lost':       { cls: 'chip-lost',       label: '📦 Archief' },
       }[lead.lead_status] || null;
 
       // Bel-status chip
@@ -4560,7 +4560,7 @@
           ` : ''}
           <div class="lead-naam">${lead.naam}</div>
           ${lead.adres ? `<div class="lead-adres">📍 ${lead.adres}</div>` : ''}
-          ${lead.bij_wie ? `<div class="lead-adres" style="font-size:12px;margin-top:2px">📓 Bezichtigd bij: ${lead.bij_wie}</div>` : ''}
+          ${lead.bij_wie ? `<div style="display:inline-block;margin-top:6px;padding:3px 10px;background:#fef3c7;color:#92400e;border-radius:999px;font-size:11px;font-weight:600">🔄 Doorgegeven door ${lead.bij_wie}</div>` : ''}
 
           <div class="lead-meta" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
             ${leadStatusChip ? `<span class="lead-chip ${leadStatusChip.cls}">${leadStatusChip.label}</span>` : ''}
@@ -4600,7 +4600,7 @@
               <button class="btn-leadstatus btn-hot"        onclick="zetLeadStatus('${lead.id}', 'Hot')">🔥 Hot</button>
               <button class="btn-leadstatus btn-afspraak"   onclick="zetLeadStatus('${lead.id}', 'Afspraak')">📅 Afspraak</button>
               <button class="btn-leadstatus btn-deal"       onclick="zetLeadStatus('${lead.id}', 'Deal')">✅ Deal</button>
-              <button class="btn-leadstatus btn-lost"       onclick="zetLeadStatus('${lead.id}', 'Lost')">❌ Lost</button>
+              <button class="btn-leadstatus btn-lost"       onclick="zetLeadStatus('${lead.id}', 'Lost')">📦 Archief</button>
             </div>
           `}
         </div>
@@ -4965,7 +4965,7 @@
       'Warm':      { cls: 'chip-warm',      label: '🌡️ Warm' },
       'Afspraak':  { cls: 'chip-afspraak',  label: '📅 Afspraak' },
       'Deal':      { cls: 'chip-deal',      label: '✅ Deal' },
-      'Lost':      { cls: 'chip-lost',      label: '❌ Lost' },
+      'Lost':      { cls: 'chip-lost',      label: '📦 Archief' },
     };
 
     const fmtDatum = (iso) => {
@@ -5031,7 +5031,7 @@
               <option value="Hot" ${ontvangenFilters.lead_status === 'Hot' ? 'selected' : ''}>🔥 Hot</option>
               <option value="Afspraak" ${ontvangenFilters.lead_status === 'Afspraak' ? 'selected' : ''}>📅 Afspraak</option>
               <option value="Deal" ${ontvangenFilters.lead_status === 'Deal' ? 'selected' : ''}>✅ Deal</option>
-              <option value="Lost" ${ontvangenFilters.lead_status === 'Lost' ? 'selected' : ''}>❌ Lost</option>
+              <option value="Lost" ${ontvangenFilters.lead_status === 'Lost' ? 'selected' : ''}>📦 Archief</option>
             </select>
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;font-size:12px">
@@ -5215,16 +5215,21 @@
         clozeKlantFlow(lead, aankoopOfVerkoop, nieuweStatus).catch(e => {
           console.warn('Cloze-flow faalde:', e);
         });
-        toonToast(`✅ Status: ${nieuweStatus} — Cloze-klant wordt bijgewerkt…`, 'succes');
+        toonToast(`✅ Aangemaakt in Cloze (${nieuweStatus})`, 'succes');
       }
       // 2b. Vervolgkeer: alleen Cloze stage doorschuiven (geen modal, geen aanmaak)
       else if (moetAlleenStageBijwerken) {
-        clozeStageUpdate(lead, nieuweStatus).catch(e => {
-          console.warn('Cloze-stage-update faalde:', e);
-        });
-        toonToast(`✅ Status: ${nieuweStatus} — Cloze stage wordt bijgewerkt…`, 'succes');
+        // Detecteer: zelfde stage als al ingesteld → geen Cloze-call, alleen melding
+        if (oudeStatus === nieuweStatus) {
+          toonToast(`ℹ️ Al aangemaakt in Cloze — stage staat al op ${nieuweStatus}`, 'info');
+        } else {
+          clozeStageUpdate(lead, nieuweStatus, oudeStatus).catch(e => {
+            console.warn('Cloze-stage-update faalde:', e);
+          });
+          // Toast komt vanuit clozeStageUpdate met "gewijzigd" tekst
+        }
       }
-      // 2c. Lost of geen Cloze-link: alleen Supabase
+      // 2c. Archief/Lost of geen Cloze-link: alleen Supabase
       else {
         toonToast(`✅ Status: ${nieuweStatus}`, 'succes');
       }
@@ -5239,7 +5244,8 @@
   // ── CLOZE STAGE UPDATE (zonder klant aan te maken) ──────────────────
   // Voor leads die al een cloze_id hebben: schuif alleen de stage door
   // op basis van de nieuwe lead-status. Geen modal, geen aanmaak.
-  async function clozeStageUpdate(lead, nieuweLeadStatus) {
+  // oudeStatus is optioneel — als meegegeven, toont de toast de transitie.
+  async function clozeStageUpdate(lead, nieuweLeadStatus, oudeStatus) {
     // Stage-mapping bellijst-status → Cloze API stage key
     // (intern Cloze: 'lead'=Warm, 'future'=Hot, 'current'=In Contract)
     const STAGE_MAP = {
@@ -5269,7 +5275,11 @@
         ? `https://www.cloze.com/in/person/${lead.cloze_id}#section=people`
         : null;
       const actie = clozeUrl ? { url: clozeUrl, label: 'Open in Cloze →' } : null;
-      toonToast(`📋 Cloze stage bijgewerkt (${nieuweLeadStatus})`, 'succes', actie);
+      // Toon transitie als oudeStatus bekend is en verschilt
+      const tekst = (oudeStatus && oudeStatus !== nieuweLeadStatus)
+        ? `🔄 Cloze stage gewijzigd: ${oudeStatus} → ${nieuweLeadStatus}`
+        : `📋 Cloze stage bijgewerkt (${nieuweLeadStatus})`;
+      toonToast(tekst, 'succes', actie);
     } else {
       toonToast(`Cloze stage updaten faalde: ${json.error || json.message || 'onbekend'}`, 'fout');
     }
