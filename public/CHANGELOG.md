@@ -5,6 +5,43 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-15
+
+### Gefixt — Cloze "al aangemaakt" detectie op stage-knoppen
+
+**Probleem:** klik op een stage-knop (Warm/Hot/Afspraak/Deal) gaf altijd dezelfde toast "Cloze stage bijgewerkt", ook als het contact al in Cloze stond en de stage al goed was. Geen onderscheid tussen aanmaken, switchen of niets-doen.
+
+**Fix:** drie verschillende toasts afhankelijk van situatie:
+1. **Eerste klik** (geen `cloze_id` in Supabase): `✅ Aangemaakt in Cloze ({stage})` — contact wordt aangemaakt zoals voorheen.
+2. **Tweede klik op zelfde knop** (zelfde `cloze_id`, zelfde stage): `ℹ️ Al aangemaakt in Cloze — stage staat al op {stage}` — geen Cloze API-call (bespaart rate-limit).
+3. **Andere stage-knop** (al `cloze_id`, andere stage): `🔄 Cloze stage gewijzigd: {oud} → {nieuw}` — stage-update via Cloze API.
+
+`clozeStageUpdate()` accepteert nu optionele `oudeStatus` parameter voor de transitie-toast.
+
+### Toegevoegd — Lost-knop hernoemd naar Archief
+
+**Reden:** "Lost" voelt te definitief en werd gebruikt als "wegklikken/archiveren" — niet als verloren deal. Hernoemd voor duidelijkheid, in lijn met de Archief-knop op de Bezichtigingen-pagina.
+
+**Aangepast:**
+- Knop op leadkaart: `❌ Lost` → `📦 Archief`
+- Filter-dropdown leads-pagina: `❌ Lost` → `📦 Archief`
+- Chip-labels in 3 dashboards (leads-pagina, doorgegeven, ontvangen): allen `📦 Archief`
+- Filter-opties in doorgegeven- en ontvangen-dashboards: `📦 Archief`
+
+**Niet veranderd:** de DB-waarde blijft `'Lost'` zodat bestaande records en API-koppelingen niet breken. Alleen het UI-label is hernoemd.
+
+### Verbeterd — Gevende makelaar duidelijker zichtbaar op leadkaart
+
+**Was:** kleine grijze tekst onder het adres: "📓 Bezichtigd bij: Rogier" — makkelijk te missen.
+
+**Nu:** opvallende oranje badge direct onder het adres: "🔄 Doorgegeven door Rogier" — visueel duidelijk dat dit een pool-lead is van een collega.
+
+Reden: ontvangende makelaar (bv. Wilma) moet in één oogopslag zien dat een lead bij een andere makelaar (bv. Rogier) is geweest. Helpt bij gespreksvoering en bij eventueel terugkoppelen.
+
+Alleen zichtbaar als `lead.bij_wie` is ingevuld (dus alleen bij doorgegeven pool-leads, niet bij eigen leads).
+
+---
+
 ## 2026-05-12
 
 ### Gefixt — bel-status chips kwamen niet op de kaart na opslaan
