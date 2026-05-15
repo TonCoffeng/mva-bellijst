@@ -534,6 +534,24 @@ exports.handler = async (event) => {
       }
       const items = await sbGet(path);
 
+      // Voor pool-leads: haal gevende makelaar erbij via bezichtigingen-tabel
+      // (eigen leads bron='zelf' krijgen geen bij_wie — die zijn van henzelf)
+      const poolItems = items.filter(it => it.bron === 'pool' && it.bezichtiging_id);
+      let geverPerBezId = {};
+      if (poolItems.length > 0) {
+        const bezIds = [...new Set(poolItems.map(it => it.bezichtiging_id))].join(',');
+        const bezichtigingen = await sbGet(`bezichtigingen?select=id,gevende_makelaar_id&id=in.(${bezIds})`);
+        const geverIds = [...new Set(bezichtigingen.map(b => b.gevende_makelaar_id).filter(Boolean))];
+        let gebruikersMap = {};
+        if (geverIds.length > 0) {
+          const gebruikers = await sbGet(`gebruikers?select=id,naam&id=in.(${geverIds.join(',')})`);
+          gebruikersMap = Object.fromEntries(gebruikers.map(g => [g.id, g.naam]));
+        }
+        geverPerBezId = Object.fromEntries(
+          bezichtigingen.map(b => [b.id, gebruikersMap[b.gevende_makelaar_id] || ''])
+        );
+      }
+
       // Transformeer naar Monday-stijl shape voor frontend backwards compat
       const leads = items
         // Filter Gearchiveerd weg (kan ook server-side via .neq= maar PostgREST or-syntax is fragiel met null)
@@ -552,6 +570,7 @@ exports.handler = async (event) => {
           warme_lead:         it.warme_lead ? 'true' : '',
           opmerkingen:        it.opmerking || '',
           bron:               it.bron, // 'zelf' of 'pool'
+          bij_wie:            (it.bron === 'pool' && it.bezichtiging_id) ? (geverPerBezId[it.bezichtiging_id] || '') : '',
           belpogingen:        it.belpogingen || 0,
           afspraak_op:        it.afspraak_op || '',
           deal_op:            it.deal_op || '',
