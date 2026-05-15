@@ -4560,7 +4560,7 @@
           ` : ''}
           <div class="lead-naam">${lead.naam}</div>
           ${lead.adres ? `<div class="lead-adres">📍 ${lead.adres}</div>` : ''}
-          ${lead.bij_wie ? `<div style="display:inline-block;margin-top:6px;padding:3px 10px;background:#fef3c7;color:#92400e;border-radius:999px;font-size:11px;font-weight:600">🔄 Doorgegeven door ${lead.bij_wie}</div>` : ''}
+          ${lead.bij_wie && lead.bij_wie !== (huidigeMakelaar?.naam || '') ? `<div style="display:inline-block;margin-top:6px;padding:3px 10px;background:#fef3c7;color:#92400e;border-radius:999px;font-size:11px;font-weight:600">🔄 Doorgegeven door ${lead.bij_wie}</div>` : ''}
 
           <div class="lead-meta" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
             ${leadStatusChip ? `<span class="lead-chip ${leadStatusChip.cls}">${leadStatusChip.label}</span>` : ''}
@@ -5271,15 +5271,12 @@
     });
     const json = await res.json();
     if (json.ok || json.errorcode === 0) {
-      const clozeUrl = lead.cloze_id
-        ? `https://www.cloze.com/in/person/${lead.cloze_id}#section=people`
-        : null;
-      const actie = clozeUrl ? { url: clozeUrl, label: 'Open in Cloze →' } : null;
       // Toon transitie als oudeStatus bekend is en verschilt
       const tekst = (oudeStatus && oudeStatus !== nieuweLeadStatus)
         ? `🔄 Cloze stage gewijzigd: ${oudeStatus} → ${nieuweLeadStatus}`
         : `📋 Cloze stage bijgewerkt (${nieuweLeadStatus})`;
-      toonToast(tekst, 'succes', actie);
+      // Geen "Open in Cloze →" actie meer — gebruiker gebruikt de Cloze-knop op de kaart
+      toonToast(tekst, 'succes');
     } else {
       toonToast(`Cloze stage updaten faalde: ${json.error || json.message || 'onbekend'}`, 'fout');
     }
@@ -5404,12 +5401,8 @@
           // Forceer re-render zodat de knop direct verschijnt
           renderLeads();
         }
-        // Voeg klikbare link toe naar de Cloze-kaart zodat makelaar
-        // direct kan doorklikken om het record te verrijken.
-        const actie = json.cloze_url
-          ? { url: json.cloze_url, label: 'Open in Cloze →' }
-          : null;
-        toonToast(actieTekst, 'succes', actie);
+        // Geen "Open in Cloze →" actie meer — gebruiker gebruikt de Cloze-knop op de kaart
+        toonToast(actieTekst, 'succes');
       } else {
         toonToast(`Cloze-actie mislukt: ${json.error || json.cloze_response?.message || 'onbekend'}`, 'fout');
       }

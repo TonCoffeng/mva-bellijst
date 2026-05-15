@@ -18,6 +18,12 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 `clozeStageUpdate()` accepteert nu optionele `oudeStatus` parameter voor de transitie-toast.
 
+### Verwijderd — "Open in Cloze →" knop in toast-meldingen
+
+Voorheen verscheen rechts in de toast een groene "Open in Cloze →" link. Dit gaf twee paden naar Cloze (toast-link én Cloze-knop op de kaart), wat verwarrend was.
+
+**Aangepast:** toasts tonen nu alleen de melding. Doorklikken naar Cloze gebeurt via de dedicated Cloze-knop op de leadkaart. Geldt voor zowel `clozeKlantFlow()` (aanmaak) als `clozeStageUpdate()` (stage-wissel).
+
 ### Toegevoegd — Lost-knop hernoemd naar Archief
 
 **Reden:** "Lost" voelt te definitief en werd gebruikt als "wegklikken/archiveren" — niet als verloren deal. Hernoemd voor duidelijkheid, in lijn met de Archief-knop op de Bezichtigingen-pagina.
@@ -30,15 +36,17 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 **Niet veranderd:** de DB-waarde blijft `'Lost'` zodat bestaande records en API-koppelingen niet breken. Alleen het UI-label is hernoemd.
 
-### Verbeterd — Gevende makelaar duidelijker zichtbaar op leadkaart
+### Toegevoegd — Naam gevende makelaar op pool-leads (backend + frontend)
 
-**Was:** kleine grijze tekst onder het adres: "📓 Bezichtigd bij: Rogier" — makkelijk te missen.
+**Probleem:** pool-leads in de Bellijst toonden niet wie de oorspronkelijke makelaar was. Wilma kreeg een lead van Sam Kuin (oorspronkelijk bij Rogier in de agenda) maar zag niet wie de gever was.
 
-**Nu:** opvallende oranje badge direct onder het adres: "🔄 Doorgegeven door Rogier" — visueel duidelijk dat dit een pool-lead is van een collega.
+**Oorzaak:** de `get_leads` Netlify-functie leverde geen `bij_wie` veld in de API-response. De frontend had het veld al wel klaar staan, maar er was niks om te tonen.
 
-Reden: ontvangende makelaar (bv. Wilma) moet in één oogopslag zien dat een lead bij een andere makelaar (bv. Rogier) is geweest. Helpt bij gespreksvoering en bij eventueel terugkoppelen.
+**Fix (backend `monday.js`):** `get_leads` haalt nu voor pool-items (`bron='pool'`) de bezichtiging op via `bezichtiging_id`, leest `gevende_makelaar_id`, en vertaalt die naar `naam` via de `gebruikers`-tabel. Resultaat komt mee als `bij_wie` in de response. Eigen leads (`bron='zelf'`) krijgen leeg `bij_wie` — die zijn van henzelf, niet doorgegeven.
 
-Alleen zichtbaar als `lead.bij_wie` is ingevuld (dus alleen bij doorgegeven pool-leads, niet bij eigen leads).
+**Fix (frontend `index.html`):** opvallende oranje badge direct onder het adres: "🔄 Doorgegeven door {naam}". Verschijnt alleen wanneer `bij_wie` is gevuld én verschilt van de ingelogde makelaar (dus niet bij eigen leads of bij iemand die zichzelf zou doortoewijzen).
+
+Helpt ontvangende makelaar (bv. Wilma) in één oogopslag zien dat een lead bij een andere makelaar (bv. Rogier) is geweest — handig bij gespreksvoering en eventueel terugkoppelen.
 
 ---
 
