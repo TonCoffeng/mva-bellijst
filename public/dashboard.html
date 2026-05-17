@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — MVA Leadpool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #1A2B5F;
+    --navy-dark: #15234e;
+    --oranje: #E8500A;
+    --oranje-light: #ff6600;
+    --groen: #10b981;
+    --groen-light: #d1fae5;
+    --rood: #dc2626;
+    --rood-light: #fee2e2;
+    --geel: #f59e0b;
+    --geel-light: #fef3c7;
+    --blauw-zacht: #3b82f6;
+    --blauw-zacht-bg: #dbeafe;
+    --wit: #ffffff;
+    --grijs-bg: #f4f5f8;
+    --grijs-mid: #e5e7eb;
+    --grijs-tekst: #6b7280;
+    --grijs-donker: #374151;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--grijs-bg);
+    color: var(--navy);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--navy);
+    color: white;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-logo { display: flex; align-items: center; gap: 12px; }
+  .header-logo .dot {
+    width: 36px; height: 36px;
+    background: var(--oranje);
+    color: white;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+  }
+  .header-title { font-size: 16px; font-weight: 600; line-height: 1.2; }
+  .header-sub { font-size: 12px; opacity: 0.8; }
+  .header-actions { display: flex; gap: 10px; align-items: center; }
+  .header-btn {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: white;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .header-btn:hover { background: rgba(255,255,255,0.25); }
+
+  /* ── PAGINA CONTAINER ── */
+  .container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  /* ── TOOLBAR ── */
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 14px 16px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .toolbar-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--grijs-tekst);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .periode-knoppen {
+    display: flex;
+    gap: 4px;
+    background: var(--grijs-bg);
+    padding: 4px;
+    border-radius: 8px;
+  }
+  .periode-knop {
+    padding: 7px 14px;
+    border: none;
+    background: transparent;
+    color: var(--grijs-donker);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all .15s;
+  }
+  .periode-knop:hover { background: white; }
+  .periode-knop.actief {
+    background: var(--navy);
+    color: white;
+  }
+
+  .refresh-info {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--grijs-tekst);
+  }
+  .refresh-info .dot {
+    width: 8px; height: 8px;
+    background: var(--groen);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  .refresh-info.gepauzeerd .dot { background: var(--geel); animation: none; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .btn-icon {
+    background: var(--grijs-bg);
+    border: 1px solid var(--grijs-mid);
+    color: var(--navy);
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s;
+  }
+  .btn-icon:hover { background: var(--grijs-mid); }
+
+  /* ── KPI CARDS ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kpi-card {
+    background: white;
+    padding: 18px 20px;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    border-left: 4px solid var(--navy);
+  }
+  .kpi-card.deals { border-left-color: var(--groen); }
+  .kpi-card.conversie { border-left-color: var(--oranje); }
+  .kpi-card.snelheid { border-left-color: var(--blauw-zacht); }
+  .kpi-card.open { border-left-color: var(--geel); }
+  .kpi-card.warm { border-left-color: var(--rood); }
+
+  .kpi-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--grijs-tekst);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .kpi-getal {
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1;
+  }
+  .kpi-getal.klein { font-size: 24px; }
+  .kpi-sub {
+    font-size: 12px;
+    color: var(--grijs-tekst);
+    margin-top: 6px;
+  }
+
+  /* ── SECTIES ── */
+  .sectie {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .sectie-titel {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--navy);
+    margin: 0 0 16px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .sectie-sub {
+    font-size: 12px;
+    color: var(--grijs-tekst);
+    font-weight: 400;
+  }
+
+  /* ── STATUS FUNNEL ── */
+  .funnel {
+    display: flex;
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .funnel-stap {
+    flex: 1;
+    background: var(--grijs-bg);
+    border-radius: 8px;
+    padding: 14px 12px;
+    text-align: center;
+    position: relative;
+    transition: transform .15s;
+  }
+  .funnel-stap:hover { transform: translateY(-2px); }
+  .funnel-stap.nieuw { background: #e0e7ff; }
+  .funnel-stap.bereikt { background: var(--blauw-zacht-bg); }
+  .funnel-stap.afspraak { background: var(--geel-light); }
+  .funnel-stap.deal { background: var(--groen-light); }
+  .funnel-stap.lost { background: var(--rood-light); }
+  .funnel-stap.niet_geinteresseerd { background: #e5e7eb; }
+
+  .funnel-aantal {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1;
+  }
+  .funnel-label {
+    font-size: 11px;
+    color: var(--grijs-donker);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+    margin-top: 6px;
+  }
+  .funnel-pijl {
+    position: absolute;
+    right: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--grijs-mid);
+    font-size: 14px;
+    z-index: 1;
+  }
+
+  /* ── MAKELAAR TABEL ── */
+  .tabel-wrap {
+    overflow-x: auto;
+    margin: 0 -20px;
+    padding: 0 20px;
+  }
+  table.makelaars {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  table.makelaars th {
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--grijs-tekst);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-bottom: 2px solid var(--grijs-mid);
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+  }
+  table.makelaars th:hover { color: var(--navy); }
+  table.makelaars th.numeriek { text-align: right; }
+  table.makelaars th .sort-pijl {
+    font-size: 10px;
+    opacity: 0.4;
+    margin-left: 4px;
+  }
+  table.makelaars th.gesorteerd .sort-pijl { opacity: 1; color: var(--navy); }
+
+  table.makelaars td {
+    padding: 12px;
+    border-bottom: 1px solid var(--grijs-bg);
+    color: var(--navy);
+  }
+  table.makelaars td.numeriek {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  table.makelaars tr:hover td { background: var(--grijs-bg); }
+
+  .makelaar-naam {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+  }
+  .makelaar-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .makelaar-badge.vakantie {
+    background: var(--geel-light);
+    color: #92400e;
+  }
+  .makelaar-badge.rr-uit {
+    background: var(--grijs-mid);
+    color: var(--grijs-donker);
+  }
+
+  .cel-deals { color: var(--groen); font-weight: 600; }
+  .cel-conversie { font-weight: 600; }
+  .cel-conversie.hoog { color: var(--groen); }
+  .cel-conversie.middel { color: var(--geel); }
+  .cel-conversie.laag { color: var(--rood); }
+
+  /* ── ROUND ROBIN INDICATOR ── */
+  .rr-status {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+  .rr-card {
+    background: var(--grijs-bg);
+    padding: 12px 14px;
+    border-radius: 10px;
+  }
+  .rr-card-label {
+    font-size: 11px;
+    color: var(--grijs-tekst);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+  }
+  .rr-card-getal {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--navy);
+    margin-top: 4px;
+  }
+  .rr-card-getal.spreiding-ok { color: var(--groen); }
+  .rr-card-getal.spreiding-let { color: var(--geel); }
+  .rr-card-getal.spreiding-slecht { color: var(--rood); }
+
+  /* ── LADEN STATE ── */
+  .laden {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--grijs-tekst);
+  }
+  .laden-spinner {
+    display: inline-block;
+    width: 24px; height: 24px;
+    border: 3px solid var(--grijs-mid);
+    border-top-color: var(--navy);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 12px;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .leeg-bericht {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--grijs-tekst);
+    font-size: 14px;
+  }
+
+  .fout-bericht {
+    background: var(--rood-light);
+    color: var(--rood);
+    padding: 14px 18px;
+    border-radius: 10px;
+    font-size: 14px;
+    border-left: 4px solid var(--rood);
+    margin-bottom: 16px;
+  }
+
+  /* ── MOBILE ── */
+  @media (max-width: 720px) {
+    .container { padding: 12px; }
+    .header { padding: 12px 14px; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .kpi-card { padding: 14px; }
+    .kpi-getal { font-size: 24px; }
+    .funnel { flex-direction: column; }
+    .funnel-pijl { display: none; }
+    .toolbar { padding: 12px; }
+    .refresh-info { width: 100%; justify-content: flex-end; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-logo">
+    <div class="dot">M</div>
+    <div>
+      <div class="header-title">MVA Leadpool — Dashboard</div>
+      <div class="header-sub" id="header-sub">Overzicht</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="header-btn" onclick="terugNaarApp()">← Terug naar app</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <span class="toolbar-label">Periode</span>
+    <div class="periode-knoppen" id="periode-knoppen">
+      <button class="periode-knop" data-periode="vandaag">Vandaag</button>
+      <button class="periode-knop actief" data-periode="week">Deze week</button>
+      <button class="periode-knop" data-periode="maand">Deze maand</button>
+      <button class="periode-knop" data-periode="alles">Alles</button>
+    </div>
+
+    <div class="refresh-info" id="refresh-info">
+      <span class="dot"></span>
+      <span id="refresh-tekst">Auto-refresh aan · laatst: —</span>
+      <button class="btn-icon" id="btn-pauze" onclick="togglePauze()" title="Pauzeer auto-refresh">⏸</button>
+      <button class="btn-icon" onclick="laadData()" title="Nu verversen">↻</button>
+    </div>
+  </div>
+
+  <!-- FOUTMELDING (verborgen tenzij nodig) -->
+  <div class="fout-bericht" id="fout-bericht" style="display:none;"></div>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-grid" id="kpi-grid">
+    <!-- gevuld door JS -->
+  </div>
+
+  <!-- STATUS FUNNEL -->
+  <div class="sectie">
+    <h2 class="sectie-titel">
+      Status-funnel
+      <span class="sectie-sub" id="funnel-sub">—</span>
+    </h2>
+    <div class="funnel" id="funnel">
+      <!-- gevuld door JS -->
+    </div>
+  </div>
+
+  <!-- ROUND ROBIN BALANS -->
+  <div class="sectie">
+    <h2 class="sectie-titel">
+      Round Robin verdeling
+      <span class="sectie-sub">Eerlijkheidscheck pool-toewijzingen</span>
+    </h2>
+    <div class="rr-status" id="rr-status">
+      <!-- gevuld door JS -->
+    </div>
+  </div>
+
+  <!-- MAKELAARS TABEL -->
+  <div class="sectie">
+    <h2 class="sectie-titel">
+      Per makelaar
+      <span class="sectie-sub" id="makelaars-sub">—</span>
+    </h2>
+    <div class="tabel-wrap">
+      <table class="makelaars" id="tabel-makelaars">
+        <thead>
+          <tr>
+            <th data-sort="naam">Naam <span class="sort-pijl">▲▼</span></th>
+            <th class="numeriek" data-sort="ontvangen">Ontvangen <span class="sort-pijl">▲▼</span></th>
+            <th class="numeriek" data-sort="gebeld_pct">Gebeld <span class="sort-pijl">▲▼</span></th>
+            <th class="numeriek" data-sort="afspraken">Afspraken <span class="sort-pijl">▲▼</span></th>
+            <th class="numeriek" data-sort="deals">Deals <span class="sort-pijl">▲▼</span></th>
+            <th class="numeriek gesorteerd" data-sort="conversie">Conversie <span class="sort-pijl">▼</span></th>
+            <th class="numeriek" data-sort="bel_snelheid_uur">Bel-snelheid <span class="sort-pijl">▲▼</span></th>
+            <th class="numeriek" data-sort="openstaand">Open <span class="sort-pijl">▲▼</span></th>
+          </tr>
+        </thead>
+        <tbody id="tabel-body">
+          <!-- gevuld door JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── STATE ────────────────────────────────────────────────────
+  let huidigePeriode = 'week';
+  let huidigeData = null;
+  let sortKolom = 'conversie';
+  let sortRichting = 'desc';
+  let refreshInterval = null;
+  let gepauzeerd = false;
+
+  const AUTO_REFRESH_MS = 30 * 1000; // 30 seconden
+
+  // ── INIT ─────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    bevestigToegang();
+
+    // Periode-knoppen
+    document.querySelectorAll('.periode-knop').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.periode-knop').forEach(b => b.classList.remove('actief'));
+        btn.classList.add('actief');
+        huidigePeriode = btn.dataset.periode;
+        laadData();
+      });
+    });
+
+    // Tabel sortering
+    document.querySelectorAll('#tabel-makelaars th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const kolom = th.dataset.sort;
+        if (sortKolom === kolom) {
+          sortRichting = sortRichting === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortKolom = kolom;
+          sortRichting = kolom === 'naam' ? 'asc' : 'desc';
+        }
+        rendertabel();
+      });
+    });
+
+    laadData();
+    startAutoRefresh();
+  });
+
+  // ── TOEGANGSCONTROLE ─────────────────────────────────────────
+  function bevestigToegang() {
+    // Frontend-only check: leest gebruiker uit localStorage van bellijst-app
+    try {
+      const raw = localStorage.getItem('mva_bellijst_gebruiker');
+      if (!raw) {
+        toonGeenToegang('Niet ingelogd in MVA Leadpool app.');
+        return;
+      }
+      const g = JSON.parse(raw);
+      if (g.rol !== 'admin') {
+        toonGeenToegang('Geen admin-rechten.');
+        return;
+      }
+      document.getElementById('header-sub').textContent = 'Welkom, ' + (g.naam || g.email || 'admin');
+    } catch (e) {
+      toonGeenToegang('Sessie kon niet worden gelezen.');
+    }
+  }
+
+  function toonGeenToegang(reden) {
+    document.body.innerHTML = `
+      <div style="max-width:480px;margin:80px auto;padding:40px;background:white;border-radius:12px;text-align:center;font-family:Roboto,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+        <div style="font-size:48px;margin-bottom:16px;">🔒</div>
+        <h2 style="color:#1A2B5F;margin-bottom:8px;">Geen toegang</h2>
+        <p style="color:#6b7280;margin-bottom:24px;">${reden}</p>
+        <a href="/" style="display:inline-block;padding:12px 24px;background:#E8500A;color:white;text-decoration:none;border-radius:8px;font-weight:600;">
+          Terug naar app
+        </a>
+      </div>
+    `;
+  }
+
+  // ── DATA LADEN ───────────────────────────────────────────────
+  async function laadData() {
+    try {
+      const res = await fetch('/.netlify/functions/dashboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ periode: huidigePeriode })
+      });
+
+      if (!res.ok) {
+        throw new Error('Server gaf status ' + res.status);
+      }
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      huidigeData = data;
+      verbergFout();
+      render();
+      werkRefreshTekstBij();
+    } catch (err) {
+      console.error('Dashboard laden faalde:', err);
+      toonFout('Dashboard kon niet worden geladen: ' + err.message);
+    }
+  }
+
+  function toonFout(tekst) {
+    const el = document.getElementById('fout-bericht');
+    el.textContent = tekst;
+    el.style.display = 'block';
+  }
+
+  function verbergFout() {
+    document.getElementById('fout-bericht').style.display = 'none';
+  }
+
+  // ── RENDER ───────────────────────────────────────────────────
+  function render() {
+    if (!huidigeData) return;
+    renderKpis();
+    renderFunnel();
+    renderRoundRobin();
+    rendertabel();
+  }
+
+  function renderKpis() {
+    const k = huidigeData.kpi;
+    const grid = document.getElementById('kpi-grid');
+    grid.innerHTML = `
+      <div class="kpi-card">
+        <div class="kpi-label">Totaal leads</div>
+        <div class="kpi-getal">${k.totaal_leads}</div>
+        <div class="kpi-sub">${k.warme_leads} warm · ${k.warme_leads_pct.toFixed(0)}%</div>
+      </div>
+      <div class="kpi-card deals">
+        <div class="kpi-label">Deals</div>
+        <div class="kpi-getal">${k.deals}</div>
+        <div class="kpi-sub">${k.afspraken} afspraken</div>
+      </div>
+      <div class="kpi-card conversie">
+        <div class="kpi-label">Conversie</div>
+        <div class="kpi-getal">${k.conversie_pct.toFixed(1)}<span style="font-size:18px;">%</span></div>
+        <div class="kpi-sub">leads → deal</div>
+      </div>
+      <div class="kpi-card snelheid">
+        <div class="kpi-label">Bel-snelheid</div>
+        <div class="kpi-getal klein">${formatUren(k.gem_bel_snelheid_uur)}</div>
+        <div class="kpi-sub">gem. tijd tot eerste belactie</div>
+      </div>
+      <div class="kpi-card open">
+        <div class="kpi-label">Openstaand</div>
+        <div class="kpi-getal">${k.openstaand}</div>
+        <div class="kpi-sub">nog te belopen</div>
+      </div>
+    `;
+  }
+
+  function renderFunnel() {
+    const f = huidigeData.funnel;
+    const totaalActief = f.nieuw + f.bereikt + f.afspraak + f.deal;
+    const totaalAlles = totaalActief + f.lost + f.niet_geinteresseerd;
+
+    document.getElementById('funnel-sub').textContent =
+      `${totaalActief} actief · ${f.lost + f.niet_geinteresseerd} afgesloten`;
+
+    const funnelEl = document.getElementById('funnel');
+    funnelEl.innerHTML = `
+      <div class="funnel-stap nieuw">
+        <div class="funnel-aantal">${f.nieuw}</div>
+        <div class="funnel-label">Nieuw</div>
+        <div class="funnel-pijl">→</div>
+      </div>
+      <div class="funnel-stap bereikt">
+        <div class="funnel-aantal">${f.bereikt}</div>
+        <div class="funnel-label">Bereikt</div>
+        <div class="funnel-pijl">→</div>
+      </div>
+      <div class="funnel-stap afspraak">
+        <div class="funnel-aantal">${f.afspraak}</div>
+        <div class="funnel-label">Afspraak</div>
+        <div class="funnel-pijl">→</div>
+      </div>
+      <div class="funnel-stap deal">
+        <div class="funnel-aantal">${f.deal}</div>
+        <div class="funnel-label">Deal</div>
+      </div>
+      <div style="width:24px;"></div>
+      <div class="funnel-stap niet_geinteresseerd">
+        <div class="funnel-aantal">${f.niet_geinteresseerd}</div>
+        <div class="funnel-label">Niet geïnt.</div>
+      </div>
+      <div class="funnel-stap lost">
+        <div class="funnel-aantal">${f.lost}</div>
+        <div class="funnel-label">Lost</div>
+      </div>
+    `;
+  }
+
+  function renderRoundRobin() {
+    const r = huidigeData.round_robin;
+    const spreidingsKlasse =
+      r.spreiding <= 2 ? 'spreiding-ok' :
+      r.spreiding <= 5 ? 'spreiding-let' : 'spreiding-slecht';
+    const spreidingsTekst =
+      r.spreiding <= 2 ? 'in balans' :
+      r.spreiding <= 5 ? 'let op' : 'scheef';
+
+    document.getElementById('rr-status').innerHTML = `
+      <div class="rr-card">
+        <div class="rr-card-label">Deelnemers</div>
+        <div class="rr-card-getal">${r.deelnemers}</div>
+      </div>
+      <div class="rr-card">
+        <div class="rr-card-label">Gemiddeld</div>
+        <div class="rr-card-getal">${r.gemiddeld.toFixed(1)}</div>
+      </div>
+      <div class="rr-card">
+        <div class="rr-card-label">Min — Max</div>
+        <div class="rr-card-getal">${r.min} — ${r.max}</div>
+      </div>
+      <div class="rr-card">
+        <div class="rr-card-label">Spreiding</div>
+        <div class="rr-card-getal ${spreidingsKlasse}">${r.spreiding} <span style="font-size:12px;font-weight:500;">${spreidingsTekst}</span></div>
+      </div>
+    `;
+  }
+
+  function rendertabel() {
+    const tbody = document.getElementById('tabel-body');
+    if (!huidigeData || !huidigeData.makelaars.length) {
+      tbody.innerHTML = `<tr><td colspan="8" class="leeg-bericht">Geen makelaars in deze periode.</td></tr>`;
+      return;
+    }
+
+    // Sorteren
+    const ms = [...huidigeData.makelaars];
+    ms.sort((a, b) => {
+      let av = a[sortKolom];
+      let bv = b[sortKolom];
+      if (av === null || av === undefined) av = -Infinity;
+      if (bv === null || bv === undefined) bv = -Infinity;
+      if (typeof av === 'string') {
+        return sortRichting === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      }
+      return sortRichting === 'asc' ? av - bv : bv - av;
+    });
+
+    // Header sort-indicator bijwerken
+    document.querySelectorAll('#tabel-makelaars th[data-sort]').forEach(th => {
+      th.classList.toggle('gesorteerd', th.dataset.sort === sortKolom);
+      const pijl = th.querySelector('.sort-pijl');
+      if (th.dataset.sort === sortKolom) {
+        pijl.textContent = sortRichting === 'asc' ? '▲' : '▼';
+      } else {
+        pijl.textContent = '▲▼';
+      }
+    });
+
+    // Rijen renderen
+    tbody.innerHTML = ms.map(m => {
+      const badges = [];
+      if (m.op_vakantie) badges.push('<span class="makelaar-badge vakantie">vakantie</span>');
+      if (!m.doet_mee_round_robin) badges.push('<span class="makelaar-badge rr-uit">RR uit</span>');
+
+      const convKlasse =
+        m.conversie >= 20 ? 'hoog' :
+        m.conversie >= 10 ? 'middel' : 'laag';
+
+      return `
+        <tr>
+          <td>
+            <div class="makelaar-naam">
+              ${escapeHtml(m.naam)} ${badges.join(' ')}
+            </div>
+          </td>
+          <td class="numeriek">${m.ontvangen}</td>
+          <td class="numeriek">${m.gebeld} <span style="color:#9ca3af;font-size:12px;">(${m.gebeld_pct.toFixed(0)}%)</span></td>
+          <td class="numeriek">${m.afspraken}</td>
+          <td class="numeriek cel-deals">${m.deals}</td>
+          <td class="numeriek cel-conversie ${convKlasse}">${m.conversie.toFixed(1)}%</td>
+          <td class="numeriek">${formatUren(m.bel_snelheid_uur)}</td>
+          <td class="numeriek">${m.openstaand}</td>
+        </tr>
+      `;
+    }).join('');
+
+    document.getElementById('makelaars-sub').textContent =
+      `${ms.length} makelaar${ms.length === 1 ? '' : 's'} · sorteer op kolomtitel`;
+  }
+
+  // ── HULP FUNCTIES ────────────────────────────────────────────
+  function formatUren(uren) {
+    if (uren === null || uren === undefined) return '—';
+    if (uren < 1) return Math.round(uren * 60) + ' min';
+    if (uren < 24) return uren.toFixed(1) + ' u';
+    return (uren / 24).toFixed(1) + ' dag';
+  }
+
+  function escapeHtml(s) {
+    if (s === null || s === undefined) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function werkRefreshTekstBij() {
+    const tijd = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const tekst = gepauzeerd
+      ? `Auto-refresh gepauzeerd · laatst: ${tijd}`
+      : `Auto-refresh aan · laatst: ${tijd}`;
+    document.getElementById('refresh-tekst').textContent = tekst;
+  }
+
+  // ── AUTO REFRESH ─────────────────────────────────────────────
+  function startAutoRefresh() {
+    if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = setInterval(() => {
+      if (!gepauzeerd) laadData();
+    }, AUTO_REFRESH_MS);
+  }
+
+  function togglePauze() {
+    gepauzeerd = !gepauzeerd;
+    document.getElementById('btn-pauze').textContent = gepauzeerd ? '▶' : '⏸';
+    document.getElementById('refresh-info').classList.toggle('gepauzeerd', gepauzeerd);
+    werkRefreshTekstBij();
+  }
+
+  // ── NAVIGATIE ────────────────────────────────────────────────
+  function terugNaarApp() {
+    window.location.href = '/';
+  }
+</script>
+
+</body>
+</html>
