@@ -409,33 +409,143 @@
       gap: 10px;
       margin-bottom: 16px;
     }
+    .status-group-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--grijs-tekst);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin: 6px 0 8px 2px;
+    }
     .status-btn {
-      padding: 14px 12px;
-      border: 2px solid var(--grijs-mid);
-      border-radius: 12px;
+      padding: 16px 12px 14px;
+      border: 2px solid transparent;
+      border-radius: 14px;
       background: white;
       cursor: pointer;
       text-align: center;
-      transition: all 0.15s;
+      transition: all 0.2s ease;
       font-family: 'Roboto', sans-serif;
+      position: relative;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .status-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.08);
     }
     .status-btn:active { transform: scale(0.97); }
-    .status-btn .status-icon { font-size: 22px; margin-bottom: 4px; }
-    .status-btn .status-label { font-size: 13px; font-weight: 500; color: var(--navy); }
-    .status-btn .status-sub { font-size: 11px; color: var(--grijs-tekst); }
+    .status-btn .status-icon {
+      font-size: 26px;
+      margin-bottom: 6px;
+      display: block;
+      line-height: 1;
+    }
+    .status-btn .status-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--navy);
+      line-height: 1.2;
+    }
+    .status-btn .status-sub {
+      font-size: 11px;
+      color: var(--grijs-tekst);
+      margin-top: 3px;
+    }
 
-    .status-btn.bereikt_ja { border-color: var(--groen); }
-    .status-btn.bereikt_ja:active { background: #dcfce7; }
-    .status-btn.niet_geinteresseerd { border-color: var(--rood); }
-    .status-btn.niet_geinteresseerd:active { background: #fee2e2; }
-    .status-btn.niet_bereikbaar { border-color: var(--geel); }
-    .status-btn.niet_bereikbaar:active { background: #fef3c7; }
-    .status-btn.bereikt_later { border-color: var(--blauw-zacht); }
-    .status-btn.bereikt_later:active { background: #dbeafe; }
-    .status-btn.voicemail { border-color: var(--paars); }
-    .status-btn.voicemail:active { background: #ede9fe; }
-    .status-btn.wellicht_later { border-color: var(--grijs-tekst); }
-    .status-btn.wellicht_later:active { background: #f3f4f6; }
+    /* ── KLEURBLOKKEN PER STATUS (rust-stand) ── */
+    .status-btn.bereikt_ja {
+      background: #ecfdf5;
+      border-color: #a7f3d0;
+    }
+    .status-btn.bereikt_ja .status-label { color: #047857; }
+
+    .status-btn.niet_bereikbaar {
+      background: #fffbeb;
+      border-color: #fcd34d;
+    }
+    .status-btn.niet_bereikbaar .status-label { color: #b45309; }
+
+    .status-btn.voicemail {
+      background: #faf5ff;
+      border-color: #d8b4fe;
+    }
+    .status-btn.voicemail .status-label { color: #6b21a8; }
+
+    .status-btn.niet_geinteresseerd {
+      background: #fef2f2;
+      border-color: #fca5a5;
+    }
+    .status-btn.niet_geinteresseerd .status-label { color: #b91c1c; }
+
+    .status-btn.bereikt_later {
+      background: #eff6ff;
+      border-color: #93c5fd;
+    }
+    .status-btn.bereikt_later .status-label { color: #1d4ed8; }
+
+    .status-btn.wellicht_later {
+      background: #f9fafb;
+      border-color: #d1d5db;
+    }
+    .status-btn.wellicht_later .status-label { color: #4b5563; }
+
+    /* ── GESELECTEERDE KNOP — duidelijk eruit springen ── */
+    .status-btn.gekozen {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(26, 43, 95, 0.18);
+      border-width: 3px;
+    }
+    .status-btn.gekozen::after {
+      content: '✓';
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      width: 22px;
+      height: 22px;
+      background: var(--navy);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    /* Status-specifieke geselecteerde kleuren (verzadigder) */
+    .status-btn.bereikt_ja.gekozen {
+      background: #d1fae5;
+      border-color: #10b981;
+    }
+    .status-btn.niet_bereikbaar.gekozen {
+      background: #fef3c7;
+      border-color: #f59e0b;
+    }
+    .status-btn.voicemail.gekozen {
+      background: #ede9fe;
+      border-color: #8b5cf6;
+    }
+    .status-btn.niet_geinteresseerd.gekozen {
+      background: #fee2e2;
+      border-color: #dc2626;
+    }
+    .status-btn.bereikt_later.gekozen {
+      background: #dbeafe;
+      border-color: #3b82f6;
+    }
+    .status-btn.wellicht_later.gekozen {
+      background: #e5e7eb;
+      border-color: #6b7280;
+    }
+
+    /* ── NIET-GEKOZEN KNOPPEN — vervagen wanneer er één gekozen is ── */
+    .status-grid.heeft-keuze .status-btn:not(.gekozen) {
+      opacity: 0.45;
+      transform: none;
+    }
+    .status-grid.heeft-keuze .status-btn:not(.gekozen):hover {
+      opacity: 0.7;
+    }
 
     /* Datum picker voor "bel later" */
     .datum-picker {
@@ -1465,6 +1575,7 @@
     <div class="modal-adres" id="modal-adres">Adres</div>
     <div class="modal-title">Wat is het resultaat van dit gesprek?</div>
 
+    <div class="status-group-label">Gebeld vandaag</div>
     <div class="status-grid">
       <button class="status-btn bereikt_ja" onclick="kiesStatus('bereikt_ja')">
         <div class="status-icon">✅</div>
@@ -1476,25 +1587,29 @@
         <div class="status-label">Niet bereikbaar</div>
         <div class="status-sub">Morgen opnieuw</div>
       </button>
-      <button class="status-btn bereikt_later" onclick="kiesStatus('bereikt_later')">
-        <div class="status-icon">📲</div>
-        <div class="status-label">Bel later terug</div>
-        <div class="status-sub">Datum kiezen</div>
-      </button>
       <button class="status-btn voicemail" onclick="kiesStatus('voicemail')">
         <div class="status-icon">📬</div>
         <div class="status-label">Voicemail</div>
         <div class="status-sub">Ingesproken</div>
       </button>
-      <button class="status-btn wellicht_later" onclick="kiesStatus('wellicht_later')">
-        <div class="status-icon">💤</div>
-        <div class="status-label">Wellicht later</div>
-        <div class="status-sub">Over 2 weken</div>
-      </button>
       <button class="status-btn niet_geinteresseerd" onclick="kiesStatus('niet_geinteresseerd')">
         <div class="status-icon">❌</div>
         <div class="status-label">Niet geïnt.</div>
         <div class="status-sub">Lead sluiten</div>
+      </button>
+    </div>
+
+    <div class="status-group-label">Later proberen</div>
+    <div class="status-grid">
+      <button class="status-btn bereikt_later" onclick="kiesStatus('bereikt_later')">
+        <div class="status-icon">📲</div>
+        <div class="status-label">Bel later terug</div>
+        <div class="status-sub">Datum kiezen</div>
+      </button>
+      <button class="status-btn wellicht_later" onclick="kiesStatus('wellicht_later')">
+        <div class="status-icon">💤</div>
+        <div class="status-label">Wellicht later</div>
+        <div class="status-sub">Over 2 weken</div>
       </button>
     </div>
 
@@ -5443,6 +5558,14 @@
 
   function sluitModalDirect() {
     document.getElementById('status-modal').classList.remove('open');
+    // Reset visuele staat van knoppen voor volgende keer openen
+    document.querySelectorAll('.status-btn').forEach(b => {
+      b.classList.remove('gekozen');
+      b.style.opacity = '';
+    });
+    document.querySelectorAll('.status-grid').forEach(g => g.classList.remove('heeft-keuze'));
+    const picker = document.getElementById('datum-picker');
+    if (picker) picker.classList.remove('open');
     gekozenStatus = null;
     huidigeLead = null;
   }
@@ -5450,9 +5573,16 @@
   function kiesStatus(status) {
     gekozenStatus = status;
 
-    // Highlight geselecteerde knop
-    document.querySelectorAll('.status-btn').forEach(b => b.style.opacity = '0.5');
-    document.querySelector(`.status-btn.${status}`).style.opacity = '1';
+    // Reset alle knoppen + grids
+    document.querySelectorAll('.status-btn').forEach(b => {
+      b.classList.remove('gekozen');
+      b.style.opacity = ''; // legacy reset
+    });
+    document.querySelectorAll('.status-grid').forEach(g => g.classList.add('heeft-keuze'));
+
+    // Highlight gekozen knop
+    const knop = document.querySelector(`.status-btn.${status}`);
+    if (knop) knop.classList.add('gekozen');
 
     // Datum picker tonen bij "bel later"
     const picker = document.getElementById('datum-picker');
