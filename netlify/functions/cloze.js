@@ -42,21 +42,6 @@ exports.handler = async (event) => {
     noshow:     '🚫 No-show',
   };
 
-  // Cloze indexeert telefoonnummers in E.164-formaat (+31...).
-  // Realworks/onze leads geven 06... — moet vóór de Cloze-query
-  // genormaliseerd worden, anders vindt Cloze niets.
-  const normalizeTelToE164NL = (tel) => {
-    if (!tel) return null;
-    const trimmed = String(tel).trim();
-    const digits = trimmed.replace(/\D/g, '');
-    if (!digits) return null;
-    if (trimmed.startsWith('+')) return '+' + digits;        // al E.164
-    if (digits.startsWith('31'))  return '+' + digits;       // 31... zonder +
-    if (digits.startsWith('0'))   return '+31' + digits.slice(1); // 06... of 020...
-    if (digits.length === 8)      return '+316' + digits;    // mobiel zonder 0
-    return trimmed;                                          // onbekend, ongewijzigd
-  };
-
   try {
 
     // ── VERWERK LEAD — alles in één ───────────────────────────────────────
@@ -134,7 +119,7 @@ exports.handler = async (event) => {
 
     // ── 2. LOG BELPOGING ───────────────────────────────────────────────
     if (action === "log_call") {
-      const { telefoon, naam, outcome, notitie, makelaar_email, adres } = data;
+      const { telefoon, email, naam, outcome, notitie, makelaar_email, adres } = data;
 
       // outcome mapping:
       // "bereikt_ja"      → connected
@@ -186,7 +171,37 @@ exports.handler = async (event) => {
         }
       );
       const result = await res.json();
-      return { statusCode: 200, headers, body: JSON.stringify(result) };
+
+      // ── FIX (Anthonie 18-mei): bij "niet geïnteresseerd" stage op 'out' (= Lost) zetten ──
+      // Zonder deze update blijft Cloze de persoon als 'lead' (= Warm) tonen.
+      let stageUpdate = null;
+      if (outcome === 'niet_geinteresseerd') {
+        const stageBody = {
+          stage: 'out',
+          ...(email
+            ? { emails: [{ value: email }] }
+            : { phones: [{ value: telefoon }] }),
+        };
+        try {
+          const stageRes = await fetch(
+            `https://api.cloze.com/v1/people/update?api_key=${CLOZE_API_KEY}&user_email=${CLOZE_USER}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(stageBody),
+            }
+          );
+          stageUpdate = await stageRes.json();
+        } catch (e) {
+          stageUpdate = { error: e.message };
+        }
+      }
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ ...result, stage_update: stageUpdate }),
+      };
     }
 
     // ── 3. MAAK FOLLOW-UP TODO AAN ────────────────────────────────────
@@ -215,107 +230,53 @@ exports.handler = async (event) => {
 
     // ── 4. UPDATE PERSOON STAGE ────────────────────────────────────────
     if (action === "update_stage") {
-      const { telefoon, email, portableId, stage } = data;
-      // stage: "lead" (Warm) | "future" (Hot) | "current" (In Contract) | "out" / "lost"
+      const { telefoon, email, stage } = data;
+      // stage: "lead" | "current" | "out" | "future"
 
-      // Cloze accepteert portableId als identifier in de body
-      const idBody = portableId
-        ? { portableId }
-        : email
-          ? { emails: [{ value: email }] }
-          : telefoon
-            ? { phones: [{ value: telefoon }] }
-            : null;
-
-      if (!idBody || !stage) {
-        return {
-          statusCode: 400, headers,
-          body: JSON.stringify({ error: 'portableId/email/telefoon en stage zijn vereist' }),
-        };
-      }
+      const identifier = email || telefoon;
+      const stageBody = { stage };
 
       const res = await fetch(
-        `https://api.cloze.com/v1/people/update?api_key=${CLOZE_API_KEY}&user_email=${encodeURIComponent(CLOZE_USER)}`,
+        `https://api.cloze.com/v1/people/update?api_key=${CLOZE_API_KEY}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...idBody, stage }),
+          body: JSON.stringify({
+            ...stageBody,
+            ...(email
+              ? { emails: [{ value: email }] }
+              : { phones: [{ value: telefoon }] }),
+          }),
         }
       );
       const result = await res.json();
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          ok: !result?.errorcode || result.errorcode === 0,
-          stage,
-          ...result,
-        }),
-      };
+      return { statusCode: 200, headers, body: JSON.stringify(result) };
     }
 
     // ── CHECK OF PERSOON AL IN CLOZE STAAT ────────────────────────────
     if (action === "check_bestaand") {
       const { email, telefoon, naam } = data;
 
-      // Cloze slaat telefoons op in E.164 (+31...). Normaliseer 06... → +316...
-      // anders vindt freeformquery ze niet. (Bevestigd 9 mei 2026.)
-      const telE164 = normalizeTelToE164NL(telefoon);
-
-      // Zoek alleen op email en telefoon — die zijn uniek genoeg om
-      // safe te matchen. Naam-zoek leverde fuzzy false-positives op
-      // (bv. "Eveline Kraan" → "Roos Solleveld" via naam-deel match).
-      // Naam wordt alleen gebruikt om de match te valideren als laatste check.
-      const queries = [email, telE164].filter(Boolean);
+      // Zoek op email eerst, dan telefoon, dan naam
+      const queries = [email, telefoon, naam].filter(Boolean);
       let gevonden = null;
 
       for (const query of queries) {
         const res = await fetch(
-          `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(query)}&pagesize=3`
+          `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(query)}&pagesize=1`
         );
         const json = await res.json();
         if (json?.people?.length > 0) {
-          // Valideer match: het gevonden contact moet email of telefoon
-          // bevatten die we zochten. Zo niet, was het een fuzzy match — overslaan.
-          const valid = json.people.find(p => {
-            // Email match
-            if (email && Array.isArray(p.emails)) {
-              const heeftMatch = p.emails.some(e =>
-                (e.value || e).toLowerCase() === email.toLowerCase()
-              );
-              if (heeftMatch) return true;
-            }
-            // Telefoon match — Cloze slaat op als +31..., wij krijgen vaak 06...
-            // Vergelijk daarom op de "kale" laatste 9 cijfers (NL mobiel zonder prefix).
-            if (telefoon && Array.isArray(p.phones)) {
-              const stripPrefix = (s) => {
-                let d = String(s || '').replace(/\D/g, '');
-                if (d.startsWith('31')) d = d.slice(2);  // 31646... → 646...
-                if (d.startsWith('0'))  d = d.slice(1);  // 0646... → 646...
-                return d;
-              };
-              const tel = stripPrefix(telefoon);
-              const heeftMatch = p.phones.some(ph => {
-                const v = stripPrefix(ph.value || ph);
-                return v && tel && (v === tel || v.endsWith(tel) || tel.endsWith(v));
-              });
-              if (heeftMatch) return true;
-            }
-            return false;
-          });
-          if (valid) {
-            gevonden = valid;
-            break;
-          }
+          gevonden = json.people[0];
+          break;
         }
       }
 
-      // Eigenaar bepalen — Cloze response heeft 'assignee'
-      // (bevestigd 9 mei 2026; 'assignedTo' bestaat niet in find/get).
+      // Eigenaar bepalen — Cloze geeft 'assignedTo' (email of object met email/name)
       let eigenaar_email = null;
       let eigenaar_naam = null;
       if (gevonden) {
-        const a = gevonden.assignee || gevonden.assignedTo;
+        const a = gevonden.assignedTo;
         if (typeof a === 'string') {
           eigenaar_email = a;
         } else if (a && typeof a === 'object') {
@@ -327,603 +288,18 @@ exports.handler = async (event) => {
         if (!eigenaar_email && gevonden.owner) eigenaar_email = gevonden.owner;
       }
 
-      // ── KLANT-STERKTE-SIGNALEN — voor "echte klant" detectie ──────────
-      // Cloze velden om de relatiediepte te bepalen. Velden die niet bestaan
-      // zijn null, dat is OK — frontend filtert dan naar 'zwak'.
-      // - segment: 'A' / 'B' / 'C' / 'D' (priority-letter)
-      // - pinned: true/false (handmatig vinkje door eigenaar)
-      // - createdAt: ISO datum waarop contact is aangemaakt
-      // - engagement.score: 0-100
-      // Klant-sterkte signalen — let op: Cloze stuurt soms de letterlijke
-      // string "none" terug ipv null. Behandelen als leeg.
-      const norm = (v) => (!v || v === 'none' || v === 'None') ? null : v;
-      const segment    = norm(gevonden?.segment) || norm(gevonden?.priority);
-      const stage      = norm(gevonden?.stage);
-      const pinned     = !!(gevonden?.pinned || gevonden?.priority === 'high');
-      const created_at = gevonden?.createdAt || gevonden?.created_at || null;
-
-      // Cloze-id: het echte veld is `portableId` (uit live response geconfirmeerd).
-      // De andere namen blijven als fallback voor robuustheid.
-      const cloze_id = gevonden?.portableId || gevonden?.id || gevonden?.personId || gevonden?._id || gevonden?.pid || null;
-
-      // Debug: alle top-level velden van Cloze response (alleen veld-namen).
-      const debug_velden = gevonden ? Object.keys(gevonden).slice(0, 30) : [];
-
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           bestaand: !!gevonden,
-          id: cloze_id,
           naam: gevonden?.name || null,
-          stage,
+          stage: gevonden?.stage || null,
+          // Hoeveel interacties er al zijn (geeft inschatting van relatiediepte)
           interacties: gevonden?.engagement?.score || null,
-          segment,
-          pinned,
-          created_at,
+          // Eigenaar van het contact in Cloze (null = ongekoppeld)
           eigenaar_email,
           eigenaar_naam,
-          _debug_velden: debug_velden,
-        }),
-      };
-    }
-
-    // ── POOL ROUTING CHECK ─────────────────────────────────────────────
-    // Bepaalt of een lead direct naar een specifieke makelaar moet (omdat
-    // klant al actief contact heeft met een MvA-makelaar) of via Round Robin
-    // naar de pool. Beslislogica:
-    //   1. Klant niet in Cloze → pool
-    //   2. Klant in Cloze + actieve MvA-eigenaar + lastChanged < 90d → makelaar
-    //   3. Klant in Cloze maar lastChanged ≥ 90d → pool (record te oud)
-    //
-    // OPMERKING: `lastChanged` is een proxy voor "recent contact". Cloze
-    // heeft geen publiek endpoint om individuele tijdlijn-items op te halen
-    // (alleen people/feed voor bulk sync of webhooks). lastChanged schuift
-    // wanneer een email/call/note/todo aan het record wordt toegevoegd, maar
-    // ook bij handmatige wijzigingen (stage, segment). Niet 100% accuraat
-    // maar goed genoeg voor 90-dagen-grens.
-    //
-    // Aanroep: { action: "pool_routing_check", data: { email, telefoon, naam, gevende_makelaar_email } }
-    //   gevende_makelaar_email is optioneel — als gevuld én gelijk aan de Cloze-eigenaar,
-    //   dan gaat de lead naar pool (de gevende makelaar IS de eigenaar; hij wil hem juist weggeven).
-    if (action === "pool_routing_check") {
-      const { email, telefoon, naam, gevende_makelaar_email } = data;
-      const MVA_DOMEINEN = ['@makelaarsvan.nl', '@teunisse.nl'];
-
-      // Cloze slaat telefoons op in E.164. Normaliseer vóór de query.
-      const telE164 = normalizeTelToE164NL(telefoon);
-
-      // STAP 1 — Zoek persoon via people/find (zelfde patroon als check_bestaand)
-      const queries = [email, telE164].filter(Boolean);
-      let gevonden = null;
-
-      try {
-        for (const query of queries) {
-          const res = await fetch(
-            `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(query)}&pagesize=3`
-          );
-          const json = await res.json();
-          if (json?.people?.length > 0) {
-            // Valideer match op email of telefoon (geen fuzzy naam-match)
-            const valid = json.people.find(p => {
-              if (email && Array.isArray(p.emails)) {
-                if (p.emails.some(e => (e.value || e).toLowerCase() === email.toLowerCase())) return true;
-              }
-              if (telefoon && Array.isArray(p.phones)) {
-                const stripPrefix = (s) => {
-                  let d = String(s || '').replace(/\D/g, '');
-                  if (d.startsWith('31')) d = d.slice(2);
-                  if (d.startsWith('0'))  d = d.slice(1);
-                  return d;
-                };
-                const tel = stripPrefix(telefoon);
-                if (p.phones.some(ph => {
-                  const v = stripPrefix(ph.value || ph);
-                  return v && tel && (v === tel || v.endsWith(tel) || tel.endsWith(v));
-                })) return true;
-              }
-              return false;
-            });
-            if (valid) { gevonden = valid; break; }
-          }
-        }
-      } catch (e) {
-        // Cloze API down/timeout → fallback naar pool (regel 3 fail-safe)
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({
-            routing: "pool",
-            reden: "Cloze-check niet beschikbaar — lead gaat naar pool",
-            error: e.message,
-          }),
-        };
-      }
-
-      // REGEL 1 — niet gevonden in Cloze
-      if (!gevonden) {
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({
-            routing: "pool",
-            reden: "Klant niet bekend in Cloze",
-            cloze_url: null,
-          }),
-        };
-      }
-
-      // STAP 2 — Bepaal eigenaar
-      // Cloze response heeft 'assignee' (bevestigd 9 mei 2026 via _debug_velden).
-      // Oude code keek naar 'assignedTo' — bestaat niet in find/get response.
-      // Beide proberen voor robuustheid; eerste niet-leeg wint.
-      const portableId = gevonden.portableId || gevonden.id || gevonden._id;
-      const cloze_url = portableId
-        ? `https://www.cloze.com/in/person/${portableId}#section=people`
-        : null;
-
-      const a = gevonden.assignee || gevonden.assignedTo;
-      let makelaar_email = null;
-      let makelaar_naam = null;
-      if (typeof a === 'string') {
-        makelaar_email = a;
-      } else if (a && typeof a === 'object') {
-        makelaar_email = a.email || a.value || null;
-        makelaar_naam = a.name || null;
-      }
-      if (!makelaar_naam && gevonden.assigneeName) makelaar_naam = gevonden.assigneeName;
-      if (!makelaar_email && gevonden.owner) makelaar_email = gevonden.owner;
-
-      const isMvaEigenaar = makelaar_email
-        && MVA_DOMEINEN.some(d => makelaar_email.toLowerCase().endsWith(d));
-
-      // Als geen MvA-eigenaar → naar pool (Niels Ottink van Effytool, externe partners, etc.)
-      if (!isMvaEigenaar) {
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({
-            routing: "pool",
-            reden: makelaar_email
-              ? `Eigenaar ${makelaar_email} is geen MvA-makelaar`
-              : "Klant heeft geen eigenaar in Cloze",
-            cloze_url,
-          }),
-        };
-      }
-
-      // STAP 3 — Stage-check (vervangt lastChanged proxy van 9 mei)
-      // Cloze person-API geeft geen activiteits-data terug; alleen het
-      // person-record met stage. Stage is wat de makelaar zelf onderhoudt:
-      //   lead/current/future = actieve relatie  → naar makelaar
-      //   out/closed/null     = niet meer actief → naar pool
-      const stage = (gevonden.stage || '').toLowerCase();
-
-      const ACTIEVE_STAGES = ['lead', 'current', 'future'];
-      const isActief = ACTIEVE_STAGES.includes(stage);
-
-      // REGEL 3 — niet-actieve stage → naar pool
-      if (!isActief) {
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({
-            routing: "pool",
-            reden: stage
-              ? `Klant in Cloze met stage "${stage}" — niet meer actief`
-              : `Klant in Cloze maar zonder stage — behandeld als niet-actief`,
-            makelaar_email,
-            makelaar_naam,
-            stage: stage || null,
-            cloze_url,
-          }),
-        };
-      }
-
-      // CHECK — gevende makelaar IS zelf de eigenaar
-      // (hij doet de bezichtiging, ziet "actief contact", maar wil hem
-      // juist doorgeven aan pool; hij heeft hem zelf.)
-      if (gevende_makelaar_email
-          && makelaar_email
-          && gevende_makelaar_email.toLowerCase() === makelaar_email.toLowerCase()) {
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({
-            routing: "pool",
-            reden: `Je bent zelf de eigenaar in Cloze — lead gaat naar pool`,
-            makelaar_email,
-            makelaar_naam,
-            stage,
-            cloze_url,
-          }),
-        };
-      }
-
-      // REGEL 2 — actieve MvA-makelaar + actieve stage → naar die makelaar
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          routing: "naar_makelaar",
-          reden: `Actieve klant van ${makelaar_naam || makelaar_email} (stage: ${stage})`,
-          makelaar_email,
-          makelaar_naam,
-          stage,
-          cloze_url,
-        }),
-      };
-    }
-
-    // ── KLANT AANMAKEN OF UPDATEN ────────────────────────────────────────
-    // Wordt aangeroepen wanneer makelaar een lead-status zet op
-    // Hot/Warm/Afspraak/Deal — dan moet de klant in Cloze actief worden.
-    // Stap 1: zoek of klant al bestaat (people/find op email/telefoon)
-    // Stap 2a: bestaat → people/update met segment+stage+assignee
-    // Stap 2b: bestaat niet → people/create met alle data
-    // Returns: { ok, actie: "aangemaakt"|"bijgewerkt", portableId, cloze_url }
-    // ── DIAGNOSE — toon beschikbare stages voor people contacts ─────
-    if (action === "lijst_stages") {
-      const tests = [
-        'https://api.cloze.com/v1/stages',
-        'https://api.cloze.com/v1/people/stages',
-        'https://api.cloze.com/v1/contact/stages',
-        'https://api.cloze.com/v1/stages/list',
-        'https://api.cloze.com/v1/people/contact_stages',
-      ];
-      const results = {};
-      for (const url of tests) {
-        try {
-          const r = await fetch(`${url}?api_key=${CLOZE_API_KEY}&user_email=${encodeURIComponent(CLOZE_USER)}`);
-          const j = await r.json();
-          results[url] = { status: r.status, body: j };
-        } catch (e) {
-          results[url] = { error: e.message };
-        }
-      }
-      return { statusCode: 200, headers, body: JSON.stringify(results, null, 2) };
-    }
-
-    // ── DIAGNOSE — toon beschikbare segments en stages voor dit account ─
-    // Cloze accepteert geen vrije strings als segment; alleen vooraf
-    // gedefinieerde keys. Deze action probeert verschillende endpoints
-    // om te ontdekken welke segments dit account heeft.
-    if (action === "lijst_segments") {
-      const tests = [
-        'https://api.cloze.com/v1/segments',
-        'https://api.cloze.com/v1/people/segments',
-        'https://api.cloze.com/v1/contact/segments',
-        'https://api.cloze.com/v1/segments/get',
-        'https://api.cloze.com/v1/people/segments/list',
-      ];
-      const results = {};
-      for (const url of tests) {
-        try {
-          const r = await fetch(`${url}?api_key=${CLOZE_API_KEY}&user_email=${encodeURIComponent(CLOZE_USER)}`);
-          const j = await r.json();
-          results[url] = { status: r.status, body: j };
-        } catch (e) {
-          results[url] = { error: e.message };
-        }
-      }
-      return { statusCode: 200, headers, body: JSON.stringify(results, null, 2) };
-    }
-
-    if (action === "klant_aanmaken_of_updaten") {
-      const { naam, email, telefoon, adres, segment, stage, lead_status, makelaar_email } = data;
-
-      // Mapping van user-friendly segment-naam naar Cloze interne key.
-      // Lijst opgehaald via /v1/segments op 10 mei 2026 voor account toncoffeng@makelaarsvan.nl.
-      const SEGMENT_MAP = {
-        'Aankoop':       'custom1',  // Aankoopklant
-        'Verkoop':       'custom2',  // Verkoopklant
-        'Aankoopklant':  'custom1',
-        'Verkoopklant':  'custom2',
-        'Verhuur':       'project2',
-        'Aanhuur':       'project3',
-        'Verhuurder':    'custom3',
-        'Huurder':       'custom4',
-      };
-      const segmentKey = SEGMENT_MAP[segment] || segment;
-
-      // Cloze indexeert telefoons in E.164
-      const telE164 = normalizeTelToE164NL(telefoon);
-
-      // STAP 1 — zoek bestaande klant via email
-      // Match-criterium (besloten 11 mei 2026): vereist EMAIL + NAAM beide match.
-      // Mensen geven vaak niet de juiste info door — daarom geen fuzzy match
-      // op telefoon of alleen email. Bij twijfel: nieuwe record aanmaken,
-      // duplicaten kunnen later in Cloze gemerged worden.
-      let bestaand = null;
-
-      const normalizeNaam = (s) => String(s || '')
-        .toLowerCase()
-        .replace(/\s+/g, ' ')
-        .trim();
-      const zoekNaam = normalizeNaam(naam);
-
-      if (email && zoekNaam) {
-        const findRes = await fetch(
-          `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(email)}&pagesize=5`
-        );
-        const findJson = await findRes.json();
-        const matches = Array.isArray(findJson?.people) ? findJson.people : [];
-
-        const valid = matches.find(p => {
-          // 1) Email moet kloppen
-          const emailMatch = Array.isArray(p.emails) && p.emails.some(
-            e => (e.value || e || '').toLowerCase() === email.toLowerCase()
-          );
-          if (!emailMatch) return false;
-
-          // 2) Naam moet ook kloppen (volledige naam, hoofdletter-ongevoelig)
-          const clozeFullName = normalizeNaam(p.name || `${p.first || ''} ${p.last || ''}`);
-          if (clozeFullName === zoekNaam) return true;
-          // Soms is Cloze-naam langer (bv "Luis Alberto De Cecco" vs bellijst "de Cecco")
-          // — accepteer als de zoeknaam volledig in Cloze-naam zit OF andersom
-          if (clozeFullName.includes(zoekNaam) || zoekNaam.includes(clozeFullName)) return true;
-          return false;
-        });
-        if (valid) bestaand = valid;
-      }
-
-      // Notitie voor in Cloze (bouw 'm één keer)
-      const notitie = `Lead ${lead_status} via Bellijst${adres ? ` — bezichtigd ${adres}` : ''}`;
-
-      // STAP 2a — bestaat: update met nieuwe segment + stage + assignee
-      if (bestaand) {
-        const updateBody = {
-          // Cloze update vereist een unique identifier in body
-          ...(email    ? { emails: [{ value: email }] }
-            : telE164  ? { phones: [{ value: telE164 }] }
-            : {}),
-          ...(segmentKey && { segment: segmentKey }),
-          ...(stage     && { stage }),
-          ...(makelaar_email && { assignee: makelaar_email }),
-          atAGlanceNotes: notitie,
-        };
-        const updateRes = await fetch(
-          `https://api.cloze.com/v1/people/update?api_key=${CLOZE_API_KEY}&user_email=${encodeURIComponent(CLOZE_USER)}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updateBody)
-          }
-        );
-        const updateJson = await updateRes.json();
-        const portableId = bestaand.portableId || bestaand.id || null;
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({
-            ok: !updateJson?.errorcode || updateJson.errorcode === 0,
-            actie: 'bijgewerkt',
-            portableId,
-            cloze_url: portableId ? `https://www.cloze.com/in/person/${portableId}#section=people` : null,
-            cloze_response: updateJson,
-          }),
-        };
-      }
-
-      // STAP 2b — bestaat niet: aanmaken
-      const createBody = {
-        name: naam || (email || telefoon || 'Onbekend'),
-        ...(email    && { emails: [{ value: email }] }),
-        ...(telE164  && { phones: [{ value: telE164, type: 'mobile' }] }),
-        ...(segmentKey && { segment: segmentKey }),
-        ...(stage     && { stage }),
-        ...(makelaar_email && { assignee: makelaar_email }),
-        atAGlanceNotes: notitie,
-      };
-      const createRes = await fetch(
-        `https://api.cloze.com/v1/people/create?api_key=${CLOZE_API_KEY}&user_email=${encodeURIComponent(CLOZE_USER)}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(createBody)
-        }
-      );
-      const createJson = await createRes.json();
-      const newPortableId = createJson?.person?.portableId || createJson?.portableId || null;
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          ok: !createJson?.errorcode || createJson.errorcode === 0,
-          actie: 'aangemaakt',
-          portableId: newPortableId,
-          cloze_url: newPortableId ? `https://www.cloze.com/in/person/${newPortableId}#section=people` : null,
-          cloze_response: createJson,
-        }),
-      };
-    }
-
-    // ── DEBUG (tijdelijk) — toon alle tijd-velden van een Cloze persoon ─
-    // Doel: ontdekken welk veld de "laatste activiteit" weerspiegelt.
-    // lastChanged blijkt te schuiven bij record-edits, niet bij activiteiten.
-    // Aanroep: { action: "pool_routing_debug", data: { telefoon: "+316..." } }
-    if (action === "pool_routing_debug") {
-      const { email, telefoon } = data;
-      const telE164 = normalizeTelToE164NL(telefoon);
-
-      const q = email || telE164;
-      if (!q) return { statusCode: 400, headers, body: JSON.stringify({ error: "geen email of telefoon" }) };
-      const findRes = await fetch(
-        `https://api.cloze.com/v1/people/find?api_key=${CLOZE_API_KEY}&freeformquery=${encodeURIComponent(q)}&pagesize=3`
-      );
-      const findJson = await findRes.json();
-      const findFirst = findJson?.people?.[0];
-
-      let getPerson = null;
-      if (findFirst?.portableId) {
-        const getRes = await fetch(
-          `https://api.cloze.com/v1/people/get?api_key=${CLOZE_API_KEY}&uniqueid=${encodeURIComponent(findFirst.portableId)}`
-        );
-        const getJson = await getRes.json();
-        getPerson = getJson?.person || null;
-      }
-
-      const tijdVelden = (obj) => {
-        if (!obj) return null;
-        const out = {};
-        for (const k of Object.keys(obj)) {
-          const lk = k.toLowerCase();
-          if (lk.includes('date') || lk.includes('time') || lk.includes('seen') ||
-              lk.includes('changed') || lk.includes('engage') || lk.includes('contact') ||
-              lk.includes('activ') || lk.includes('last') || lk.includes('first') ||
-              lk.includes('created') || lk.includes('updated')) {
-            const v = obj[k];
-            const iso = (typeof v === 'number' && v > 1000000000000)
-              ? new Date(v).toISOString()
-              : null;
-            out[k] = iso ? `${v} (${iso})` : v;
-          }
-        }
-        return out;
-      };
-
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          query: q,
-          found: !!findFirst,
-          name: findFirst?.name,
-          portableId: findFirst?.portableId,
-          assignee: findFirst?.assignee || findFirst?.assignedTo || null,
-          find_alle_keys: findFirst ? Object.keys(findFirst) : null,
-          find_tijd_velden: tijdVelden(findFirst),
-          get_alle_keys: getPerson ? Object.keys(getPerson) : null,
-          get_tijd_velden: tijdVelden(getPerson),
-        }),
-      };
-    }
-
-    // ── REQUEST OVERNAME ──────────────────────────────────────────────
-    // Verstuurt een vriendelijke email aan Ton met het verzoek om een
-    // Cloze-klant over te zetten van makelaar A naar makelaar B.
-    // Ton is de enige die klanten kan omzetten (afgesproken 12 mei 2026).
-    //
-    // Aanroep: { action: "request_overname", data: {
-    //   verzoeker_naam,           // bv "Pelle Freijsen"
-    //   verzoeker_email,          // bv "pellefreijsen@makelaarsvan.nl"
-    //   klant_naam,               // bv "Devika Blok"
-    //   klant_email,              // bv "devikablok@gmail.com"
-    //   klant_telefoon,           // optioneel
-    //   huidige_eigenaar_naam,    // bv "Maurits van Leeuwen"
-    //   huidige_eigenaar_email,   // optioneel
-    //   cloze_id,                 // portableId van de klant in Cloze
-    //   adres,                    // bv "Boterdiepstraat 8 H"
-    //   datum_bezichtiging,       // bv "2026-05-12"
-    // }}
-    if (action === "request_overname") {
-      const {
-        verzoeker_naam,
-        verzoeker_email,
-        klant_naam,
-        klant_email,
-        klant_telefoon,
-        huidige_eigenaar_naam,
-        huidige_eigenaar_email,
-        cloze_id,
-        adres,
-        datum_bezichtiging,
-      } = data;
-
-      const RESEND_API_KEY = process.env.RESEND_API_KEY;
-      if (!RESEND_API_KEY) {
-        return {
-          statusCode: 500,
-          headers,
-          body: JSON.stringify({ ok: false, error: 'RESEND_API_KEY niet ingesteld in Netlify env vars' }),
-        };
-      }
-
-      const TON_EMAIL = 'toncoffeng@makelaarsvan.nl';
-      const clozeUrl = cloze_id
-        ? `https://www.cloze.com/in/person/${cloze_id}#section=people`
-        : null;
-
-      const subject = `Overnameverzoek: ${klant_naam || 'klant'}`;
-      const htmlBody = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a2540;">
-          <p style="margin: 0 0 12px;">Hoi Ton,</p>
-          <p style="margin: 0 0 12px;">
-            <strong>${verzoeker_naam || 'Een makelaar'}</strong> zou graag de Cloze-klant
-            <strong>${klant_naam || '(onbekend)'}</strong> overnemen van
-            <strong>${huidige_eigenaar_naam || '(onbekend)'}</strong>.
-          </p>
-          <div style="background:#f5f5f3; border-radius:8px; padding:14px 18px; margin:0 0 16px; font-size:14px; line-height:1.6;">
-            <div><strong>Klant:</strong> ${klant_naam || '—'}</div>
-            ${klant_email    ? `<div><strong>Email:</strong> ${klant_email}</div>` : ''}
-            ${klant_telefoon ? `<div><strong>Telefoon:</strong> ${klant_telefoon}</div>` : ''}
-            <div><strong>Huidige eigenaar:</strong> ${huidige_eigenaar_naam || '—'}${huidige_eigenaar_email ? ` (${huidige_eigenaar_email})` : ''}</div>
-            <div><strong>Verzoek door:</strong> ${verzoeker_naam || '—'}${verzoeker_email ? ` (${verzoeker_email})` : ''}</div>
-            ${adres                ? `<div><strong>Object:</strong> ${adres}</div>` : ''}
-            ${datum_bezichtiging   ? `<div><strong>Bezichtiging:</strong> ${datum_bezichtiging}</div>` : ''}
-          </div>
-          ${clozeUrl ? `
-            <p style="margin: 0 0 12px;">
-              <a href="${clozeUrl}" style="display:inline-block; background:#1a2540; color:#fff; padding:10px 18px; border-radius:6px; text-decoration:none; font-weight:500;">
-                Open klant in Cloze
-              </a>
-            </p>
-          ` : ''}
-          <p style="margin: 16px 0 4px; color:#666;">Kun je hier even naar kijken?</p>
-          <p style="margin: 0; color:#666;">Groet,<br>MVA Bellijst</p>
-          <p style="margin: 24px 0 0; font-size:11px; color:#999; border-top:1px solid #e5e5e5; padding-top:10px;">
-            Automatisch verzonden via mvaleadpool.netlify.app
-          </p>
-        </div>
-      `;
-
-      const plainText = [
-        `Hoi Ton,`,
-        ``,
-        `${verzoeker_naam || 'Een makelaar'} zou graag de Cloze-klant ${klant_naam || '(onbekend)'} overnemen van ${huidige_eigenaar_naam || '(onbekend)'}.`,
-        ``,
-        `Klant: ${klant_naam || '—'}`,
-        klant_email    ? `Email: ${klant_email}` : null,
-        klant_telefoon ? `Telefoon: ${klant_telefoon}` : null,
-        `Huidige eigenaar: ${huidige_eigenaar_naam || '—'}${huidige_eigenaar_email ? ` (${huidige_eigenaar_email})` : ''}`,
-        `Verzoek door: ${verzoeker_naam || '—'}${verzoeker_email ? ` (${verzoeker_email})` : ''}`,
-        adres                ? `Object: ${adres}` : null,
-        datum_bezichtiging   ? `Bezichtiging: ${datum_bezichtiging}` : null,
-        ``,
-        clozeUrl ? `Open in Cloze: ${clozeUrl}` : null,
-        ``,
-        `Kun je hier even naar kijken?`,
-        ``,
-        `Groet,`,
-        `MVA Bellijst`,
-      ].filter(Boolean).join('\n');
-
-      const resendRes = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({
-          from: 'MVA Bellijst <noreply@makelaarsvan.nl>',
-          to: [TON_EMAIL],
-          ...(verzoeker_email ? { reply_to: verzoeker_email } : {}),
-          subject,
-          html: htmlBody,
-          text: plainText,
-        }),
-      });
-
-      const resendJson = await resendRes.json();
-      const okStatus = resendRes.status >= 200 && resendRes.status < 300;
-
-      return {
-        statusCode: okStatus ? 200 : 500,
-        headers,
-        body: JSON.stringify({
-          ok: okStatus,
-          email_id: resendJson?.id || null,
-          error: okStatus ? null : (resendJson?.message || resendJson?.error || 'Verzenden mislukt'),
         }),
       };
     }
