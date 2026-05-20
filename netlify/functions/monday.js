@@ -923,6 +923,98 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ makelaars: filtered }) };
     }
 
+    // ── GET RR STATUS (eigen) ────────────────────────────────────────
+    // Haalt doet_mee_round_robin voor de ingelogde makelaar op. Wordt aangeroepen
+    // door de toggle-strook in de bel-lijst om de huidige stand te tonen.
+    if (action === 'get_rr_status') {
+      const { email } = body;
+      if (!email) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'email vereist' }) };
+      }
+      const rows = await sbGet(
+        `gebruikers?select=id,naam,email,rol,doet_mee_round_robin,vakantie_van,vakantie_tot` +
+        `&email=eq.${encodeURIComponent(email.toLowerCase())}`
+      );
+      if (!rows.length) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'gebruiker niet gevonden' }) };
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ gebruiker: rows[0] }) };
+    }
+
+    // ── GET RR STATUS ALLE (admin only) ──────────────────────────────
+    // Lijst van alle actieve gebruikers in dit kantoor + hun RR-status.
+    // Caller moet email meesturen — backend checkt rol='admin'.
+    if (action === 'get_rr_status_alle') {
+      const { email } = body;
+      if (!email) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'email vereist' }) };
+      }
+      // Auth-check: alleen admin
+      const aanvrager = await sbGet(
+        `gebruikers?select=rol&email=eq.${encodeURIComponent(email.toLowerCase())}`
+      );
+      if (!aanvrager.length || aanvrager[0].rol !== 'admin') {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'geen admin-rechten' }) };
+      }
+      const lijst = await sbGet(
+        `gebruikers?select=id,naam,email,rol,doet_mee_round_robin,vakantie_van,vakantie_tot,actief` +
+        `&actief=eq.true&kantoor_id=eq.${MVA_KANTOOR_ID}` +
+        `&order=naam.asc`
+      );
+      return { statusCode: 200, headers, body: JSON.stringify({ gebruikers: lijst }) };
+    }
+
+    // ── TOGGLE RR ────────────────────────────────────────────────────
+    // Zet doet_mee_round_robin voor een gebruiker op de meegestuurde waarde.
+    // - Eigen status zetten: aanvrager_email == target_email → altijd toegestaan
+    // - Andermans status zetten: aanvrager moet rol='admin' hebben
+    if (action === 'toggle_rr') {
+      const { aanvrager_email, target_email, waarde } = body;
+      if (!aanvrager_email || !target_email || typeof waarde !== 'boolean') {
+        return {
+          statusCode: 400, headers,
+          body: JSON.stringify({ error: 'aanvrager_email, target_email en waarde (boolean) vereist' }),
+        };
+      }
+      const aanvragerEmail = aanvrager_email.toLowerCase();
+      const targetEmail = target_email.toLowerCase();
+
+      // Auth-check
+      if (aanvragerEmail !== targetEmail) {
+        const aanvrager = await sbGet(
+          `gebruikers?select=rol&email=eq.${encodeURIComponent(aanvragerEmail)}`
+        );
+        if (!aanvrager.length || aanvrager[0].rol !== 'admin') {
+          return {
+            statusCode: 403, headers,
+            body: JSON.stringify({ error: 'alleen admin kan andere gebruikers wijzigen' }),
+          };
+        }
+      }
+
+      // Update
+      const result = await sbPatch(
+        `gebruikers?email=eq.${encodeURIComponent(targetEmail)}`,
+        { doet_mee_round_robin: waarde }
+      );
+
+      if (!result || (Array.isArray(result) && result.length === 0)) {
+        return {
+          statusCode: 404, headers,
+          body: JSON.stringify({ error: 'gebruiker niet gevonden of niet bijgewerkt' }),
+        };
+      }
+
+      return {
+        statusCode: 200, headers,
+        body: JSON.stringify({
+          ok: true,
+          target_email: targetEmail,
+          doet_mee_round_robin: waarde,
+        }),
+      };
+    }
+
     // ── ASSIGN MAKELAAR (oude RR, niet meer gebruikt) ────────────────
     // Behouden voor backwards compat — nieuwe flow loopt via push_naar_pool.
     if (action === 'assign_makelaar') {
