@@ -927,7 +927,7 @@ exports.handler = async (event) => {
     // Haalt doet_mee_round_robin voor de ingelogde makelaar op. Wordt aangeroepen
     // door de toggle-strook in de bel-lijst om de huidige stand te tonen.
     if (action === 'get_rr_status') {
-      const { email } = body;
+      const { email } = data || {};
       if (!email) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'email vereist' }) };
       }
@@ -945,7 +945,7 @@ exports.handler = async (event) => {
     // Lijst van alle actieve gebruikers in dit kantoor + hun RR-status.
     // Caller moet email meesturen — backend checkt rol='admin'.
     if (action === 'get_rr_status_alle') {
-      const { email } = body;
+      const { email } = data || {};
       if (!email) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'email vereist' }) };
       }
@@ -969,7 +969,7 @@ exports.handler = async (event) => {
     // - Eigen status zetten: aanvrager_email == target_email → altijd toegestaan
     // - Andermans status zetten: aanvrager moet rol='admin' hebben
     if (action === 'toggle_rr') {
-      const { aanvrager_email, target_email, waarde } = body;
+      const { aanvrager_email, target_email, waarde } = data || {};
       if (!aanvrager_email || !target_email || typeof waarde !== 'boolean') {
         return {
           statusCode: 400, headers,
