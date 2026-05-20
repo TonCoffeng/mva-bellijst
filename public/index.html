@@ -4432,7 +4432,10 @@
       const res = await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get_rr_status', email: huidigeMakelaar.email })
+        body: JSON.stringify({
+          action: 'get_rr_status',
+          data: { email: huidigeMakelaar.email }
+        })
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -4466,9 +4469,11 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'toggle_rr',
-          aanvrager_email: huidigeMakelaar.email,
-          target_email: huidigeMakelaar.email,
-          waarde: nieuweWaarde,
+          data: {
+            aanvrager_email: huidigeMakelaar.email,
+            target_email: huidigeMakelaar.email,
+            waarde: nieuweWaarde,
+          }
         })
       });
       const json = await res.json();
@@ -4507,7 +4512,10 @@
       const res = await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get_rr_status_alle', email: huidigeMakelaar.email })
+        body: JSON.stringify({
+          action: 'get_rr_status_alle',
+          data: { email: huidigeMakelaar.email }
+        })
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -4566,9 +4574,11 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'toggle_rr',
-          aanvrager_email: huidigeMakelaar.email,
-          target_email: targetEmail,
-          waarde: nieuweWaarde,
+          data: {
+            aanvrager_email: huidigeMakelaar.email,
+            target_email: targetEmail,
+            waarde: nieuweWaarde,
+          }
         })
       });
       const json = await res.json();
