@@ -5,6 +5,34 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-20 (avond)
+
+### Toegevoegd — Round Robin aan/uit toggle
+**Aanleiding:** makelaars moeten zichzelf tijdelijk uit de pool kunnen halen (bv. vakantie) zonder dat Ton via SQL een mutatie hoeft te doen. Backend-filter in `roundRobinPick` werkte al op `doet_mee_round_robin=true` en de vakantie-datums, alleen ontbrak de UI.
+
+**Frontend (`public/index.html`):**
+- **RR-strook bovenaan de bellijst-weergave** (`overzicht-screen`) met iOS-stijl switch. Groen = aan, rood + ⏸-icoon = uit.
+- **Admin-knop ⚙️ Beheer** in dezelfde strook, alleen zichtbaar voor gebruikers met `rol='admin'` (= Ton). Opent modal met lijst van alle actieve makelaars + per-rij toggle, plus badges voor admin-rol en lopende vakantie.
+- Bij login wordt `doet_mee_round_robin` opgehaald en op `huidigeMakelaar.doetMeeRR` gezet. Strook ververst bij elke open van het bel-scherm.
+- Toast bevestigt wijziging: "✅ Je doet weer mee aan de pool" / "⏸ Je staat op pauze — geen nieuwe leads".
+
+**Backend (`netlify/functions/monday.js`):**
+- Nieuwe action `get_rr_status` — eigen RR-status ophalen (email als parameter).
+- Nieuwe action `get_rr_status_alle` — admin-only lijst van alle actieve gebruikers in MVA-kantoor (filter op `rol='admin'` bij aanvrager).
+- Nieuwe action `toggle_rr` — zet `doet_mee_round_robin` voor doelgebruiker. Auth-regel: aanvrager mag zichzelf altijd wijzigen, andermans status alleen als `rol='admin'`.
+- Geen schemawijzigingen — `gebruikers.doet_mee_round_robin`, `gebruikers.vakantie_van/tot` en `gebruikers.rol` bestonden al.
+
+### Niet in deze release (bewust uitgesteld)
+- Datum-velden in UI (vakantie van/tot). Voor nu alleen pure aan/uit; vakantie kan nog via SQL of Supabase Studio worden gezet als dat nodig is.
+- Reden-veld / audit-log van wie wanneer iemand pauzeerde.
+- Aparte `instellingen.html`-pagina. Admin-functionaliteit is nu een modal in dezelfde index.html.
+
+### Open / volgend
+- Volledige admin-pagina (scope-memo 13 mei: ook rol-dropdown, volgnummer-reset, vakantie-datepicker).
+- Manager dashboard met leads-statistieken per makelaar.
+
+---
+
 ## 2026-05-20
 
 ### Gewijzigd — Cloze-drempel: alleen echte signalen schrijven door
