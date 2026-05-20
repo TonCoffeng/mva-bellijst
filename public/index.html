@@ -4691,6 +4691,10 @@
             ${lead.belpogingen > 0 ? `<span class="lead-chip chip-belpogingen">📞 ${lead.belpogingen}× geprobeerd</span>` : ''}
           </div>
 
+          <div id="cloze-badge-${lead.id}" style="margin-top:8px;min-height:20px" onclick="event.stopPropagation()">
+            <span style="font-size:11px;color:var(--grijs-tekst)">⏳ Cloze check...</span>
+          </div>
+
           <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;flex-wrap:wrap">
             ${lead.datum_bezichtiging ? `<span style="color:var(--navy);font-weight:500">🏠 Bezichtiging: <strong>${lead.datum_bezichtiging}</strong></span>` : ''}
             ${lead.datum ? `<span style="color:var(--grijs-tekst)">📥 In pool: <strong>${lead.datum}</strong></span>` : ''}
@@ -5599,7 +5603,21 @@
     document.getElementById('btn-opslaan').disabled = false;
   }
 
-  // ── OPSLAAN IN CLOZE ────────────────────────────────────────────────
+  // ── OPSLAAN MET DREMPEL-LOGICA ──────────────────────────────────────
+  // Drempel: alleen Cloze raken wanneer er een echt signaal is.
+  //
+  // Persoon NIET in Cloze:
+  //   - bereikt_ja        → aanmaken als nieuwe lead + call log
+  //   - andere uitkomsten → niets naar Cloze (alleen Supabase status)
+  //
+  // Persoon WEL in Cloze:
+  //   - bereikt_ja bij klant van COLLEGA → eerst bevestigingsmodal,
+  //     bij OK alleen call log toevoegen, GEEN stage/eigenaar wijzigen
+  //   - alle andere uitkomsten → call log toevoegen, geen stage-wijziging
+  //
+  // De backend (`cloze.js` action 'log_call_v2') doet de feitelijke
+  // beslissing wat er naar Cloze gaat. Hier in de frontend doen we de
+  // bevestigings-UX vóór de call.
   async function slaOpEnSluit() {
     if (!gekozenStatus || !huidigeLead) return;
 
@@ -5610,31 +5628,50 @@
     const notitie = document.getElementById('notitie-input').value;
     const terugbelDatum = document.getElementById('terugbel-datum').value;
 
+    // ── BEVESTIGINGSMODAL bij bereikt_ja voor klant van collega ─────────
+    // We blokkeren niet, maar tonen wel duidelijk dat de klant op naam
+    // staat van iemand anders. Bij doorzetten: alleen call log, geen
+    // stage/eigenaar mutatie. De huidige eigenaar behoudt zijn klant.
+    const eigenaarEmail = (huidigeLead.cloze_eigenaar_email || '').toLowerCase();
+    const huidigeEmail  = (huidigeMakelaar?.email || '').toLowerCase();
+    const isKlantCollega = huidigeLead.cloze_bestaand
+                        && eigenaarEmail
+                        && eigenaarEmail !== huidigeEmail;
+
+    if (gekozenStatus === 'bereikt_ja' && isKlantCollega) {
+      const eigenaarNaam = huidigeLead.cloze_eigenaar_naam
+                       || (eigenaarEmail ? eigenaarEmail.split('@')[0] : 'een collega');
+      const clozeUrl = huidigeLead.cloze_id
+        ? `https://www.cloze.com/in/person/${huidigeLead.cloze_id}#section=people`
+        : null;
+
+      const ok = await mvaConfirm({
+        titel: '⚠️ Klant van collega',
+        tekst: `${huidigeLead.naam} staat in Cloze op naam van ${eigenaarNaam}.\n\nAls je opslaat, voegen we een call-notitie toe aan de timeline (zodat ${eigenaarNaam} weet wat er gebeurd is). De klant blijft op naam van ${eigenaarNaam}.\n\nWil je doorgaan?`,
+        okTekst: 'Ja, log gesprek',
+        annuleerTekst: 'Annuleren',
+        clozeUrl,
+      });
+
+      if (!ok) {
+        btn.disabled = false;
+        btn.textContent = 'Opslaan in Cloze →';
+        return;
+      }
+    }
+
     try {
-      // 1. Persoon aanmaken/updaten in Cloze
-      await fetch('/.netlify/functions/cloze', {
+      // 1. Cloze actie via log_call_v2 — backend past drempel toe
+      // (zie cloze.js: bestaande persoon krijgt call log zonder stage,
+      // niet-bestaande persoon wordt alleen aangemaakt bij bereikt_ja)
+      const clozeRes = await fetch('/.netlify/functions/cloze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'upsert_person',
+          action: 'log_call_v2',
           data: {
             naam: huidigeLead.naam,
             email: huidigeLead.email,
-            telefoon: huidigeLead.telefoon,
-            adres: huidigeLead.adres,
-            makelaar_email: huidigeMakelaar.email,
-          }
-        })
-      });
-
-      // 2. Belpoging loggen
-      await fetch('/.netlify/functions/cloze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'log_call',
-          data: {
-            naam: huidigeLead.naam,
             telefoon: huidigeLead.telefoon,
             adres: huidigeLead.adres,
             outcome: gekozenStatus,
@@ -5643,9 +5680,34 @@
           }
         })
       });
+      const clozeJson = await clozeRes.json().catch(() => ({}));
 
-      // 3. Follow-up todo aanmaken indien nodig
-      if (['niet_bereikbaar', 'voicemail', 'bereikt_later', 'wellicht_later'].includes(gekozenStatus)) {
+      // Als nieuwe persoon is aangemaakt → portableId opslaan in Supabase
+      // zodat de "🔗 Cloze" knop persistent op de lead-kaart blijft staan
+      if (clozeJson.mode === 'nieuwe_persoon' && clozeJson.portableId) {
+        huidigeLead.cloze_id = clozeJson.portableId;
+        huidigeLead.cloze_bestaand = true;
+        const leadInData = leadsData.find(l => l.id === huidigeLead.id);
+        if (leadInData) {
+          leadInData.cloze_id = clozeJson.portableId;
+          leadInData.cloze_bestaand = true;
+        }
+        // Async — niet awaiten, blokkeer UI niet
+        fetch('/.netlify/functions/monday', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'set_cloze_id',
+            data: { item_id: huidigeLead.id, cloze_id: clozeJson.portableId }
+          })
+        }).catch(e => console.warn('cloze_id opslaan faalde:', e));
+      }
+
+      // 2. Follow-up todo aanmaken indien nodig — alleen als persoon in
+      //    Cloze bestaat (anders heeft een todo geen contact om aan te koppelen)
+      const persoonInCloze = clozeJson.mode === 'bestaande_persoon'
+                          || clozeJson.mode === 'nieuwe_persoon';
+      if (persoonInCloze && ['niet_bereikbaar', 'voicemail', 'bereikt_later', 'wellicht_later'].includes(gekozenStatus)) {
         let followUpDatum;
         if (gekozenStatus === 'bereikt_later') {
           followUpDatum = new Date(terugbelDatum).toISOString();
@@ -5671,7 +5733,7 @@
         });
       }
 
-      // 4. Status updaten in monday
+      // 3. Status updaten in monday (Supabase via Netlify function)
       await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -5685,7 +5747,7 @@
         })
       });
 
-      // 5. Bedank-mail naar gevende makelaar bij bereikt_ja
+      // 4. Bedank-mail naar gevende makelaar bij bereikt_ja
       if (gekozenStatus === 'bereikt_ja' && huidigeLead.bij_wie) {
         fetch('/.netlify/functions/mail', {
           method: 'POST',
@@ -5704,22 +5766,33 @@
         }); // fire-and-forget, niet awaiten zodat UI niet wacht
       }
 
-      // 6. Lokaal updaten
+      // 5. Lokaal updaten
       const lead = leadsData.find(l => l.id === huidigeLead.id);
       if (lead) lead.status = gekozenStatus;
 
       sluitModalDirect();
       renderLeads();
 
-      const bericht = gekozenStatus === 'bereikt_ja' && huidigeLead.bij_wie
-        ? `✅ Opgeslagen — bedankmail verstuurd naar ${huidigeLead.bij_wie}`
-        : '✅ Opgeslagen';
+      // 6. Toast — vertel duidelijk wat er gebeurd is
+      let bericht;
+      if (clozeJson.mode === 'skip') {
+        bericht = '✅ Opgeslagen — niet doorgezet naar Cloze (geen klantsignaal)';
+      } else if (clozeJson.mode === 'nieuwe_persoon') {
+        bericht = '✅ Opgeslagen + nieuw contact in Cloze';
+      } else if (clozeJson.mode === 'bestaande_persoon') {
+        bericht = '✅ Opgeslagen + notitie in Cloze-timeline';
+      } else if (gekozenStatus === 'bereikt_ja' && huidigeLead.bij_wie) {
+        bericht = `✅ Opgeslagen — bedankmail naar ${huidigeLead.bij_wie}`;
+      } else {
+        bericht = '✅ Opgeslagen';
+      }
       toonToast(bericht, 'succes');
 
     } catch (err) {
+      console.warn('slaOpEnSluit error:', err);
       toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
       btn.disabled = false;
-      btn.textContent = 'Opslaan';
+      btn.textContent = 'Opslaan in Cloze →';
     }
   }
 
