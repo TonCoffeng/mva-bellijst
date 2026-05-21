@@ -949,12 +949,13 @@ exports.handler = async (event) => {
       if (!email) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'email vereist' }) };
       }
-      // Auth-check: alleen admin
+      // Auth-check: admin of directie mag iedereen zien
       const aanvrager = await sbGet(
         `gebruikers?select=rol&email=eq.${encodeURIComponent(email.toLowerCase())}`
       );
-      if (!aanvrager.length || aanvrager[0].rol !== 'admin') {
-        return { statusCode: 403, headers, body: JSON.stringify({ error: 'geen admin-rechten' }) };
+      const aanvragerRol = aanvrager.length ? aanvrager[0].rol : null;
+      if (aanvragerRol !== 'admin' && aanvragerRol !== 'directie') {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'geen beheerder-rechten' }) };
       }
       const lijst = await sbGet(
         `gebruikers?select=id,naam,email,rol,doet_mee_round_robin,vakantie_van,vakantie_tot,actief` +
@@ -984,10 +985,11 @@ exports.handler = async (event) => {
         const aanvrager = await sbGet(
           `gebruikers?select=rol&email=eq.${encodeURIComponent(aanvragerEmail)}`
         );
-        if (!aanvrager.length || aanvrager[0].rol !== 'admin') {
+        const aanvragerRol = aanvrager.length ? aanvrager[0].rol : null;
+        if (aanvragerRol !== 'admin' && aanvragerRol !== 'directie') {
           return {
             statusCode: 403, headers,
-            body: JSON.stringify({ error: 'alleen admin kan andere gebruikers wijzigen' }),
+            body: JSON.stringify({ error: 'alleen beheerder kan andere gebruikers wijzigen' }),
           };
         }
       }
