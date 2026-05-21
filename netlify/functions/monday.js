@@ -72,6 +72,98 @@ const sbInsert = async (path, body) => {
   return res.json();
 };
 
+// ── RESEND MAIL HELPER ────────────────────────────────────────────────
+// Stuurt notificatie-mail vanuit contact@makelaarsvan.nl. Faalt stilletjes —
+// een mail-fout mag de lead-toewijzing nooit blokkeren. Gebruikt in
+// push_naar_pool om de ontvangende makelaar te notificeren.
+//
+// Vereist Netlify env var: RESEND_API_KEY
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const MAIL_FROM = 'MVA Leadpool <contact@makelaarsvan.nl>';
+
+const stuurMail = async ({ to, subject, html }) => {
+  if (!RESEND_API_KEY) {
+    console.warn('[mail] RESEND_API_KEY ontbreekt — mail niet verstuurd');
+    return { ok: false, reason: 'no_api_key' };
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from: MAIL_FROM, to, subject, html }),
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error(`[mail] Resend ${res.status}: ${txt}`);
+      return { ok: false, reason: `http_${res.status}`, detail: txt };
+    }
+    const json = await res.json();
+    console.log(`[mail] verstuurd naar ${to} (id=${json.id})`);
+    return { ok: true, id: json.id };
+  } catch (err) {
+    console.error('[mail] uitzondering:', err.message);
+    return { ok: false, reason: 'exception', detail: err.message };
+  }
+};
+
+// Bouwt de HTML-body voor een lead-toewijzing-notificatie.
+const renderLeadNotificatieMail = ({
+  ontvangerNaam, klantNaam, adres, telefoon, email,
+  gevendeMakelaar, opmerking, leadpoolUrl,
+}) => {
+  const esc = s => String(s || '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+  const veiligeTel = esc(telefoon || '—');
+  const veiligEmail = esc(email || '—');
+  const opmerkingBlok = opmerking
+    ? `<tr><td style="padding:8px 0;color:#64748b;font-size:13px;width:140px">Opmerking</td>
+         <td style="padding:8px 0;color:#1A2B5F;font-size:14px;font-style:italic">${esc(opmerking)}</td></tr>`
+    : '';
+  return `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f4f6fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f4f6fa;padding:24px 0">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden">
+        <tr><td style="background:#1A2B5F;padding:20px 24px;color:white">
+          <div style="font-size:12px;letter-spacing:0.05em;opacity:0.8;text-transform:uppercase">MVA Leadpool</div>
+          <div style="font-size:20px;font-weight:700;margin-top:4px">Nieuwe lead voor jou</div>
+        </td></tr>
+        <tr><td style="padding:24px">
+          <div style="font-size:15px;color:#1A2B5F;margin-bottom:18px">
+            Hoi ${esc(ontvangerNaam)}, je hebt een nieuwe lead ontvangen uit de pool.
+          </div>
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse">
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px;width:140px">Klant</td>
+                <td style="padding:8px 0;color:#1A2B5F;font-size:15px;font-weight:600">${esc(klantNaam)}</td></tr>
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px">Adres bezichtiging</td>
+                <td style="padding:8px 0;color:#1A2B5F;font-size:14px">${esc(adres)}</td></tr>
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px">Telefoon</td>
+                <td style="padding:8px 0;color:#1A2B5F;font-size:14px"><a href="tel:${veiligeTel}" style="color:#E8500A;text-decoration:none">${veiligeTel}</a></td></tr>
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px">Email</td>
+                <td style="padding:8px 0;color:#1A2B5F;font-size:14px"><a href="mailto:${veiligEmail}" style="color:#E8500A;text-decoration:none">${veiligEmail}</a></td></tr>
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px">Doorgegeven door</td>
+                <td style="padding:8px 0;color:#1A2B5F;font-size:14px">${esc(gevendeMakelaar)}</td></tr>
+            ${opmerkingBlok}
+          </table>
+          <div style="margin-top:24px;text-align:center">
+            <a href="${leadpoolUrl}" style="display:inline-block;background:#E8500A;color:white;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px">
+              Open in Leadpool →
+            </a>
+          </div>
+          <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center">
+            Wil je geen leads meer ontvangen? Zet Round Robin uit in de Leadpool-app.
+          </div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+};
+
 // ── TRANSFORMATIE: Supabase row → Monday-stijl object voor frontend ───
 // De frontend (index.html) verwacht exact deze veldnamen — niet aanraken.
 const rowToMondayShape = (b, makelaarNaam = '') => {
@@ -418,6 +510,39 @@ exports.handler = async (event) => {
 
       // Archiveer bezichtiging (uit gevende lijst, in archief vindbaar)
       await archiveerBezichtiging(item_id, 'pool');
+
+      // ── Notificatie-mail naar ontvangende makelaar ──────────────────
+      // ALLEEN bij echte Round Robin, niet bij direct-assign (Cloze-routing).
+      // Faalt stilletjes — een mail-fout mag de pool-flow niet blokkeren.
+      if (!useDirectAssign && rr.gekozen_email) {
+        // Haal naam gevende makelaar op (niet altijd bekend in bez-row)
+        let gevendeMakelaar = 'een collega';
+        if (bez.gevende_makelaar_id) {
+          try {
+            const gRows = await sbGet(
+              `gebruikers?select=naam&id=eq.${bez.gevende_makelaar_id}`
+            );
+            if (gRows[0]?.naam) gevendeMakelaar = gRows[0].naam;
+          } catch { /* mag falen */ }
+        }
+        const html = renderLeadNotificatieMail({
+          ontvangerNaam:    rr.gekozen_naam,
+          klantNaam:        bez.bezichtiger_naam || 'Onbekend',
+          adres:            bez.adres || '—',
+          telefoon:         bez.bezichtiger_telefoon || '',
+          email:            bez.bezichtiger_email || '',
+          gevendeMakelaar,
+          opmerking:        bez.feedback_opmerking || '',
+          leadpoolUrl:      'https://mvaleadpool.netlify.app/',
+        });
+        // Niet awaiten zou cleaner zijn, maar Netlify Functions kunnen geen
+        // async werk na response. Dus wel awaiten en falen-stilletjes.
+        await stuurMail({
+          to:      rr.gekozen_email,
+          subject: `Nieuwe lead: ${bez.bezichtiger_naam || 'bezichtiger'} · ${bez.adres || ''}`.trim(),
+          html,
+        });
+      }
 
       return {
         statusCode: 200, headers,
