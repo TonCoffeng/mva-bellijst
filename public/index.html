@@ -1521,6 +1521,10 @@
       <div class="stat-number">📂</div>
       <div class="stat-label">Ontvangen leads</div>
     </div>
+    <div class="stat-card filter-knop" id="leads-dashboards-knop" onclick="openDashboards()" title="Open dashboards in nieuw tabblad">
+      <div class="stat-number">📊</div>
+      <div class="stat-label">Dashboards</div>
+    </div>
   </div>
 
   <!-- BEL-STATUS FILTER PILLEN -->
@@ -5330,6 +5334,14 @@
     await laadEnRenderOntvangen();
   }
   window.openOntvangenPagina = openOntvangenPagina;
+
+  // ── DASHBOARDS — opent mva-dashboards in nieuw tabblad ──────────────
+  // De dashboards-site bepaalt zelf wat de gebruiker te zien krijgt op
+  // basis van rol (eigen auth via wachtwoord-portal, Supabase SSO volgt).
+  function openDashboards() {
+    window.open('https://mva-dashboards.netlify.app/', '_blank', 'noopener');
+  }
+  window.openDashboards = openDashboards;
 
   function sluitOntvangenPagina() {
     document.getElementById('ontvangen-screen').classList.add('hidden');
