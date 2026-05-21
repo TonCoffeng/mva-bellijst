@@ -5,6 +5,37 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-21 (avond)
+
+### Toegevoegd — Extern-rol (Filipe & Gert-Jan)
+**Aanleiding:** Filipe Bataglia en Gert-Jan Mulder werken voor MVA maar zetten binnenkort een eigen kantoor op ('t Gooi). Ze mogen in de tussentijd weer leads doorgeven en ontvangen, maar mogen absoluut niet meedoen aan de Round Robin van de MVA-makelaars. Hun bezichtigingen gaan uitsluitend naar elkaar (Filipe ↔ Gert-Jan).
+
+**Database (`gebruikers`):**
+- Nieuwe kolom `mag_in_round_robin` (boolean, default true) — keiharde block voor wie nooit in RR mag
+- Nieuwe rol `'extern'` toegevoegd aan CHECK-constraint
+- Filipe Bataglia en Gert-Jan Mulder opnieuw aangemaakt met rol `extern`, `doet_mee_round_robin=false`, `mag_in_round_robin=false`
+
+**Backend (`netlify/functions/monday.js`):**
+- Nieuwe helper `externPick()` — voor extern-gevers wordt de andere actieve extern-makelaar gekozen (geen RR-pool)
+- `push_naar_pool` checkt eerst of gever rol `extern` heeft → routing via externPick, anders standaard RR
+- Edge case: als er geen actieve extern-collega is (vakantie, RR uit) → lead blijft bij gever (response `reden: 'extern_geen_kandidaat'`, geen error)
+- `toggle_rr` blokkeert nu het aanzetten van iemand met `mag_in_round_robin=false` — voorkomt dat een beheerder per ongeluk Filipe of Gert-Jan aanzet
+- `get_rr_status_alle` retourneert nu ook `mag_in_round_robin`
+
+**Frontend (`public/index.html`):**
+- Admin-modal toont extern-makelaars met paarse "extern · vast uit RR" badge
+- Toggle is `disabled` voor externs — kan niet aan/uit
+- Visueel onderscheid: lichtgrijze achtergrond i.p.v. groen/rood
+
+**Inloggegevens (te delen):**
+- filipebataglia@makelaarsvan.nl / MVA2026!
+- gertjanmulder@makelaarsvan.nl / MVA2026!
+
+**Auth-accounts:**
+- Moeten nog in Supabase Auth worden aangemaakt (via Dashboard → Auth → Users → Add user)
+
+---
+
 ## 2026-05-21 (eind van de dag)
 
 ### Toegevoegd — Herinneringsmail bij niet-gebelde leads

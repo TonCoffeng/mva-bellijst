@@ -4552,6 +4552,7 @@
     const vandaag = new Date().toISOString().split('T')[0];
     lijst.innerHTML = gebruikers.map(g => {
       const aan = g.doet_mee_round_robin === true;
+      const magInRR = g.mag_in_round_robin !== false; // default true voor oude records
       const opVakantie = g.vakantie_van && g.vakantie_tot
         && g.vakantie_van <= vandaag && vandaag <= g.vakantie_tot;
       const vakantieBadge = opVakantie
@@ -4560,18 +4561,25 @@
       const adminBadge = g.rol === 'admin'
         ? `<span style="display:inline-block;background:#dbeafe;color:#1e3a8a;font-size:10px;font-weight:600;padding:2px 6px;border-radius:6px;margin-left:6px">admin</span>`
         : '';
+      const externBadge = g.rol === 'extern'
+        ? `<span style="display:inline-block;background:#ede9fe;color:#5b21b6;font-size:10px;font-weight:600;padding:2px 6px;border-radius:6px;margin-left:6px">extern · vast uit RR</span>`
+        : '';
+      const achtergrond = !magInRR ? '#f8fafc' : (aan ? 'var(--wit)' : '#fef2f2');
+      const toggleTitle = !magInRR
+        ? 'Extern — mag niet in RR meedoen'
+        : (aan ? 'Aan — krijgt leads' : 'Uit — wordt overgeslagen');
       return `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--grijs-mid);border-radius:10px;background:${aan ? 'var(--wit)' : '#fef2f2'}">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--grijs-mid);border-radius:10px;background:${achtergrond}">
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:700;color:var(--navy)">
-              ${escapeHtml(g.naam)}${adminBadge}${vakantieBadge}
+              ${escapeHtml(g.naam)}${adminBadge}${externBadge}${vakantieBadge}
             </div>
             <div style="font-size:11px;color:var(--grijs-tekst);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
               ${escapeHtml(g.email)}
             </div>
           </div>
-          <label class="rr-switch" title="${aan ? 'Aan — krijgt leads' : 'Uit — wordt overgeslagen'}">
-            <input type="checkbox" ${aan ? 'checked' : ''}
+          <label class="rr-switch" title="${toggleTitle}">
+            <input type="checkbox" ${aan ? 'checked' : ''} ${!magInRR ? 'disabled' : ''}
               data-email="${escapeHtml(g.email)}"
               onchange="toggleAndereRR(this)" />
             <span class="rr-slider"></span>
