@@ -5,6 +5,12 @@
 [functions]
   node_bundler = "esbuild"
 
+# Scheduled function: stuurt herinneringsmails naar makelaars die een lead
+# uit de pool hebben gekregen maar er nog niet mee aan de slag zijn.
+# Draait elke 15 minuten — checkt zelf welke leads aan de beurt zijn.
+[functions."herinnering-check"]
+  schedule = "*/15 * * * *"
+
 [[headers]]
   for = "/*"
   [headers.values]
