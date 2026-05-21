@@ -317,6 +317,60 @@ const roundRobinPick = async (bezichtigingId, gevendeMakelaarId) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────
+// EXTERN PICK — voor extern-gevers (Filipe, Gert-Jan) gaat de lead NIET
+// via de RR-pool maar direct naar de andere actieve extern-makelaar.
+// Filipe geeft → Gert-Jan ontvangt, en vice versa.
+//
+// Edge case: als de andere extern-makelaar niet beschikbaar is (vakantie,
+// RR uit, of niet actief) → throw error met duidelijke melding. De aanroep
+// in push_naar_pool vangt deze op en zet de lead terug bij de gever.
+// ─────────────────────────────────────────────────────────────────────
+const externPick = async (bezichtigingId, gevendeMakelaarId) => {
+  // Haal alle externs op behalve de gever, alleen actieve, doet_mee_round_robin=true
+  // (toggle in app), niet op vakantie.
+  const externs = await sbGet(
+    `gebruikers?select=id,naam,email,vakantie_van,vakantie_tot` +
+    `&rol=eq.extern&actief=eq.true&doet_mee_round_robin=eq.true` +
+    `&kantoor_id=eq.${MVA_KANTOOR_ID}` +
+    `&id=neq.${gevendeMakelaarId}`
+  );
+
+  const vandaag = new Date().toISOString().split('T')[0];
+  const opVakantie = (g) =>
+    g.vakantie_van && g.vakantie_tot &&
+    g.vakantie_van <= vandaag && vandaag <= g.vakantie_tot;
+
+  const kandidaten = externs.filter(g => !opVakantie(g));
+
+  if (kandidaten.length === 0) {
+    throw new Error(
+      `EXTERN_GEEN_KANDIDAAT: geen actieve extern-makelaar beschikbaar ` +
+      `(externs gevonden=${externs.length}, allen op vakantie of niet actief)`
+    );
+  }
+
+  // Bij meer dan 1 (toekomstig?): kies degene met laagste volgnummer.
+  // Voor nu: eerste = enige.
+  const gekozen = kandidaten[0];
+
+  await sbInsert('toewijzingen', {
+    kantoor_id:       MVA_KANTOOR_ID,
+    bezichtiging_id:  bezichtigingId,
+    gebruiker_id:     gekozen.id,
+    toegewezen_op:    new Date().toISOString(),
+    status:           'open',
+  });
+
+  return {
+    gekozen_id:    gekozen.id,
+    gekozen_naam:  gekozen.naam,
+    gekozen_email: gekozen.email,
+    pool_grootte:  kandidaten.length,
+    via_extern:    true,
+  };
+};
+
+// ─────────────────────────────────────────────────────────────────────
 // HANDLER
 // ─────────────────────────────────────────────────────────────────────
 exports.handler = async (event) => {
@@ -488,11 +542,44 @@ exports.handler = async (event) => {
           pool_grootte: null,  // n.v.t. — was bypass
         };
       } else {
-        // ── Standaard: Round Robin ───────────────────────────────────
-        try {
-          rr = await roundRobinPick(parseInt(item_id), bez.gevende_makelaar_id);
-        } catch (e) {
-          return { statusCode: 500, headers, body: JSON.stringify({ error: `Round Robin faalde: ${e.message}` }) };
+        // ── Check eerst of gever 'extern' is (Filipe/Gert-Jan flow) ──
+        // Extern-gevers gaan NIET via de RR-pool. Lead gaat direct naar
+        // de andere extern-makelaar. Bij geen kandidaat: lead blijft bij
+        // de gever (er wordt niets aangemaakt en de bezichtiging blijft
+        // open in zijn lijst).
+        let externRouting = false;
+        if (bez.gevende_makelaar_id) {
+          try {
+            const geverRows = await sbGet(
+              `gebruikers?select=rol&id=eq.${bez.gevende_makelaar_id}`
+            );
+            if (geverRows[0]?.rol === 'extern') externRouting = true;
+          } catch { /* fallback naar RR */ }
+        }
+
+        if (externRouting) {
+          // ── Extern → andere extern (Filipe ↔ Gert-Jan) ─────────────
+          try {
+            rr = await externPick(parseInt(item_id), bez.gevende_makelaar_id);
+          } catch (e) {
+            // Geen kandidaat → lead blijft bij gever, geen bellijst-item
+            console.warn(`[push_naar_pool] extern-routing faalde: ${e.message}`);
+            return {
+              statusCode: 200, headers,
+              body: JSON.stringify({
+                ok: false,
+                reden: 'extern_geen_kandidaat',
+                bericht: 'Je collega is niet beschikbaar. De lead blijft bij jou staan — je kunt m later opnieuw doorgeven of zelf bellen.',
+              }),
+            };
+          }
+        } else {
+          // ── Standaard: Round Robin ──────────────────────────────────
+          try {
+            rr = await roundRobinPick(parseInt(item_id), bez.gevende_makelaar_id);
+          } catch (e) {
+            return { statusCode: 500, headers, body: JSON.stringify({ error: `Round Robin faalde: ${e.message}` }) };
+          }
         }
       }
 
@@ -1083,7 +1170,7 @@ exports.handler = async (event) => {
         return { statusCode: 403, headers, body: JSON.stringify({ error: 'geen beheerder-rechten' }) };
       }
       const lijst = await sbGet(
-        `gebruikers?select=id,naam,email,rol,doet_mee_round_robin,vakantie_van,vakantie_tot,actief` +
+        `gebruikers?select=id,naam,email,rol,doet_mee_round_robin,mag_in_round_robin,vakantie_van,vakantie_tot,actief` +
         `&actief=eq.true&kantoor_id=eq.${MVA_KANTOOR_ID}` +
         `&order=naam.asc`
       );
@@ -1115,6 +1202,24 @@ exports.handler = async (event) => {
           return {
             statusCode: 403, headers,
             body: JSON.stringify({ error: 'alleen beheerder kan andere gebruikers wijzigen' }),
+          };
+        }
+      }
+
+      // Block: gebruikers met mag_in_round_robin=false kunnen niet aangezet
+      // worden. Geldt voor zowel zichzelf als beheerder die het probeert.
+      // Dit beschermt externs (Filipe/Gert-Jan) tegen onbedoeld in RR komen.
+      if (waarde === true) {
+        const targetRows = await sbGet(
+          `gebruikers?select=mag_in_round_robin,naam&email=eq.${encodeURIComponent(targetEmail)}`
+        );
+        const target = targetRows[0];
+        if (target && target.mag_in_round_robin === false) {
+          return {
+            statusCode: 403, headers,
+            body: JSON.stringify({
+              error: `${target.naam} mag niet aan Round Robin meedoen (externe makelaar)`,
+            }),
           };
         }
       }
