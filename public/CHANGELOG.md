@@ -5,6 +5,34 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-21 (eind van de dag)
+
+### Toegevoegd — Herinneringsmail bij niet-gebelde leads
+**Aanleiding:** discussie met Rogier over leads die blijven liggen. Ton wilde een positieve nudge ("vergeten te bellen?"), Rogier wilde automatische overdracht. Compromis: nudge na 1 werkdag, nogmaals na 2 werkdagen, daarna stilte. Geen automatische overdracht — de makelaar blijft de eigenaar en kiest zelf wat 'ie doet.
+
+**Nieuw bestand (`netlify/functions/herinnering-check.js`):**
+- Scheduled function die elke 15 minuten draait
+- Checkt alle bellijst_items met `bel_status='nieuw'` en `belpogingen=0`
+- Berekent werkuren sinds toewijzing (weekend telt niet — vrijdag 14u → maandag 14u = 24 werkuren)
+- Stuurt herinnering 1 na 24 werkuren, herinnering 2 na 48 werkuren (mits 1 al verstuurd is)
+- Mail-template met klant-info, gevende makelaar, opmerking + "twee opties"-blok (bellen of doorgeven)
+- Markeert `herinnering_1_verzonden_op` / `herinnering_2_verzonden_op` zodat geen dubbele mails
+
+**Database (`bellijst_items`):**
+- Nieuwe kolommen `herinnering_1_verzonden_op` en `herinnering_2_verzonden_op` (timestamptz)
+- Partial index op `(toegevoegd_op, bel_status, belpogingen) WHERE bel_status='nieuw' AND belpogingen=0` voor snelle lookup
+
+**Config (`netlify.toml`):**
+- Nieuw blok `[functions."herinnering-check"]` met `schedule = "*/15 * * * *"`
+
+**Bewuste keuzes:**
+- Geen automatische overdracht — makelaar blijft eigenaar tot ze zelf actie nemen
+- Tweede herinnering visueel anders (rode header i.p.v. navy) om urgentie te benadrukken
+- Footer expliciet: "Geen actie nodig als je intussen al hebt gebeld — zet dan even de status in de app." → leert makelaars om status bij te houden
+- Cloze-integratie (Rogier's idee) niet meegenomen — eerst zien hoe deze simpele variant werkt, later eventueel uitbreiden door Cloze-timeline mee te checken
+
+---
+
 ## 2026-05-21 (later)
 
 ### Toegevoegd — E-mail notificatie bij nieuwe pool-lead
