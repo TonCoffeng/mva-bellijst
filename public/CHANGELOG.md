@@ -5,6 +5,32 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-21 (later)
+
+### Toegevoegd — E-mail notificatie bij nieuwe pool-lead
+**Aanleiding:** ontvangende makelaars wisten niet meteen dat ze een lead hadden — ze moesten de Leadpool-app actief openen om het te zien. Met een directe e-mail-notificatie pakt de makelaar de lead sneller op.
+
+**Backend (`netlify/functions/monday.js`):**
+- Nieuwe helper `stuurMail()` die via Resend mailt vanuit `contact@makelaarsvan.nl`. Faalt stilletjes als `RESEND_API_KEY` niet is gezet — een mail-fout blokkeert de lead-toewijzing nooit.
+- Nieuwe helper `renderLeadNotificatieMail()` met een schone MVA-stijl HTML-template (navy/oranje, mobiel-vriendelijk, klikbare tel: en mailto: links).
+- `push_naar_pool` triggert nu een mail naar de ontvangende makelaar bij elke Round Robin-toewijzing.
+
+**Inhoud van de mail:**
+- Klantnaam, adres bezichtiging, telefoon, email
+- Naam van de gevende makelaar (opgehaald uit `gebruikers` op basis van `gevende_makelaar_id`)
+- Eventuele `feedback_opmerking`
+- CTA-knop "Open in Leadpool →" naar mvaleadpool.netlify.app
+
+**Bewuste keuzes:**
+- Alleen bij echte Round Robin, **niet bij direct-assign** (Cloze-routing) — daar weet de ontvangende makelaar al dat het zijn klant is.
+- `From: MVA Leadpool <contact@makelaarsvan.nl>` zonder Reply-To. Het is een notificatie, geen conversatie.
+- Mail-fouten worden alleen gelogd, niet gerapporteerd aan de frontend.
+
+**Vereiste env-var (handmatig instellen in Netlify):**
+- `RESEND_API_KEY` voor de mvaleadpool site. Domein `makelaarsvan.nl` is geverifieerd bij Resend sinds 20 mei.
+
+---
+
 ## 2026-05-21
 
 ### Toegevoegd — Dashboards-knop in bellijst
