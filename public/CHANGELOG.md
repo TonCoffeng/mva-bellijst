@@ -5,6 +5,39 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-21
+
+### Toegevoegd — Dashboards-knop in bellijst
+**Aanleiding:** dashboards stonden op een aparte URL (`mva-dashboards.netlify.app`) en waren daardoor lastig vindbaar. Voor makelaars is het logischer om vanuit de bellijst door te klikken naar hun cijfers.
+
+**Frontend (`public/index.html`):**
+- Derde tegel "📊 Dashboards" toegevoegd naast "Openstaand" en "Ontvangen leads" in `overzicht-screen`.
+- Klik opent `mva-dashboards.netlify.app` in een nieuw tabblad (`window.open(..., '_blank', 'noopener')`).
+- Zichtbaar voor iedereen — de dashboards-site bepaalt zelf wat de gebruiker te zien krijgt op basis van rol (Supabase-sessie wordt gedeeld via dezelfde Supabase-instance).
+
+### Toegevoegd — Makelaar-Mentor rol in gebruikersmodel
+**Aanleiding:** Rogier en Maurits van Leeuwen krijgen een mentor-rol voor coaching van jongere makelaars. Dit is een tussenniveau tussen `makelaar` en `directie` met inzicht in eigen mentees (komt straks tot uiting in mva-dashboards).
+
+**Database (`gebruikers` tabel):**
+- CHECK-constraint op `rol` uitgebreid met `'makelaar-mentor'`. Toegestane waarden zijn nu: `makelaar`, `makelaar-mentor`, `directie`, `admin`, `viewer`.
+- Rogier de Vries en Maurits van Leeuwen gepromoveerd van `makelaar` naar `makelaar-mentor`.
+- Rogier's 4 mentees gekoppeld via `mentor_id`: Anthonie Schilder, Wilma Out, Maurits Rodermond, Mathias Elias.
+- Maurits van Leeuwen heeft op dit moment nog geen mentees toegewezen.
+
+**Migratie-script:** `2026-05-21_mentor_rol_setup.sql` (handmatig draaien in Supabase SQL Editor).
+
+### Gerepareerd — RR-admin-knop ook voor directie
+**Aanleiding:** de gisteren toegevoegde "⚙️ Beheer" knop in de RR-strook checkte op `rol='admin'`, maar niemand in het systeem heeft die rol. Ton en Hans hebben rol `directie`.
+
+**Frontend (`public/index.html`):**
+- Check uitgebreid: `huidigeMakelaar.level === 'admin' || huidigeMakelaar.level === 'directie'` → knop verschijnt nu wel voor Ton en Hans.
+
+**Backend (`netlify/functions/monday.js`):**
+- Actions `get_rr_status_alle` en `toggle_rr` accepteren nu zowel `admin` als `directie` als aanvrager-rol.
+- Foutmeldingen aangepast van "admin-rechten" naar "beheerder-rechten".
+
+---
+
 ## 2026-05-20 (avond)
 
 ### Toegevoegd — Round Robin aan/uit toggle

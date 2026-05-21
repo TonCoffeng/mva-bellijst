@@ -1521,6 +1521,10 @@
       <div class="stat-number">📂</div>
       <div class="stat-label">Ontvangen leads</div>
     </div>
+    <div class="stat-card filter-knop" id="leads-dashboards-knop" onclick="openDashboards()" title="Open dashboards in nieuw tabblad">
+      <div class="stat-number">📊</div>
+      <div class="stat-label">Dashboards</div>
+    </div>
   </div>
 
   <!-- BEL-STATUS FILTER PILLEN -->
@@ -4445,7 +4449,9 @@
       // Admin-knop alleen tonen voor admins
       const adminBtn = document.getElementById('rr-admin-btn');
       if (adminBtn) {
-        adminBtn.style.display = (huidigeMakelaar.level === 'admin') ? '' : 'none';
+        // Admin-knop ook voor directie (Ton, Hans) — niet alleen admin-rol
+        const isBeheerder = (huidigeMakelaar.level === 'admin') || (huidigeMakelaar.level === 'directie');
+        adminBtn.style.display = isBeheerder ? '' : 'none';
       }
     } catch (err) {
       console.warn('RR-status laden mislukt:', err);
@@ -5317,6 +5323,14 @@
     await laadEnRenderOntvangen();
   }
   window.openOntvangenPagina = openOntvangenPagina;
+
+  // ── DASHBOARDS — opent mva-dashboards in nieuw tabblad ──────────────
+  // De dashboards-site bepaalt zelf wat de gebruiker te zien krijgt op
+  // basis van de Supabase-sessie (gedeelde auth via dezelfde Supabase-instance).
+  function openDashboards() {
+    window.open('https://mva-dashboards.netlify.app/', '_blank', 'noopener');
+  }
+  window.openDashboards = openDashboards;
 
   function sluitOntvangenPagina() {
     document.getElementById('ontvangen-screen').classList.add('hidden');
