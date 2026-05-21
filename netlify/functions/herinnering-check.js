@@ -23,7 +23,8 @@
 //
 // Cron-schedule: elke 15 minuten via netlify.toml (zie deploy-notitie onderaan).
 
-const fetch = global.fetch || ((...args) => import('node-fetch').then(({ default: f }) => f(...args)));
+// Schedule wordt geregistreerd in netlify.toml (elke 15 minuten).
+// Node 18+ heeft global fetch ingebouwd, geen node-fetch nodig.
 
 const SUPABASE_URL         = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
