@@ -1521,10 +1521,6 @@
       <div class="stat-number">📂</div>
       <div class="stat-label">Ontvangen leads</div>
     </div>
-    <div class="stat-card filter-knop" id="leads-dashboards-knop" onclick="openDashboards()" title="Open dashboards in nieuw tabblad">
-      <div class="stat-number">📊</div>
-      <div class="stat-label">Dashboards</div>
-    </div>
   </div>
 
   <!-- BEL-STATUS FILTER PILLEN -->
@@ -4446,10 +4442,9 @@
       const aan = json.gebruiker?.doet_mee_round_robin === true;
       huidigeMakelaar.doetMeeRR = aan;
       rrStrookSync(aan);
-      // Admin-knop alleen tonen voor admins
+      // Beheer-knop tonen voor admin én directie
       const adminBtn = document.getElementById('rr-admin-btn');
       if (adminBtn) {
-        // Admin-knop ook voor directie (Ton, Hans) — niet alleen admin-rol
         const isBeheerder = (huidigeMakelaar.level === 'admin') || (huidigeMakelaar.level === 'directie');
         adminBtn.style.display = isBeheerder ? '' : 'none';
       }
@@ -4505,8 +4500,9 @@
 
   // Admin-modal: lijst alle makelaars + per-rij toggle
   async function openRRAdminModal() {
-    if (huidigeMakelaar?.level !== 'admin') {
-      toonToast('Alleen voor admins', 'fout');
+    const isBeheerder = (huidigeMakelaar?.level === 'admin') || (huidigeMakelaar?.level === 'directie');
+    if (!isBeheerder) {
+      toonToast('Alleen voor beheerders', 'fout');
       return;
     }
     const modal = document.getElementById('rr-admin-modal');
@@ -5323,14 +5319,6 @@
     await laadEnRenderOntvangen();
   }
   window.openOntvangenPagina = openOntvangenPagina;
-
-  // ── DASHBOARDS — opent mva-dashboards in nieuw tabblad ──────────────
-  // De dashboards-site bepaalt zelf wat de gebruiker te zien krijgt op
-  // basis van de Supabase-sessie (gedeelde auth via dezelfde Supabase-instance).
-  function openDashboards() {
-    window.open('https://mva-dashboards.netlify.app/', '_blank', 'noopener');
-  }
-  window.openDashboards = openDashboards;
 
   function sluitOntvangenPagina() {
     document.getElementById('ontvangen-screen').classList.add('hidden');
