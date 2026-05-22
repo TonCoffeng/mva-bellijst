@@ -212,6 +212,7 @@ const rowToMondayShape = (b, makelaarNaam = '') => {
     actie_status:   b.actie_status || '',
     type:           b.type || 'ingepland',
     publieke_token: b.publieke_token || null,
+    open_huis_door_id: b.open_huis_door_id || null,
   };
 };
 
@@ -428,7 +429,18 @@ exports.handler = async (event) => {
 
       const bezichtigingen = rows
         .filter(r => !isLegeSlot(r))
-        .map(r => rowToMondayShape(r, makelaarNaam))
+        .map(r => {
+          const shape = rowToMondayShape(r, makelaarNaam);
+          // Voor open-huis-bezoeker-kaarten: doorsturen mag alleen als de
+          // ingelogde (verkopend) makelaar het open huis ZELF draaide.
+          // Ander draaide → kaart is ter info, geen doorstuur-acties.
+          if (shape.type === 'open_huis_bezoeker') {
+            shape.mag_doorsturen = (r.open_huis_door_id === makelaarId);
+          } else {
+            shape.mag_doorsturen = true; // gewone bezichtigingen: altijd
+          }
+          return shape;
+        })
         .filter(b => isMVAMakelaar(b.makelaar));
 
       return { statusCode: 200, headers, body: JSON.stringify({ bezichtigingen }) };

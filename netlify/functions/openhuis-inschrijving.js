@@ -238,6 +238,32 @@ exports.handler = async (event) => {
       opmerking:            opm || null,
     });
 
+    // ── Bezoeker ook als bezichtigingsregel bij de VERKOPEND makelaar ──
+    // Elke inschrijving wordt een eigen bezichtigingskaart (type
+    // 'open_huis_bezoeker') zodat de verkopend makelaar elke bezoeker apart
+    // in zijn Bezichtigingen-lijst ziet. open_huis_door_id bepaalt of 'ie
+    // mag doorsturen (alleen als hij zelf draaide). Fire-and-forget: een fout
+    // hier mag de inschrijving (bellijst-item) niet laten falen.
+    try {
+      await sbInsert('bezichtigingen', {
+        kantoor_id:          bez.kantoor_id,
+        gevende_makelaar_id: verkopendId,   // → komt in lijst verkopend makelaar
+        open_huis_door_id:   opvolgerId,    // → bepaalt doorstuur-knop in render
+        pand_id:             bez.pand_id || null,
+        type:                'open_huis_bezoeker',
+        bezichtiger_naam:     naam.trim(),
+        bezichtiger_email:    (email || '').trim(),
+        bezichtiger_telefoon: (telefoon || '').trim(),
+        adres:                bez.adres,
+        datum_tijd:           bez.datum_tijd || new Date().toISOString(),
+        feedback_opmerking:   opm || null,
+        actie_status:         'open',
+        gearchiveerd:         false,
+      });
+    } catch (bezErr) {
+      console.error('[openhuis-inschrijving] bezichtigingsregel faalde (inschrijving wel opgeslagen):', bezErr.message);
+    }
+
     // ── Notificatiemails (fire-and-forget) ────────────────────────
     // 1. Opvolger (draaier): "jij volgt deze lead op"
     // 2. Verkopend makelaar: "ter info" — alleen als dat een ándere persoon is.
