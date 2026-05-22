@@ -117,6 +117,14 @@ exports.handler = async (event) => {
       const status = (row.actie_status || '').toLowerCase();
       const inPool = (status === 'pool');
 
+      // Open-huis-bezoeker mag alleen doorgestuurd worden als de ingelogde
+      // (verkopend) makelaar het open huis ZELF draaide. Ander draaide →
+      // kaart is ter info, geen doorstuur/zelf-bellen/toewijzen-knoppen.
+      const type = row.type || 'ingepland';
+      const magDoorsturen = (type === 'open_huis_bezoeker')
+        ? (row.open_huis_door_id === user.id)
+        : true;
+
       return {
         id: String(row.id),  // database primary key — matcht monday.js queries (push_naar_pool, push_naar_eigen_bellijst, etc.)
         realworks_id: row.realworks_id || null,  // beschikbaar als referentie maar niet als hoofdkey
@@ -134,6 +142,10 @@ exports.handler = async (event) => {
         opmerking: row.feedback_opmerking || '',
         in_pool: inPool,
         actie_status: status === 'open' ? '' : status,  // '' betekent "nog geen actie" voor frontend
+        type,
+        publieke_token: row.publieke_token || null,
+        open_huis_door_id: row.open_huis_door_id || null,
+        mag_doorsturen: magDoorsturen,
       };
     });
 
