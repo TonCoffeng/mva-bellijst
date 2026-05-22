@@ -210,6 +210,8 @@ const rowToMondayShape = (b, makelaarNaam = '') => {
     feedback:       feedbackCsv,
     opmerking:      b.feedback_opmerking || '',
     actie_status:   b.actie_status || '',
+    type:           b.type || 'ingepland',
+    publieke_token: b.publieke_token || null,
   };
 };
 
@@ -429,6 +431,66 @@ exports.handler = async (event) => {
         .filter(b => isMVAMakelaar(b.makelaar));
 
       return { statusCode: 200, headers, body: JSON.stringify({ bezichtigingen }) };
+    }
+
+    // ── OPEN HUIS AANMAKEN ───────────────────────────────────────────
+    // Maakt een bezichtiging met type='open_huis'. Géén bezichtiger-gegevens
+    // (die komen later binnen via QR-inschrijvingen). De makelaar die 'm
+    // aanmaakt is de gevende_makelaar (= de verkopend makelaar van de woning).
+    // Retourneert de publieke_token zodat de frontend direct de QR kan tonen.
+    if (action === 'maak_open_huis') {
+      const { makelaar_email, makelaar_naam, adres, datum_tijd } = data;
+
+      if (!adres || !adres.trim()) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Adres is verplicht' }) };
+      }
+
+      // Lookup gevende makelaar via email (voorkeur) of naam
+      let makelaarId = null;
+      if (makelaar_email) {
+        const u = await sbGet(`gebruikers?select=id,naam&email=eq.${encodeURIComponent(makelaar_email.toLowerCase())}`);
+        if (u[0]) makelaarId = u[0].id;
+      }
+      if (!makelaarId && makelaar_naam) {
+        const u = await sbGet(`gebruikers?select=id,naam&naam=eq.${encodeURIComponent(makelaar_naam)}`);
+        if (u[0]) makelaarId = u[0].id;
+      }
+      if (!makelaarId) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'Makelaar niet gevonden' }) };
+      }
+
+      // Token genereren in JS (crypto.randomUUID is beschikbaar in Netlify Node 18+)
+      const token = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : require('crypto').randomUUID();
+
+      let created;
+      try {
+        created = await sbInsert('bezichtigingen', {
+          kantoor_id:          MVA_KANTOOR_ID,
+          gevende_makelaar_id: makelaarId,
+          adres:               adres.trim(),
+          datum_tijd:          datum_tijd || null,
+          type:                'open_huis',
+          publieke_token:      token,
+          actie_status:        'open',
+          gearchiveerd:        false,
+        });
+      } catch (e) {
+        return { statusCode: 500, headers, body: JSON.stringify({ error: `Open huis aanmaken faalde: ${e.message}` }) };
+      }
+
+      const bez = created[0];
+      return {
+        statusCode: 200, headers,
+        body: JSON.stringify({
+          ok:             true,
+          id:             String(bez.id),
+          publieke_token: bez.publieke_token,
+          adres:          bez.adres,
+          datum_tijd:     bez.datum_tijd,
+        }),
+      };
     }
 
     // ── GEARCHIVEERDE BEZICHTIGINGEN OPHALEN ─────────────────────────
