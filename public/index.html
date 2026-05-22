@@ -5882,9 +5882,67 @@
     document.getElementById('oh-adres').value = '';
     document.getElementById('oh-datum').value = '';
     document.getElementById('oh-fout').style.display = 'none';
+    document.getElementById('oh-adres-wrap').style.display = 'none';
+    const sel = document.getElementById('oh-pand');
+    sel.innerHTML = '<option value="">⏳ Panden laden...</option>';
     document.getElementById('open-huis-modal').classList.add('open');
+    laadPandenVoorDropdown();
   }
   window.openOpenHuisModal = openOpenHuisModal;
+
+  async function laadPandenVoorDropdown() {
+    const sel = document.getElementById('oh-pand');
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get_panden_voor_makelaar',
+          data: { makelaar_email: huidigeMakelaar.email, makelaar_naam: huidigeMakelaar.naam }
+        })
+      });
+      const json = await res.json();
+      const eigen  = json.eigen  || [];
+      const overig = json.overig || [];
+
+      let html = '<option value="">— Kies een woning —</option>';
+
+      if (eigen.length) {
+        html += '<optgroup label="Jouw panden">';
+        eigen.forEach(p => {
+          html += `<option value="${p.id}">${escHtml(p.adres)}${p.plaats ? ', ' + escHtml(p.plaats) : ''}</option>`;
+        });
+        html += '</optgroup>';
+      }
+      if (overig.length) {
+        html += '<optgroup label="Overige MVA-panden">';
+        overig.forEach(p => {
+          const wie = p.eigenaar_naam ? ` · ${escHtml(p.eigenaar_naam)}` : '';
+          html += `<option value="${p.id}">${escHtml(p.adres)}${p.plaats ? ', ' + escHtml(p.plaats) : ''}${wie}</option>`;
+        });
+        html += '</optgroup>';
+      }
+      html += '<option value="__handmatig__">✏️ Ander adres invoeren…</option>';
+
+      sel.innerHTML = html;
+    } catch (e) {
+      sel.innerHTML = '<option value="__handmatig__">✏️ Ander adres invoeren…</option>';
+      ohPandGewijzigd();
+    }
+  }
+
+  // Kleine HTML-escape voor adres/naam in options
+  function escHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function ohPandGewijzigd() {
+    const val = document.getElementById('oh-pand').value;
+    const wrap = document.getElementById('oh-adres-wrap');
+    wrap.style.display = (val === '__handmatig__') ? 'block' : 'none';
+    if (val !== '__handmatig__') document.getElementById('oh-adres').value = '';
+  }
+  window.ohPandGewijzigd = ohPandGewijzigd;
 
   function sluitOpenHuisModal(event) {
     if (event && event.target !== document.getElementById('open-huis-modal')) return;
@@ -5893,15 +5951,32 @@
   window.sluitOpenHuisModal = sluitOpenHuisModal;
 
   async function maakOpenHuis() {
-    const adres = document.getElementById('oh-adres').value.trim();
-    const datumLokaal = document.getElementById('oh-datum').value; // 'YYYY-MM-DDTHH:MM' of ''
+    const keuze = document.getElementById('oh-pand').value;
+    const handmatigAdres = document.getElementById('oh-adres').value.trim();
+    const datumLokaal = document.getElementById('oh-datum').value;
     const foutEl = document.getElementById('oh-fout');
     foutEl.style.display = 'none';
 
-    if (!adres) {
-      foutEl.textContent = 'Vul het adres van de woning in.';
+    // Bepaal wat we meesturen
+    let payloadData = {
+      makelaar_email: huidigeMakelaar.email,
+      makelaar_naam:  huidigeMakelaar.naam,
+      datum_tijd:     datumLokaal ? new Date(datumLokaal).toISOString() : null,
+    };
+
+    if (!keuze) {
+      foutEl.textContent = 'Kies een woning of voer een adres in.';
       foutEl.style.display = 'block';
       return;
+    } else if (keuze === '__handmatig__') {
+      if (!handmatigAdres) {
+        foutEl.textContent = 'Vul het adres van de woning in.';
+        foutEl.style.display = 'block';
+        return;
+      }
+      payloadData.adres = handmatigAdres;
+    } else {
+      payloadData.pand_id = keuze;
     }
 
     const btn = document.getElementById('oh-maak-btn');
@@ -5912,15 +5987,7 @@
       const res = await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'maak_open_huis',
-          data: {
-            makelaar_email: huidigeMakelaar.email,
-            makelaar_naam:  huidigeMakelaar.naam,
-            adres:          adres,
-            datum_tijd:     datumLokaal ? new Date(datumLokaal).toISOString() : null,
-          }
-        })
+        body: JSON.stringify({ action: 'maak_open_huis', data: payloadData })
       });
       const json = await res.json();
       if (!res.ok || !json.ok) {
@@ -6475,6 +6542,14 @@
     </div>
 
     <label style="display:block;margin-bottom:14px">
+      <span style="font-size:13px;font-weight:500;margin-bottom:5px;display:block">Kies de woning <span style="color:var(--oranje)">*</span></span>
+      <select id="oh-pand" onchange="ohPandGewijzigd()"
+        style="width:100%;font-family:inherit;font-size:15px;padding:11px 13px;border:1px solid var(--grijs-mid);border-radius:10px;color:var(--navy);background:var(--wit)">
+        <option value="">⏳ Panden laden...</option>
+      </select>
+    </label>
+
+    <label id="oh-adres-wrap" style="display:none;margin-bottom:14px">
       <span style="font-size:13px;font-weight:500;margin-bottom:5px;display:block">Adres van de woning <span style="color:var(--oranje)">*</span></span>
       <input type="text" id="oh-adres" placeholder="Bijv. Ernest Staesstraat 41, 1061 CC Amsterdam"
         style="width:100%;font-family:inherit;font-size:15px;padding:11px 13px;border:1px solid var(--grijs-mid);border-radius:10px;color:var(--navy)" />
