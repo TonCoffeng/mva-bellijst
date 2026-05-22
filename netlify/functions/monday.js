@@ -236,6 +236,7 @@ const createBellijstItem = async (bezichtiging, eigenaarId, bron) => {
     bezichtiger_telefoon: bezichtiging.bezichtiger_telefoon,
     adres:                bezichtiging.adres,
     datum_tijd:           bezichtiging.datum_tijd,
+    gever_opmerking:      bezichtiging.feedback_opmerking || null,
     bel_status:           'nieuw',
     belpogingen:          0,
   });
@@ -918,6 +919,7 @@ exports.handler = async (event) => {
           cloze_id:           it.cloze_id || null,
           warme_lead:         it.warme_lead ? 'true' : '',
           opmerkingen:        it.opmerking || '',
+          gever_opmerking:    it.gever_opmerking || '',
           bron:               it.bron, // 'zelf' of 'pool'
           bij_wie:            (it.bron === 'pool' && it.bezichtiging_id) ? (geverPerBezId[it.bezichtiging_id] || '') : '',
           belpogingen:        it.belpogingen || 0,
@@ -1097,7 +1099,7 @@ exports.handler = async (event) => {
     // Monday-keys is (bereikt_ja, bereikt_later, niet_bereikbaar, ...).
     // Vertaal naar onze interne bel_status enum.
     if (action === 'update_status') {
-      const { item_id, status } = data;
+      const { item_id, status, opmerking } = data;
 
       // Mapping van oude Monday-keys naar nieuwe bel_status enum
       const statusMap = {
@@ -1115,6 +1117,14 @@ exports.handler = async (event) => {
         bel_status:          belStatus,
         status_gewijzigd_op: new Date().toISOString(),
       };
+
+      // Beller-notitie meeschrijven als die is meegegeven.
+      // Let op: dit is de notitie van de BELLER (eigen veld), los van
+      // gever_opmerking. Alleen overschrijven als er echt iets is meegegeven
+      // (undefined = veld niet aanraken; lege string = bewust leegmaken mag).
+      if (typeof opmerking === 'string') {
+        body.opmerking = opmerking;
+      }
 
       // Bij niet_bereikbaar / voicemail: belpogingen ophogen
       if (belStatus === 'niet_bereikbaar' || belStatus === 'voicemail') {
