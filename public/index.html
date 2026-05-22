@@ -1714,9 +1714,12 @@
       <input type="datetime-local" id="terugbel-datum" />
     </div>
 
-    <!-- Notitie -->
+    <!-- Gever-opmerking (read-only context van de makelaar die doorgaf) -->
+    <div id="modal-gever-opmerking" style="display:none;margin:0 0 12px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:13px;color:#92400e;line-height:1.5"></div>
+
+    <!-- Notitie van de beller -->
     <div class="notitie-veld">
-      <textarea id="notitie-input" placeholder="Notitie (optioneel)..."></textarea>
+      <textarea id="notitie-input" placeholder="Jouw notitie (optioneel)..."></textarea>
     </div>
 
     <button class="btn-opslaan" id="btn-opslaan" disabled onclick="slaOpEnSluit()">
@@ -1927,6 +1930,7 @@
           status:             statusMap[rawStatus] ?? rawStatus,
           warme_lead:         item.warme_lead === 'true' || item.warme_lead === 'v',
           opmerkingen:        item.opmerkingen || '',
+          gever_opmerking:    item.gever_opmerking || '',
           email_makelaar:     item.email_makelaar || '',
           lead_status:        item.lead_status || '',
           cloze_id:           item.cloze_id || '',
@@ -5036,7 +5040,8 @@
             ${lead.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">✉️ ${lead.email}</span>` : ''}
           </div>
 
-          ${lead.opmerkingen ? `<div style="margin-top:6px;font-size:12px;color:var(--grijs-tekst);font-style:italic">💬 ${lead.opmerkingen}</div>` : ''}
+          ${lead.gever_opmerking ? `<div style="margin-top:6px;font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 10px">📋 <strong>Van gever:</strong> ${lead.gever_opmerking.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
+          ${lead.opmerkingen ? `<div style="margin-top:6px;font-size:12px;color:var(--grijs-tekst);font-style:italic">💬 ${lead.opmerkingen.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
 
           ${leadsSelectieModusAan ? '' : `
             <div class="lead-acties" onclick="event.stopPropagation()">
@@ -6049,7 +6054,22 @@
 
     document.getElementById('modal-naam').textContent = huidigeLead.naam;
     document.getElementById('modal-adres').textContent = '📍 ' + huidigeLead.adres;
-    document.getElementById('notitie-input').value = '';
+    // Bestaande beller-notitie voorvullen zodat bewerken werkt (niet steeds leeg)
+    document.getElementById('notitie-input').value = huidigeLead.opmerkingen || '';
+
+    // Gever-opmerking read-only tonen als context (alleen als die er is)
+    const geverBox = document.getElementById('modal-gever-opmerking');
+    if (geverBox) {
+      const gever = (huidigeLead.gever_opmerking || '').trim();
+      if (gever) {
+        geverBox.innerHTML = '📋 <strong>Van de gevende makelaar:</strong> ' +
+          gever.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+        geverBox.style.display = 'block';
+      } else {
+        geverBox.style.display = 'none';
+      }
+    }
+
     document.getElementById('datum-picker').classList.remove('open');
     document.getElementById('btn-opslaan').disabled = true;
     gekozenStatus = null;
@@ -6232,6 +6252,8 @@
       }
 
       // 3. Status updaten in monday (Supabase via Netlify function)
+      // De beller-notitie gaat mee zodat 'ie op de kaart bewaard blijft
+      // (los van de gever-opmerking).
       await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -6241,6 +6263,7 @@
             item_id: huidigeLead.id,
             board_id: huidigeMakelaar.boardId,
             status: gekozenStatus,
+            opmerking: notitie,
           }
         })
       });
