@@ -902,6 +902,32 @@ exports.handler = async (event) => {
         );
       }
 
+      // ── NO-SHOW TELLER ───────────────────────────────────────────
+      // Tel hoe vaak de persoon achter elke lead eerder een no-show had,
+      // over ALLE bezichtigingen heen. Match op e-mail (voorkeur) of telefoon
+      // — bewezen betrouwbaarder dan naam (zelfde persoon, andere naam-spelling).
+      // Eén query voor alle no-show-bezichtigingen, daarna in-memory tellen.
+      const persoonSleutel = (email, tel) => {
+        const e = (email || '').trim().toLowerCase();
+        if (e) return `e:${e}`;
+        const t = (tel || '').replace(/[^0-9+]/g, ''); // normaliseer telefoon
+        if (t) return `t:${t}`;
+        return null;
+      };
+      let noshowPerSleutel = {};
+      try {
+        // PostgREST: feedback_keys is een array-kolom; cs.{noshow} = "contains noshow"
+        const noshowBez = await sbGet(
+          `bezichtigingen?select=bezichtiger_email,bezichtiger_telefoon&feedback_keys=cs.{noshow}`
+        );
+        for (const b of noshowBez) {
+          const sl = persoonSleutel(b.bezichtiger_email, b.bezichtiger_telefoon);
+          if (sl) noshowPerSleutel[sl] = (noshowPerSleutel[sl] || 0) + 1;
+        }
+      } catch (e) {
+        console.warn('[get_leads] no-show telling faalde (niet kritiek):', e.message);
+      }
+
       // Transformeer naar Monday-stijl shape voor frontend backwards compat
       const leads = items
         // Filter Gearchiveerd weg (kan ook server-side via .neq= maar PostgREST or-syntax is fragiel met null)
@@ -920,6 +946,7 @@ exports.handler = async (event) => {
           warme_lead:         it.warme_lead ? 'true' : '',
           opmerkingen:        it.opmerking || '',
           gever_opmerking:    it.gever_opmerking || '',
+          no_shows:           noshowPerSleutel[persoonSleutel(it.bezichtiger_email, it.bezichtiger_telefoon)] || 0,
           bron:               it.bron, // 'zelf' of 'pool'
           bij_wie:            (it.bron === 'pool' && it.bezichtiging_id) ? (geverPerBezId[it.bezichtiging_id] || '') : '',
           belpogingen:        it.belpogingen || 0,
