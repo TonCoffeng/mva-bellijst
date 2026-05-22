@@ -5,6 +5,58 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-22
+
+### Toegevoegd — Open huis met QR-code
+**Aanleiding:** Rogier wilde open-huis-bezoekers digitaal vastleggen i.p.v. een papieren lijst die later overgetypt moet worden. Bezoekers schrijven zichzelf nu in via een QR-code.
+
+**Werking:**
+- Makelaar maakt een open huis aan in de app → krijgt een QR-code op het scherm.
+- Bezoekers scannen met hun eigen telefoon → publieke pagina `public/openhuis.html` (geen login) → inschrijfformulier (naam, e-mail, telefoon, interesse koop/verkoop, opmerking).
+- Inschrijving wordt verwerkt door `netlify/functions/openhuis-inschrijving.js` (service-key, server-side) → komt direct als lead in de bellijst.
+
+**Pand-dropdown met Realworks-koppeling:**
+- Bij het aanmaken kies je de woning uit een dropdown van het actuele beschikbare aanbod, i.p.v. een adres te typen. Eigen panden bovenaan, daaronder die van collega's (met naam).
+- Nieuwe tabel `panden` wordt elke 10 min gevuld door de droplet-sync (`lib/panden-sync.js` in repo `mva-roundrobin-sync`): filtert Realworks Wonen-objecten op status BESCHIKBAAR, haalt per pand de accountmanager (verkopend makelaar) op via de Realworks Relaties-API (`GET /relaties/v1/{id}`), matcht op e-mail tegen `gebruikers` → koppelt `eigenaar_id`.
+- Nieuwe backend-action `get_panden_voor_makelaar` (eigen panden eerst), `maak_open_huis` uitgebreid met `pand_id`-koppeling.
+
+**Lead-routing (belangrijke afspraak):** de lead is voor wie het open huis **draait**, niet voor de verkopend makelaar.
+- De op-te-volgen kaart komt bij de draaier (`open_huis_door_id`).
+- Twee mails: draaier krijgt "nieuwe lead — jij volgt op", verkopend makelaar krijgt "ter info, inschrijving op jouw woning". Info-mail wordt overgeslagen als draaier = verkopend makelaar (geen dubbele).
+
+**Database:**
+- `bezichtigingen`: nieuwe kolommen `type` ('ingepland'/'open_huis'), `publieke_token` (uuid), `pand_id` (FK), `open_huis_door_id` (FK gebruikers).
+- `bellijst_items.bron` CHECK uitgebreid met `'openhuis'`.
+- Nieuwe tabel `panden` (realworks_object_id uniek, adres, status, eigenaar_id, etc.).
+
+### Toegevoegd — No-show teller per persoon
+**Aanleiding:** Rogier had voor de tweede keer een no-show van dezelfde persoon bij een ander pand. Makelaars moeten zien of iemand al vaker is weggebleven, zodat ze bij herhaling even vooraf nabellen.
+
+**Werking:**
+- Telt no-shows over álle bezichtigingen heen, gematcht op e-mailadres (of telefoon als e-mail ontbreekt) — bewust niet op naam, want dezelfde persoon kan net anders gespeld zijn.
+- Gebruikt de bestaande `noshow`-feedback-key (geen nieuwe registratie nodig).
+- Badge op de leadkaart: grijze chip "🚫 N× no-show" bij 1-2, rode waarschuwing "⚠️ N× no-show — even nabellen" bij 3+.
+- Backend telt in één query (`feedback_keys=cs.{noshow}`) en koppelt in-memory per persoon-sleutel — geen query-per-lead.
+
+**Let op:** de teller is zo goed als de invoer. Telt alleen no-shows die met de 🚫 No-show-knop zijn vastgelegd.
+
+### Toegevoegd — Twee gescheiden opmerkingen (gever + beller)
+**Aanleiding:** de opmerking van de gevende makelaar (context: "serieuze koper, bel na 18u") was niet zichtbaar bij de ontvangende makelaar in de app — alleen in de notificatie-mail. En de beller had geen plek voor eigen aantekeningen die bewaard bleven.
+
+**Werking:**
+- Nieuwe kolom `bellijst_items.gever_opmerking` (text). `createBellijstItem` kopieert `feedback_opmerking` van de gever hierheen bij doorgeven.
+- Gever-opmerking staat read-only op de kaart (geel kadertje "📋 Van gever: …") en als context in de status-modal.
+- Beller-notitie gaat in het bestaande `opmerking`-veld, in te voeren via de status-modal, blijft bewaard en is bij heropenen voorgevuld. De twee velden overschrijven elkaar nooit.
+- Bevinding: het notitieveld bestond al in de modal, maar werd nooit naar de kaart opgeslagen (ging alleen naar Cloze) — nu gedicht via `update_status` (accepteert optionele `opmerking`).
+- Eenmalige backfill gedraaid voor 3 bestaande leads die al een gever-opmerking hadden.
+
+### Gewijzigd — Naam-tegel + klikbaar telefoonnummer
+**Aanleiding:** feedback Rogier. "Lead doorgeven" dekte de lading niet, en telefoonnummers waren niet aantikbaar.
+- Welkomsttegel hernoemd naar **"Bezichtigingen"** ("Doorgeven of zelf opvolgen").
+- Telefoonnummers klikbaar gemaakt (`tel:`-link) op de bezichtigingskaart; de bellijst-kaart had al een werkende belknop.
+
+---
+
 ## 2026-05-21 (avond)
 
 ### Toegevoegd — Extern-rol (Filipe & Gert-Jan)
