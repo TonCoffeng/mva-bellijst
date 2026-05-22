@@ -433,33 +433,106 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ bezichtigingen }) };
     }
 
-    // ── OPEN HUIS AANMAKEN ───────────────────────────────────────────
-    // Maakt een bezichtiging met type='open_huis'. Géén bezichtiger-gegevens
-    // (die komen later binnen via QR-inschrijvingen). De makelaar die 'm
-    // aanmaakt is de gevende_makelaar (= de verkopend makelaar van de woning).
-    // Retourneert de publieke_token zodat de frontend direct de QR kan tonen.
-    if (action === 'maak_open_huis') {
-      const { makelaar_email, makelaar_naam, adres, datum_tijd } = data;
+    // ── PANDEN OPHALEN VOOR DROPDOWN (open huis) ─────────────────────
+    // Geeft beschikbare panden terug: eigen panden eerst, daarna de rest.
+    // De ingelogde makelaar wordt opgezocht via email zodat we 'eigen' kunnen
+    // markeren. Een trainee ziet zo zijn eigen (lege) lijst bovenaan en kan
+    // daaronder het pand van bijv. Rogier kiezen.
+    if (action === 'get_panden_voor_makelaar') {
+      const { makelaar_email, makelaar_naam } = data;
 
-      if (!adres || !adres.trim()) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Adres is verplicht' }) };
-      }
-
-      // Lookup gevende makelaar via email (voorkeur) of naam
       let makelaarId = null;
       if (makelaar_email) {
-        const u = await sbGet(`gebruikers?select=id,naam&email=eq.${encodeURIComponent(makelaar_email.toLowerCase())}`);
+        const u = await sbGet(`gebruikers?select=id&email=eq.${encodeURIComponent(makelaar_email.toLowerCase())}`);
         if (u[0]) makelaarId = u[0].id;
       }
       if (!makelaarId && makelaar_naam) {
-        const u = await sbGet(`gebruikers?select=id,naam&naam=eq.${encodeURIComponent(makelaar_naam)}`);
+        const u = await sbGet(`gebruikers?select=id&naam=eq.${encodeURIComponent(makelaar_naam)}`);
         if (u[0]) makelaarId = u[0].id;
       }
-      if (!makelaarId) {
+
+      // Alle beschikbare panden ophalen
+      const panden = await sbGet(
+        `panden?select=id,adres,plaats,postcode,status,eigenaar_id&status=eq.BESCHIKBAAR&order=adres.asc`
+      );
+
+      // Eigenaarsnamen erbij voor weergave
+      const eigenaarIds = [...new Set(panden.map(p => p.eigenaar_id).filter(Boolean))];
+      let namen = {};
+      if (eigenaarIds.length) {
+        const gs = await sbGet(`gebruikers?select=id,naam&id=in.(${eigenaarIds.join(',')})`);
+        gs.forEach(g => { namen[g.id] = g.naam; });
+      }
+
+      // Verrijken + splitsen in eigen / overig
+      const verrijkt = panden.map(p => ({
+        id:            p.id,
+        adres:         p.adres,
+        plaats:        p.plaats || '',
+        postcode:      p.postcode || '',
+        eigenaar_id:   p.eigenaar_id,
+        eigenaar_naam: namen[p.eigenaar_id] || '',
+        is_eigen:      makelaarId && p.eigenaar_id === makelaarId,
+      }));
+
+      const eigen  = verrijkt.filter(p => p.is_eigen);
+      const overig = verrijkt.filter(p => !p.is_eigen);
+
+      return {
+        statusCode: 200, headers,
+        body: JSON.stringify({ ok: true, eigen, overig }),
+      };
+    }
+
+    // ── OPEN HUIS AANMAKEN ───────────────────────────────────────────
+    // Maakt een bezichtiging met type='open_huis'. Géén bezichtiger-gegevens
+    // (die komen later binnen via QR-inschrijvingen).
+    //
+    // Twee scenario's:
+    //  1. Pand gekozen uit dropdown (pand_id meegegeven): de inschrijving gaat
+    //     naar de VERKOPEND makelaar (eigenaar van het pand). De ingelogde
+    //     makelaar wordt vastgelegd als open_huis_door_id (kan een trainee zijn).
+    //  2. Handmatig adres (geen pand_id): valt terug op de ingelogde makelaar
+    //     als gevende makelaar, want we weten niet wie de verkopend makelaar is.
+    if (action === 'maak_open_huis') {
+      const { makelaar_email, makelaar_naam, adres, datum_tijd, pand_id } = data;
+
+      // Lookup ingelogde makelaar
+      let ingelogdeId = null;
+      if (makelaar_email) {
+        const u = await sbGet(`gebruikers?select=id,naam&email=eq.${encodeURIComponent(makelaar_email.toLowerCase())}`);
+        if (u[0]) ingelogdeId = u[0].id;
+      }
+      if (!ingelogdeId && makelaar_naam) {
+        const u = await sbGet(`gebruikers?select=id,naam&naam=eq.${encodeURIComponent(makelaar_naam)}`);
+        if (u[0]) ingelogdeId = u[0].id;
+      }
+      if (!ingelogdeId) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'Makelaar niet gevonden' }) };
       }
 
-      // Token genereren in JS (crypto.randomUUID is beschikbaar in Netlify Node 18+)
+      // Bepaal adres + verkopend makelaar
+      let definitiefAdres = (adres || '').trim();
+      let verkopendId = ingelogdeId; // default: handmatig → ingelogde makelaar
+      let gekoppeldPandId = null;
+
+      if (pand_id) {
+        // Pand uit dropdown: haal adres + eigenaar uit panden-tabel (betrouwbaar)
+        const prows = await sbGet(`panden?select=id,adres,plaats,postcode,eigenaar_id&id=eq.${pand_id}`);
+        if (!prows[0]) {
+          return { statusCode: 404, headers, body: JSON.stringify({ error: 'Pand niet gevonden' }) };
+        }
+        const pand = prows[0];
+        gekoppeldPandId = pand.id;
+        definitiefAdres = [pand.adres, pand.postcode, pand.plaats].filter(Boolean).join(', ');
+        if (pand.eigenaar_id) verkopendId = pand.eigenaar_id;
+      }
+
+      if (!definitiefAdres) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Adres is verplicht' }) };
+      }
+
+      // Token genereren
       const token = (typeof crypto !== 'undefined' && crypto.randomUUID)
         ? crypto.randomUUID()
         : require('crypto').randomUUID();
@@ -468,8 +541,10 @@ exports.handler = async (event) => {
       try {
         created = await sbInsert('bezichtigingen', {
           kantoor_id:          MVA_KANTOOR_ID,
-          gevende_makelaar_id: makelaarId,
-          adres:               adres.trim(),
+          gevende_makelaar_id: verkopendId,        // inschrijving gaat hierheen
+          open_huis_door_id:   ingelogdeId,        // wie het open huis draait
+          pand_id:             gekoppeldPandId,
+          adres:               definitiefAdres,
           datum_tijd:          datum_tijd || null,
           type:                'open_huis',
           publieke_token:      token,
