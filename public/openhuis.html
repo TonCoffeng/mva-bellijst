@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Inschrijven open huis — Makelaars van Amsterdam</title>
+  <meta name="theme-color" content="#1A2B5F" />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --navy: #1A2B5F;
+      --navy-light: #25346c;
+      --oranje: #E8500A;
+      --wit: #ffffff;
+      --grijs: #f4f5f8;
+      --grijs-mid: #e2e5ed;
+      --grijs-tekst: #6b7280;
+      --groen: #16a34a;
+      --rood: #dc2626;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: var(--grijs);
+      color: var(--navy);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      background: var(--navy);
+      color: var(--wit);
+      padding: 20px;
+      text-align: center;
+    }
+    .header h1 { font-size: 18px; font-weight: 700; }
+    .header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+    .wrap { flex: 1; padding: 20px; max-width: 480px; width: 100%; margin: 0 auto; }
+    .card {
+      background: var(--wit);
+      border: 1px solid var(--grijs-mid);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .pand {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+      font-size: 14px;
+    }
+    .pand .label { font-size: 11px; color: var(--oranje); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .pand .adres { font-size: 16px; font-weight: 500; margin-top: 2px; }
+    .pand .datum { font-size: 13px; color: var(--grijs-tekst); margin-top: 2px; }
+    label.veld { display: block; margin-bottom: 14px; }
+    label.veld .naam { font-size: 13px; font-weight: 500; margin-bottom: 5px; display: block; }
+    label.veld .naam .verplicht { color: var(--oranje); }
+    input, textarea, select {
+      width: 100%;
+      font-family: inherit;
+      font-size: 16px;
+      padding: 12px 14px;
+      border: 1px solid var(--grijs-mid);
+      border-radius: 10px;
+      background: var(--wit);
+      color: var(--navy);
+    }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--navy-light); }
+    textarea { resize: vertical; min-height: 70px; }
+    .segment-keuze { display: flex; gap: 10px; }
+    .segment-keuze button {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid var(--grijs-mid);
+      border-radius: 10px;
+      background: var(--wit);
+      color: var(--navy);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .segment-keuze button.actief { background: var(--navy); color: var(--wit); border-color: var(--navy); }
+    .btn-verstuur {
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 12px;
+      background: var(--oranje);
+      color: var(--wit);
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .btn-verstuur:disabled { opacity: 0.5; cursor: default; }
+    .fout { color: var(--rood); font-size: 13px; margin-top: 10px; text-align: center; display: none; }
+    .laden, .klaar { text-align: center; padding: 40px 20px; }
+    .klaar .vink {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: var(--groen); color: var(--wit);
+      font-size: 36px; line-height: 64px; margin: 0 auto 16px;
+    }
+    .klaar h2 { font-size: 20px; margin-bottom: 8px; }
+    .klaar p { color: var(--grijs-tekst); font-size: 14px; }
+    .footer { text-align: center; padding: 16px; font-size: 12px; color: var(--grijs-tekst); }
+    .spinner {
+      width: 32px; height: 32px; margin: 0 auto 12px;
+      border: 3px solid var(--grijs-mid); border-top-color: var(--navy);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Makelaars van Amsterdam</h1>
+    <p>Inschrijven open huis</p>
+  </div>
+
+  <div class="wrap">
+    <!-- LADEN -->
+    <div id="laden" class="card laden">
+      <div class="spinner"></div>
+      <p style="color:var(--grijs-tekst);font-size:14px">Even laden…</p>
+    </div>
+
+    <!-- FORMULIER -->
+    <div id="formulier" class="card" style="display:none">
+      <div class="pand">
+        <div class="label">Woning</div>
+        <div class="adres" id="pand-adres">—</div>
+        <div class="datum" id="pand-datum"></div>
+      </div>
+
+      <label class="veld">
+        <span class="naam">Naam <span class="verplicht">*</span></span>
+        <input type="text" id="in-naam" autocomplete="name" placeholder="Voor- en achternaam" />
+      </label>
+
+      <label class="veld">
+        <span class="naam">E-mailadres</span>
+        <input type="email" id="in-email" autocomplete="email" placeholder="naam@voorbeeld.nl" />
+      </label>
+
+      <label class="veld">
+        <span class="naam">Telefoonnummer</span>
+        <input type="tel" id="in-telefoon" autocomplete="tel" placeholder="06 12345678" />
+      </label>
+
+      <label class="veld">
+        <span class="naam">Waar bent u in geïnteresseerd?</span>
+        <div class="segment-keuze">
+          <button type="button" id="seg-aankoop" onclick="kiesSegment('Aankoop')">Kopen</button>
+          <button type="button" id="seg-verkoop" onclick="kiesSegment('Verkoop')">Verkopen</button>
+        </div>
+      </label>
+
+      <label class="veld">
+        <span class="naam">Opmerking (optioneel)</span>
+        <textarea id="in-opmerking" placeholder="Bijv. zoekt 3-kamerwoning, of mag teruggebeld worden na 18u"></textarea>
+      </label>
+
+      <button class="btn-verstuur" id="btn-verstuur" onclick="verstuur()">Inschrijven</button>
+      <div class="fout" id="fout"></div>
+    </div>
+
+    <!-- KLAAR -->
+    <div id="klaar" class="card klaar" style="display:none">
+      <div class="vink">✓</div>
+      <h2>Bedankt!</h2>
+      <p>Uw inschrijving is ontvangen. De makelaar neemt contact met u op.</p>
+    </div>
+  </div>
+
+  <div class="footer">© Makelaars van Amsterdam</div>
+
+  <script>
+    const FUNCTIE_URL = '/.netlify/functions/openhuis-inschrijving';
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token');
+    let gekozenSegment = '';
+
+    function toon(welk) {
+      ['laden', 'formulier', 'klaar'].forEach(id => {
+        document.getElementById(id).style.display = (id === welk) ? '' : 'none';
+      });
+    }
+
+    function kiesSegment(s) {
+      gekozenSegment = (gekozenSegment === s) ? '' : s;
+      document.getElementById('seg-aankoop').classList.toggle('actief', gekozenSegment === 'Aankoop');
+      document.getElementById('seg-verkoop').classList.toggle('actief', gekozenSegment === 'Verkoop');
+    }
+
+    function toonFout(msg) {
+      const f = document.getElementById('fout');
+      f.textContent = msg;
+      f.style.display = 'block';
+    }
+
+    async function laadOpenHuis() {
+      if (!token) { toon('formulier'); toonFout('Ongeldige link. Scan de QR-code opnieuw.'); document.getElementById('btn-verstuur').disabled = true; return; }
+      try {
+        const res = await fetch(`${FUNCTIE_URL}?token=${encodeURIComponent(token)}`);
+        const json = await res.json();
+        if (!res.ok || !json.ok) {
+          toon('formulier');
+          document.getElementById('pand-adres').textContent = 'Onbekende woning';
+          toonFout(json.error || 'Open huis niet gevonden.');
+          document.getElementById('btn-verstuur').disabled = true;
+          return;
+        }
+        document.getElementById('pand-adres').textContent = json.adres || '—';
+        if (json.datum_tijd) {
+          const d = new Date(json.datum_tijd);
+          document.getElementById('pand-datum').textContent =
+            d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' });
+        }
+        toon('formulier');
+      } catch (e) {
+        toon('formulier');
+        toonFout('Kon de woninggegevens niet laden. Probeer opnieuw.');
+      }
+    }
+
+    async function verstuur() {
+      document.getElementById('fout').style.display = 'none';
+      const naam     = document.getElementById('in-naam').value.trim();
+      const email    = document.getElementById('in-email').value.trim();
+      const telefoon = document.getElementById('in-telefoon').value.trim();
+      const opmerking = document.getElementById('in-opmerking').value.trim();
+
+      if (!naam) { toonFout('Vul uw naam in.'); return; }
+      if (!email && !telefoon) { toonFout('Vul een e-mailadres of telefoonnummer in.'); return; }
+
+      const btn = document.getElementById('btn-verstuur');
+      btn.disabled = true;
+      btn.textContent = 'Bezig…';
+
+      try {
+        const res = await fetch(FUNCTIE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, naam, email, telefoon, segment: gekozenSegment, opmerking }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok) {
+          toonFout(json.error || 'Er ging iets mis. Probeer opnieuw.');
+          btn.disabled = false;
+          btn.textContent = 'Inschrijven';
+          return;
+        }
+        toon('klaar');
+      } catch (e) {
+        toonFout('Geen verbinding. Probeer opnieuw.');
+        btn.disabled = false;
+        btn.textContent = 'Inschrijven';
+      }
+    }
+
+    laadOpenHuis();
+  </script>
+</body>
+</html>

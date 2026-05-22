@@ -1356,6 +1356,7 @@
   </style>
   <!-- Supabase JS client (voor authenticatie) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -1398,8 +1399,8 @@
       <div class="rol-keuze">
         <button class="btn-rol btn-rol-geven" onclick="login('geven')">
           <span class="rol-icon">📤</span>
-          <span class="rol-titel">Lead doorgeven</span>
-          <span class="rol-sub">Bezichtiging naar pool</span>
+          <span class="rol-titel">Bezichtiging doorgeven</span>
+          <span class="rol-sub">Doorgeven of zelf beoordelen</span>
         </button>
         <button class="btn-rol" onclick="login('ontvangen')">
           <span class="rol-icon">📥</span>
@@ -1442,6 +1443,10 @@
       JOUW BEZICHTIGINGEN
     </div>
     <div class="bez-actiebalk-knoppen" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <button id="btn-open-huis" onclick="openOpenHuisModal()" title="Maak een open huis aan met QR-inschrijving"
+        style="background:var(--oranje);border:none;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit">
+        <span class="lbl-vol">🏠 Open huis</span><span class="lbl-kort" style="display:none">🏠</span>
+      </button>
       <button id="btn-sorteer" class="btn-sorteer" onclick="toggleSortering()" title="Wissel sortering">
         <span class="lbl-vol">↓ Nieuwste eerst</span><span class="lbl-kort" style="display:none">↓ Nieuwste</span>
       </button>
@@ -3026,12 +3031,19 @@
                   style="width:20px;height:20px;cursor:pointer;accent-color:var(--oranje)" />
               </label>
               <div style="flex:1;min-width:0">
-                <div class="bez-naam">${b.naam}</div>
+                <div class="bez-naam">${b.type === 'open_huis' ? '🏠 Open huis' : (b.naam || '—')}
+                  ${b.type === 'open_huis'
+                    ? `<span style="display:inline-block;margin-left:6px;vertical-align:middle;background:#fff3e0;color:#e65100;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">OPEN HUIS</span>`
+                    : `<span style="display:inline-block;margin-left:6px;vertical-align:middle;background:#eef2ff;color:#3730a3;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">INGEPLAND</span>`}
+                </div>
                 <div class="bez-adres">📍 ${b.adres || '—'}</div>
               </div>
               <div style="display:flex;gap:6px;align-items:center">
-                <button onclick="stuurTestPush('${b.naam.replace(/'/g, "\\'")}', '${b.tijdstip || ''}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
-                  style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px" title="Test push notificatie">🔔</button>
+                ${b.type === 'open_huis' && b.publieke_token
+                  ? `<button onclick="event.stopPropagation();toonQrModal('${b.publieke_token}', '${(b.adres || '').replace(/'/g, "\\'")}')"
+                      style="background:var(--oranje);border:none;color:#fff;font-size:11px;font-weight:700;border-radius:8px;padding:5px 10px;cursor:pointer;white-space:nowrap" title="Toon QR-code voor bezoekers">📲 Toon QR</button>`
+                  : `<button onclick="stuurTestPush('${b.naam.replace(/'/g, "\\'")}', '${b.tijdstip || ''}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
+                  style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px" title="Test push notificatie">🔔</button>`}
                 <button
                   class="btn-talent-icon ${isWaarschijnlijkMakelaar(b.naam, b.email) ? 'actief' : ''}"
                   id="btn-talent-${b.id}"
@@ -3044,7 +3056,7 @@
             </div>
             <div class="bez-meta" style="margin-top:8px">
               ${b.datum ? `<span>📅 <strong>${b.datum}</strong>${b.tijdstip ? ' om ' + b.tijdstip : ''}</span>` : ''}
-              ${b.telefoon ? `<span>📞 ${b.telefoon}</span>` : ''}
+              ${b.telefoon ? `<span><a href="tel:${b.telefoon}" onclick="event.stopPropagation()" style="color:var(--navy);text-decoration:none;font-weight:500">📞 ${b.telefoon}</a></span>` : ''}
               ${b.email ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px">✉️ ${b.email}</span>` : ''}
             </div>
             <div id="cloze-badge-${b.id}" style="margin-top:6px;min-height:20px">
@@ -5865,6 +5877,98 @@
     }
   }
 
+  // ── OPEN HUIS ───────────────────────────────────────────────────────
+  function openOpenHuisModal() {
+    document.getElementById('oh-adres').value = '';
+    document.getElementById('oh-datum').value = '';
+    document.getElementById('oh-fout').style.display = 'none';
+    document.getElementById('open-huis-modal').classList.add('open');
+  }
+  window.openOpenHuisModal = openOpenHuisModal;
+
+  function sluitOpenHuisModal(event) {
+    if (event && event.target !== document.getElementById('open-huis-modal')) return;
+    document.getElementById('open-huis-modal').classList.remove('open');
+  }
+  window.sluitOpenHuisModal = sluitOpenHuisModal;
+
+  async function maakOpenHuis() {
+    const adres = document.getElementById('oh-adres').value.trim();
+    const datumLokaal = document.getElementById('oh-datum').value; // 'YYYY-MM-DDTHH:MM' of ''
+    const foutEl = document.getElementById('oh-fout');
+    foutEl.style.display = 'none';
+
+    if (!adres) {
+      foutEl.textContent = 'Vul het adres van de woning in.';
+      foutEl.style.display = 'block';
+      return;
+    }
+
+    const btn = document.getElementById('oh-maak-btn');
+    btn.disabled = true;
+    btn.textContent = 'Bezig…';
+
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'maak_open_huis',
+          data: {
+            makelaar_email: huidigeMakelaar.email,
+            makelaar_naam:  huidigeMakelaar.naam,
+            adres:          adres,
+            datum_tijd:     datumLokaal ? new Date(datumLokaal).toISOString() : null,
+          }
+        })
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        foutEl.textContent = json.error || 'Aanmaken mislukt. Probeer opnieuw.';
+        foutEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Aanmaken & QR tonen';
+        return;
+      }
+
+      sluitOpenHuisModal();
+      toonQrModal(json.publieke_token, json.adres);
+      laadBezichtigingen();
+    } catch (e) {
+      foutEl.textContent = 'Geen verbinding. Probeer opnieuw.';
+      foutEl.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Aanmaken & QR tonen';
+    }
+  }
+  window.maakOpenHuis = maakOpenHuis;
+
+  function openHuisLink(token) {
+    return `${window.location.origin}/openhuis.html?token=${encodeURIComponent(token)}`;
+  }
+
+  function toonQrModal(token, adres) {
+    const link = openHuisLink(token);
+    document.getElementById('qr-adres').textContent = adres || '';
+    document.getElementById('qr-link').textContent = link;
+    const canvas = document.getElementById('qr-canvas');
+    canvas.innerHTML = '';
+    try {
+      new QRCode(canvas, { text: link, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+    } catch (e) {
+      canvas.innerHTML = `<div style="font-size:13px;color:var(--rood)">QR-code laden mislukt. Link: <br>${link}</div>`;
+    }
+    document.getElementById('qr-modal').classList.add('open');
+  }
+  window.toonQrModal = toonQrModal;
+
+  function sluitQrModal(event) {
+    if (event && event.target !== document.getElementById('qr-modal')) return;
+    document.getElementById('qr-modal').classList.remove('open');
+  }
+  window.sluitQrModal = sluitQrModal;
+
   // ── BELLEN ──────────────────────────────────────────────────────────
   function bel(telefoon, naam) {
     if (!telefoon) { toonToast('Geen telefoonnummer bekend', 'fout'); return; }
@@ -6354,6 +6458,62 @@
       <button class="bevestig" id="afhandel-modal-ok" type="button" disabled
               style="opacity:0.45;cursor:not-allowed">
         ✅ Afhandelen
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- OPEN HUIS: AANMAKEN -->
+<div class="modal-overlay" id="open-huis-modal" onclick="sluitOpenHuisModal(event)">
+  <div class="modal-sheet" style="max-width:460px" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="margin-bottom:6px">🏠 Open huis aanmaken</div>
+    <div style="font-size:12px;color:var(--grijs-tekst);margin-bottom:16px;line-height:1.4">
+      Maak een open huis aan voor een woning. Je krijgt een QR-code die bezoekers
+      met hun eigen telefoon scannen om zich in te schrijven. Inschrijvingen komen
+      direct in jouw bellijst.
+    </div>
+
+    <label style="display:block;margin-bottom:14px">
+      <span style="font-size:13px;font-weight:500;margin-bottom:5px;display:block">Adres van de woning <span style="color:var(--oranje)">*</span></span>
+      <input type="text" id="oh-adres" placeholder="Bijv. Ernest Staesstraat 41, 1061 CC Amsterdam"
+        style="width:100%;font-family:inherit;font-size:15px;padding:11px 13px;border:1px solid var(--grijs-mid);border-radius:10px;color:var(--navy)" />
+    </label>
+
+    <label style="display:block;margin-bottom:16px">
+      <span style="font-size:13px;font-weight:500;margin-bottom:5px;display:block">Datum &amp; tijd (optioneel)</span>
+      <input type="datetime-local" id="oh-datum"
+        style="width:100%;font-family:inherit;font-size:15px;padding:11px 13px;border:1px solid var(--grijs-mid);border-radius:10px;color:var(--navy)" />
+    </label>
+
+    <div id="oh-fout" style="display:none;color:var(--rood);font-size:13px;margin-bottom:10px"></div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="sluitOpenHuisModal()" style="background:none;border:1px solid var(--grijs-mid);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--grijs-tekst);cursor:pointer;font-family:inherit">
+        Annuleren
+      </button>
+      <button id="oh-maak-btn" onclick="maakOpenHuis()" style="background:var(--oranje);color:white;border:none;border-radius:10px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+        Aanmaken &amp; QR tonen
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- OPEN HUIS: QR TONEN -->
+<div class="modal-overlay" id="qr-modal" onclick="sluitQrModal(event)">
+  <div class="modal-sheet" style="max-width:380px;text-align:center" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="margin-bottom:6px">📲 Laat bezoekers scannen</div>
+    <div style="font-size:12px;color:var(--grijs-tekst);margin-bottom:16px;line-height:1.4">
+      Houd je telefoon omhoog. Bezoekers scannen deze QR-code met hun eigen
+      telefoon en schrijven zich in.
+    </div>
+    <div id="qr-adres" style="font-size:14px;font-weight:500;margin-bottom:14px"></div>
+    <div id="qr-canvas" style="display:flex;justify-content:center;margin-bottom:16px"></div>
+    <div style="font-size:11px;color:var(--grijs-tekst);word-break:break-all;margin-bottom:16px" id="qr-link"></div>
+    <div style="display:flex;gap:8px;justify-content:center">
+      <button onclick="sluitQrModal()" style="background:var(--navy);color:white;border:none;border-radius:10px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+        Klaar
       </button>
     </div>
   </div>
