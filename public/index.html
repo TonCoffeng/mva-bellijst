@@ -1931,6 +1931,7 @@
           warme_lead:         item.warme_lead === 'true' || item.warme_lead === 'v',
           opmerkingen:        item.opmerkingen || '',
           gever_opmerking:    item.gever_opmerking || '',
+          no_shows:           Number(item.no_shows) || 0,
           email_makelaar:     item.email_makelaar || '',
           lead_status:        item.lead_status || '',
           cloze_id:           item.cloze_id || '',
@@ -5024,6 +5025,11 @@
             ${leadStatusChip ? `<span class="lead-chip ${leadStatusChip.cls}">${leadStatusChip.label}</span>` : ''}
             ${belChip ? `<span class="lead-chip ${belChip.cls}">${belChip.label}</span>` : ''}
             ${lead.belpogingen > 0 ? `<span class="lead-chip chip-belpogingen">📞 ${lead.belpogingen}× geprobeerd</span>` : ''}
+            ${lead.no_shows >= 3
+              ? `<span class="lead-chip" style="background:#fee2e2;color:#991b1b;font-weight:700">⚠️ ${lead.no_shows}× no-show — even nabellen</span>`
+              : (lead.no_shows > 0
+                  ? `<span class="lead-chip" style="background:#f1f5f9;color:#64748b">🚫 ${lead.no_shows}× no-show</span>`
+                  : '')}
           </div>
 
           <div id="cloze-badge-${lead.id}" style="margin-top:8px;min-height:20px" onclick="event.stopPropagation()">
