@@ -3039,7 +3039,9 @@
                 <div class="bez-naam">${b.type === 'open_huis' ? '🏠 Open huis' : (b.naam || '—')}
                   ${b.type === 'open_huis'
                     ? `<span style="display:inline-block;margin-left:6px;vertical-align:middle;background:#fff3e0;color:#e65100;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">OPEN HUIS</span>`
-                    : `<span style="display:inline-block;margin-left:6px;vertical-align:middle;background:#eef2ff;color:#3730a3;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">INGEPLAND</span>`}
+                    : (b.type === 'open_huis_bezoeker'
+                      ? `<span style="display:inline-block;margin-left:6px;vertical-align:middle;background:#fff3e0;color:#e65100;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">🏠 OPEN HUIS</span>`
+                      : `<span style="display:inline-block;margin-left:6px;vertical-align:middle;background:#eef2ff;color:#3730a3;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">INGEPLAND</span>`)}
                 </div>
                 <div class="bez-adres">📍 ${b.adres || '—'}</div>
               </div>
@@ -3047,8 +3049,10 @@
                 ${b.type === 'open_huis' && b.publieke_token
                   ? `<button onclick="event.stopPropagation();toonQrModal('${b.publieke_token}', '${(b.adres || '').replace(/'/g, "\\'")}')"
                       style="background:var(--oranje);border:none;color:#fff;font-size:11px;font-weight:700;border-radius:8px;padding:5px 10px;cursor:pointer;white-space:nowrap" title="Toon QR-code voor bezoekers">📲 Toon QR</button>`
-                  : `<button onclick="stuurTestPush('${b.naam.replace(/'/g, "\\'")}', '${b.tijdstip || ''}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
-                  style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px" title="Test push notificatie">🔔</button>`}
+                  : (b.type === 'open_huis_bezoeker'
+                      ? ''
+                      : `<button onclick="stuurTestPush('${b.naam.replace(/'/g, "\\'")}', '${b.tijdstip || ''}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
+                  style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px" title="Test push notificatie">🔔</button>`)}
                 <button
                   class="btn-talent-icon ${isWaarschijnlijkMakelaar(b.naam, b.email) ? 'actief' : ''}"
                   id="btn-talent-${b.id}"
@@ -3127,6 +3131,7 @@
             </div>
 
             <div class="actiebalk">
+              ${b.mag_doorsturen === false ? '' : `
               <button
                 class="btn-naar-pool ${actieStatus==='pool' ? 'gedeeld' : ''}"
                 id="btn-${b.id}"
@@ -3143,6 +3148,7 @@
                 ${alGedeeld && actieStatus !== 'zelf' ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
                 <span class="lbl-vol">${actieStatus==='zelf' ? '✅ Staat bij jou!' : '👤 Zelf bellen'}</span><span class="lbl-kort">${actieStatus==='zelf' ? '✅ Zelf' : '👤 Zelf'}</span>
               </button>
+              `}
               <button
                 class="btn-afgehandeld"
                 id="btn-afgehandeld-${b.id}"
@@ -3156,6 +3162,7 @@
                 id="btn-toewijzen-${b.id}"
                 onclick="openToewijzenModal('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
                 title="Direct toewijzen aan een collega — Round Robin overslaan"
+                ${b.mag_doorsturen === false ? 'style="display:none"' : ''}
                 ${alGedeeld ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
                 <span class="lbl-vol">→ Toewijzen</span><span class="lbl-kort">→ Toew.</span>
               </button>
