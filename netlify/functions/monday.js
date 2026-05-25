@@ -837,6 +837,123 @@ exports.handler = async (event) => {
       };
     }
 
+    // ── HERVERDEEL LEAD (ontvanger geeft door) ───────────────────────
+    // Een makelaar die al een lead in zijn bellijst heeft, geeft 'm door.
+    // Twee modi:
+    //   - naar_email gezet  → direct aan die collega (dropdown-keuze)
+    //   - naar_email leeg   → terug naar pool via Round Robin, waarbij de
+    //                          huidige eigenaar zelf wordt uitgesloten.
+    //
+    // We VERPLAATSEN het bestaande bellijst_item (nieuwe eigenaar_id) zodat
+    // de historie (notities, belpogingen) meereist. Status wordt teruggezet
+    // naar 'nieuw' zodat de lead bovenaan en als open verschijnt bij de
+    // nieuwe eigenaar. Herkomst komt in gever_opmerking te staan.
+    if (action === 'herverdeel_lead') {
+      const { bellijst_item_id, naar_email, doorgever_naam } = data || {};
+      if (!bellijst_item_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'bellijst_item_id vereist' }) };
+      }
+
+      // 1. Huidige item lezen
+      const itemRows = await sbGet(`bellijst_items?select=*&id=eq.${bellijst_item_id}`);
+      if (!itemRows[0]) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: `Lead ${bellijst_item_id} niet gevonden` }) };
+      }
+      const item = itemRows[0];
+      const huidigeEigenaarId = item.eigenaar_id;
+
+      // 2. Doelmakelaar bepalen
+      let target;          // { id, naam, email }
+      let viaPool = false;
+
+      if (naar_email) {
+        // ── Dropdown: direct aan gekozen collega ───────────────────
+        const targetEmail = String(naar_email).toLowerCase().trim();
+        const userRows = await sbGet(
+          `gebruikers?select=id,naam,email&email=eq.${encodeURIComponent(targetEmail)}` +
+          `&actief=eq.true&kantoor_id=eq.${MVA_KANTOOR_ID}`
+        );
+        if (!userRows[0]) {
+          return {
+            statusCode: 400, headers,
+            body: JSON.stringify({ error: `Doorgeven faalde: ${targetEmail} niet gevonden of inactief` }),
+          };
+        }
+        if (userRows[0].id === huidigeEigenaarId) {
+          return {
+            statusCode: 400, headers,
+            body: JSON.stringify({ error: 'Je kunt een lead niet aan jezelf doorgeven' }),
+          };
+        }
+        target = userRows[0];
+      } else {
+        // ── Terug naar pool: Round Robin, huidige eigenaar uitgesloten ──
+        let rr;
+        try {
+          // roundRobinPick sluit param 2 (gever) uit → huidige eigenaar
+          rr = await roundRobinPick(item.bezichtiging_id || null, huidigeEigenaarId);
+        } catch (e) {
+          return {
+            statusCode: 200, headers,
+            body: JSON.stringify({ ok: false, reden: 'geen_kandidaat', error: e.message }),
+          };
+        }
+        target = { id: rr.gekozen_id, naam: rr.gekozen_naam, email: rr.gekozen_email };
+        viaPool = true;
+      }
+
+      // 3. Herkomst-notitie samenstellen (behoudt bestaande gever_opmerking)
+      const vandaagNL = new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+      const herkomst = `Doorgegeven door ${doorgever_naam || 'collega'} op ${vandaagNL}`;
+      const nieuweGeverOpmerking = item.gever_opmerking
+        ? `${item.gever_opmerking}\n${herkomst}`
+        : herkomst;
+
+      // 4. Item VERPLAATSEN naar nieuwe eigenaar (historie reist mee)
+      await sbPatch(`bellijst_items?id=eq.${bellijst_item_id}`, {
+        eigenaar_id:     target.id,
+        bron:            'pool',
+        bel_status:      'nieuw',
+        belpogingen:     0,
+        gever_opmerking: nieuweGeverOpmerking,
+        // herinneringen resetten zodat de nieuwe eigenaar weer genudged kan worden
+        herinnering_1_verzonden_op: null,
+        herinnering_2_verzonden_op: null,
+        toegevoegd_op:   new Date().toISOString(),
+      });
+
+      // 5. Notificatie-mail naar de nieuwe eigenaar (faalt stilletjes)
+      try {
+        const html = renderLeadNotificatieMail({
+          ontvangerNaam:   target.naam,
+          klantNaam:       item.bezichtiger_naam || '(geen naam)',
+          adres:           item.adres || '',
+          telefoon:        item.bezichtiger_telefoon || '',
+          email:           item.bezichtiger_email || '',
+          gevendeMakelaar: doorgever_naam || 'een collega',
+          opmerking:       item.opmerking || '',
+          leadpoolUrl:     'https://mvaleadpool.netlify.app/',
+        });
+        await stuurMail({
+          to:      target.email,
+          subject: `Nieuwe lead voor jou: ${item.bezichtiger_naam || 'onbekend'}`,
+          html,
+        });
+      } catch (e) {
+        console.warn('[herverdeel_lead] mail faalde (niet kritiek):', e.message);
+      }
+
+      return {
+        statusCode: 200, headers,
+        body: JSON.stringify({
+          ok:            true,
+          via_pool:      viaPool,
+          nieuwe_eigenaar_naam:  target.naam,
+          nieuwe_eigenaar_email: target.email,
+        }),
+      };
+    }
+
     // ── FEEDBACK OPSLAAN ─────────────────────────────────────────────
     if (action === 'sla_feedback_op') {
       const { item_id, feedback, opmerking } = data;
@@ -1306,6 +1423,25 @@ exports.handler = async (event) => {
     // geval er ergens nog een legacy referentie is.
 
     // ── ALLE MAKELAARS / GET_MAKELAARS ──────────────────────────────
+    // ── GET COLLEGA MAKELAARS (voor doorgeef-dropdown) ───────────────
+    // Actieve MVA-makelaars uit Supabase, exclusief de aanvrager zelf.
+    // Bron is Supabase (niet Monday) zodat de lijst consistent is met de
+    // rest van de app. Externs (Filipe/Gert-Jan) doen niet mee aan normale
+    // doorgifte binnen MVA en worden eruit gefilterd.
+    if (action === 'get_collega_makelaars') {
+      const { email } = data || {};
+      const lijst = await sbGet(
+        `gebruikers?select=id,naam,email,rol&actief=eq.true&kantoor_id=eq.${MVA_KANTOOR_ID}` +
+        `&order=naam.asc`
+      );
+      const eigenEmail = (email || '').toLowerCase();
+      const collegas = lijst
+        .filter(g => g.rol !== 'extern')
+        .filter(g => (g.email || '').toLowerCase() !== eigenEmail)
+        .map(g => ({ naam: g.naam, email: g.email }));
+      return { statusCode: 200, headers, body: JSON.stringify({ makelaars: collegas }) };
+    }
+
     if (action === 'get_alle_makelaars' || action === 'get_makelaars') {
       const result = await mondayFetch(`{
         boards(ids: [5093235823]) {
