@@ -365,6 +365,31 @@
       cursor: pointer;
     }
     .btn-doorgeven:hover { background: #ffe7cc; }
+    .btn-hypotheek {
+      padding: 12px 14px;
+      background: #eef2ff;
+      color: #3730a3;
+      border: 1px solid #c7d2fe;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'Roboto', sans-serif;
+      cursor: pointer;
+    }
+    .btn-hypotheek:hover { background: #e0e7ff; }
+    .btn-hypotheek-bez {
+      width: 100%;
+      padding: 11px;
+      background: #eef2ff;
+      color: #3730a3;
+      border: 1px solid #c7d2fe;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'Roboto', sans-serif;
+      cursor: pointer;
+    }
+    .btn-hypotheek-bez:hover { background: #e0e7ff; }
     .btn-status:active { background: var(--grijs-mid); }
 
     /* Open in Cloze knop — verschijnt op kaart als lead.cloze_id gezet is */
@@ -3150,6 +3175,15 @@
               </button>
             </div>
 
+            <div style="margin-top:10px">
+              <button
+                class="btn-hypotheek-bez"
+                onclick="openHypotheekModal({bron:'bezichtiging', id:'${b.id}', naam:'${b.naam.replace(/'/g, "\\'")}', email:'${(b.email || '').replace(/'/g, "\\'")}', telefoon:'${(b.telefoon || '').replace(/'/g, "\\'")}', adres:'${b.adres?.replace(/'/g, "\\'") || ''}'})"
+                title="Stuur deze klant door naar de Hypotheekshop">
+                🏦 Doorsturen naar Hypotheekshop
+              </button>
+            </div>
+
             <div class="actiebalk">
               ${b.mag_doorsturen === false ? '' : `
               <button
@@ -4570,6 +4604,80 @@
   window.doorgeefNaarCollega = doorgeefNaarCollega;
   window.doorgeefTerugNaarKeuze = doorgeefTerugNaarKeuze;
 
+  // ── HYPOTHEEK-DOORVERWIJZING ─────────────────────────────────────────
+  // Werkt voor beide flows. De aanroeper geeft de bron ('bezichtiging' of
+  // 'bellijst') + klantgegevens mee; de modal vult voor en stuurt naar de
+  // backend-action 'verwijs_hypotheek'. Registratie in Supabase + mail naar
+  // de Hypotheekshop gebeurt server-side.
+  let hypotheekContext = null;
+
+  function openHypotheekModal(opts) {
+    // opts: { bron, id, naam, email, telefoon, adres }
+    hypotheekContext = opts || {};
+    const naam = hypotheekContext.naam || '(geen naam)';
+    document.getElementById('hypotheek-modal-klant').textContent =
+      `Klant: ${naam}${hypotheekContext.telefoon ? ' · ' + hypotheekContext.telefoon : ''}`;
+    // Reset velden
+    document.getElementById('hyp-adviseur').value = 'Geen voorkeur';
+    document.getElementById('hyp-advies').value = '';
+    document.getElementById('hyp-opmerking').value = '';
+    const btn = document.getElementById('hyp-verstuur-btn');
+    if (btn) { btn.disabled = false; btn.textContent = '🏦 Doorsturen'; }
+    document.getElementById('hypotheek-modal-bg').classList.add('actief');
+  }
+
+  function sluitHypotheekModal() {
+    document.getElementById('hypotheek-modal-bg').classList.remove('actief');
+    hypotheekContext = null;
+  }
+
+  async function verstuurHypotheek() {
+    if (!hypotheekContext) return;
+    const ctx = hypotheekContext;
+    const btn = document.getElementById('hyp-verstuur-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Bezig...'; }
+
+    const payload = {
+      klant_naam:             ctx.naam || '',
+      klant_email:            ctx.email || '',
+      klant_telefoon:         ctx.telefoon || '',
+      voorkeur_adviseur:      document.getElementById('hyp-adviseur').value,
+      type_advies:            document.getElementById('hyp-advies').value,
+      opmerking:              document.getElementById('hyp-opmerking').value.trim(),
+      gevende_makelaar_id:    huidigeMakelaar?.id || null,
+      gevende_makelaar_naam:  huidigeMakelaar?.naam || '',
+      gevende_makelaar_email: huidigeMakelaar?.email || '',
+      adres:                  ctx.adres || '',
+    };
+    // Soft koppeling naar herkomst
+    if (ctx.bron === 'bellijst')      payload.bellijst_item_id = ctx.id;
+    if (ctx.bron === 'bezichtiging')  payload.bezichtiging_id  = ctx.id;
+
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verwijs_hypotheek', data: payload })
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+
+      sluitHypotheekModal();
+      if (json.mail_verzonden) {
+        toonToast('🏦 Doorgestuurd naar de Hypotheekshop', 'succes');
+      } else {
+        toonToast('🏦 Geregistreerd — let op: de mail kon niet verstuurd worden', 'fout');
+      }
+    } catch (err) {
+      if (btn) { btn.disabled = false; btn.textContent = '🏦 Doorsturen'; }
+      toonToast('Doorsturen mislukt: ' + (err.message || 'onbekend'), 'fout');
+    }
+  }
+
+  window.openHypotheekModal = openHypotheekModal;
+  window.sluitHypotheekModal = sluitHypotheekModal;
+  window.verstuurHypotheek = verstuurHypotheek;
+
   // ── ROUND ROBIN AAN/UIT ─────────────────────────────────────────────
   // Eigen toggle in de bellijst-strook + admin-modal voor beheer van iedereen.
   // Backend: action='get_rr_status' / 'toggle_rr' / 'get_rr_status_alle'.
@@ -5207,6 +5315,9 @@
               </button>
               <button class="btn-doorgeven" onclick="openDoorgeefModal('${lead.id}', '${safeNaam}', '${(lead.adres||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}')" title="Geef deze lead door aan een collega of terug naar de pool">
                 📨 Doorgeven
+              </button>
+              <button class="btn-hypotheek" onclick="openHypotheekModal({bron:'bellijst', id:'${lead.id}', naam:'${safeNaam}', email:'${(lead.email||'').replace(/'/g,"\\'")}', telefoon:'${(lead.telefoon||'').replace(/'/g,"\\'")}', adres:'${(lead.adres||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}'})" title="Stuur deze klant door naar de Hypotheekshop">
+                🏦 Hypotheek
               </button>
               ${lead.cloze_id ? `
                 <a class="btn-cloze" href="https://www.cloze.com/in/person/${lead.cloze_id}#section=people" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open klant in Cloze om te verrijken">
@@ -6629,6 +6740,39 @@
 
     <div class="talent-modal-acties" style="margin-top:14px">
       <button class="annuleer" onclick="sluitDoorgeefModal()">Annuleren</button>
+    </div>
+  </div>
+</div>
+
+<!-- HYPOTHEEK-DOORVERWIJZING MODAL — werkt voor bezichtiging- én bellijst-flow -->
+<div class="talent-modal-bg" id="hypotheek-modal-bg" onclick="if(event.target===this)sluitHypotheekModal()">
+  <div class="talent-modal" role="dialog" aria-labelledby="hypotheek-modal-titel" style="max-width:480px">
+    <h3 id="hypotheek-modal-titel">🏦 Doorsturen naar Hypotheekshop</h3>
+    <p id="hypotheek-modal-klant" style="color:var(--grijs-tekst);font-size:13px;margin-top:-8px;margin-bottom:14px"></p>
+
+    <label style="display:block;font-size:13px;font-weight:600;color:var(--navy);margin-bottom:4px">Voorkeur adviseur</label>
+    <select id="hyp-adviseur" style="width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;margin-bottom:14px;background:white">
+      <option value="Geen voorkeur">Geen voorkeur</option>
+      <option value="Canner">Canner</option>
+      <option value="Edwin">Edwin</option>
+    </select>
+
+    <label style="display:block;font-size:13px;font-weight:600;color:var(--navy);margin-bottom:4px">Welk advies heeft de klant nodig?</label>
+    <select id="hyp-advies" style="width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;margin-bottom:14px;background:white">
+      <option value="">— Kies (optioneel) —</option>
+      <option value="Afspraak fysiek met een adviseur Valkenburgerstraat 67">Afspraak fysiek — Valkenburgerstraat 67</option>
+      <option value="Afspraak virtueel met een adviseur">Afspraak virtueel met een adviseur</option>
+      <option value="Afspraak fysiek met de adviseur andere locatie">Afspraak fysiek — andere locatie</option>
+      <option value="Maximaal berekening loondienst - korte telefonische afspraak om het koopbudget te bepalen">Max-berekening loondienst (telefonisch)</option>
+      <option value="Maximaal berekening complex - telefonische afspraak om het koopbudget te bepalen (ondernemers, scheiding, etc.)">Max-berekening complex (ondernemers, scheiding)</option>
+    </select>
+
+    <label style="display:block;font-size:13px;font-weight:600;color:var(--navy);margin-bottom:4px">Toelichting <span style="font-weight:400;color:var(--grijs-tekst)">(optioneel)</span></label>
+    <textarea id="hyp-opmerking" rows="3" placeholder="Achtergrond van de klant, of een gewenste locatie voor de afspraak..." style="width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;box-sizing:border-box;resize:vertical;font-family:inherit"></textarea>
+
+    <div class="talent-modal-acties" style="margin-top:16px;display:flex;gap:8px">
+      <button class="annuleer" onclick="sluitHypotheekModal()">Annuleren</button>
+      <button class="bevestig" id="hyp-verstuur-btn" onclick="verstuurHypotheek()" style="background:var(--oranje)">🏦 Doorsturen</button>
     </div>
   </div>
 </div>
