@@ -81,19 +81,21 @@ const sbInsert = async (path, body) => {
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const MAIL_FROM = 'MVA Leadpool <contact@makelaarsvan.nl>';
 
-const stuurMail = async ({ to, subject, html }) => {
+const stuurMail = async ({ to, cc, subject, html }) => {
   if (!RESEND_API_KEY) {
     console.warn('[mail] RESEND_API_KEY ontbreekt — mail niet verstuurd');
     return { ok: false, reason: 'no_api_key' };
   }
   try {
+    const payload = { from: MAIL_FROM, to, subject, html };
+    if (cc && (Array.isArray(cc) ? cc.length : cc)) payload.cc = cc;
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ from: MAIL_FROM, to, subject, html }),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const txt = await res.text();
@@ -156,6 +158,62 @@ const renderLeadNotificatieMail = ({
           </div>
           <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center">
             Wil je geen leads meer ontvangen? Zet Round Robin uit in de Leadpool-app.
+          </div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+};
+
+// ── HYPOTHEEK-DOORVERWIJZING: vaste ontvangers + mail-template ─────────
+const HYPOTHEEK_ONTVANGERS = ['amsterdam547@hypotheekshop.nl', 'e.bitter@hypotheekshop.nl'];
+const HYPOTHEEK_CC          = ['toncoffeng@makelaarsvan.nl'];
+
+// Bouwt de HTML-body voor een doorverwijzing naar de Hypotheekshop.
+const renderHypotheekMail = ({
+  klantNaam, klantEmail, klantTelefoon,
+  voorkeurAdviseur, typeAdvies, opmerking,
+  gevendeMakelaar, adres,
+}) => {
+  const esc = s => String(s || '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+  const veiligeTel = esc(klantTelefoon || '—');
+  const veiligEmail = esc(klantEmail || '—');
+  const rij = (label, waarde) => waarde
+    ? `<tr><td style="padding:8px 0;color:#64748b;font-size:13px;width:160px;vertical-align:top">${label}</td>
+         <td style="padding:8px 0;color:#1A2B5F;font-size:14px">${waarde}</td></tr>`
+    : '';
+  return `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f4f6fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f4f6fa;padding:24px 0">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden">
+        <tr><td style="background:#1A2B5F;padding:20px 24px;color:white">
+          <div style="font-size:12px;letter-spacing:0.05em;opacity:0.8;text-transform:uppercase">Makelaars van Amsterdam</div>
+          <div style="font-size:20px;font-weight:700;margin-top:4px">Hypotheekdoorverwijzing</div>
+        </td></tr>
+        <tr><td style="padding:24px">
+          <div style="font-size:15px;color:#1A2B5F;margin-bottom:18px">
+            Beste collega's van de Hypotheekshop,<br><br>
+            Hierbij een nieuwe klant die graag advies wil. De gegevens:
+          </div>
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse">
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px;width:160px">Klant</td>
+                <td style="padding:8px 0;color:#1A2B5F;font-size:15px;font-weight:600">${esc(klantNaam)}</td></tr>
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px">Telefoon</td>
+                <td style="padding:8px 0;color:#1A2B5F;font-size:14px"><a href="tel:${veiligeTel}" style="color:#E8500A;text-decoration:none">${veiligeTel}</a></td></tr>
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px">E-mail</td>
+                <td style="padding:8px 0;color:#1A2B5F;font-size:14px"><a href="mailto:${veiligEmail}" style="color:#E8500A;text-decoration:none">${veiligEmail}</a></td></tr>
+            ${rij('Voorkeur adviseur', esc(voorkeurAdviseur))}
+            ${rij('Welk advies', esc(typeAdvies))}
+            ${rij('Gerelateerd pand', esc(adres))}
+            ${rij('Toelichting', esc(opmerking))}
+            ${rij('Doorgegeven door', esc(gevendeMakelaar))}
+          </table>
+          <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8">
+            Deze doorverwijzing is verstuurd vanuit de MVA Leadpool. Reageer gerust rechtstreeks naar de doorgevende makelaar of de klant.
           </div>
         </td></tr>
       </table>
@@ -951,6 +1009,105 @@ exports.handler = async (event) => {
           nieuwe_eigenaar_naam:  target.naam,
           nieuwe_eigenaar_email: target.email,
         }),
+      };
+    }
+
+    // ── HYPOTHEEK-DOORVERWIJZING ─────────────────────────────────────
+    // Een makelaar (bezichtigingen- of bellijst-flow) verwijst een klant
+    // door naar de Hypotheekshop. We registreren in de tabel
+    // hypotheek_doorverwijzingen én sturen een notificatiemail naar de
+    // Hypotheekshop (CC Ton + de doorgevende makelaar). Mail-fout blokkeert
+    // de registratie niet — de doorverwijzing is dan wel vastgelegd.
+    if (action === 'verwijs_hypotheek') {
+      const {
+        klant_naam, klant_email, klant_telefoon,
+        voorkeur_adviseur, type_advies, opmerking,
+        gevende_makelaar_id, gevende_makelaar_naam, gevende_makelaar_email,
+        bellijst_item_id, bezichtiging_id, adres,
+      } = data || {};
+
+      if (!klant_naam && !klant_email && !klant_telefoon) {
+        return {
+          statusCode: 400, headers,
+          body: JSON.stringify({ error: 'Minimaal naam, e-mail of telefoon van de klant vereist' }),
+        };
+      }
+
+      // 1. Registreer in de tabel (status default 'aangevraagd')
+      // De frontend stuurt geen makelaar-id mee (huidigeMakelaar kent alleen
+      // email/naam) — zoek de id op via email zodat de FK gevuld wordt.
+      let makelaarId = gevende_makelaar_id ? parseInt(gevende_makelaar_id) : null;
+      if (!makelaarId && gevende_makelaar_email) {
+        try {
+          const u = await sbGet(
+            `gebruikers?select=id&email=eq.${encodeURIComponent(String(gevende_makelaar_email).toLowerCase())}`
+          );
+          if (u[0]) makelaarId = u[0].id;
+        } catch { /* niet kritiek — id mag null blijven */ }
+      }
+
+      let rij;
+      try {
+        rij = await sbInsert('hypotheek_doorverwijzingen', {
+          kantoor_id:            MVA_KANTOOR_ID,
+          klant_naam:            klant_naam || null,
+          klant_email:           klant_email || null,
+          klant_telefoon:        klant_telefoon || null,
+          voorkeur_adviseur:     voorkeur_adviseur || null,
+          type_advies:           type_advies || null,
+          opmerking:             opmerking || null,
+          gevende_makelaar_id:   makelaarId,
+          gevende_makelaar_naam: gevende_makelaar_naam || null,
+          bellijst_item_id:      bellijst_item_id ? parseInt(bellijst_item_id) : null,
+          bezichtiging_id:       bezichtiging_id ? parseInt(bezichtiging_id) : null,
+          mail_verzonden:        false,
+        });
+      } catch (e) {
+        return {
+          statusCode: 500, headers,
+          body: JSON.stringify({ error: `Registratie hypotheekdoorverwijzing faalde: ${e.message}` }),
+        };
+      }
+      const nieuweId = rij && rij[0] ? rij[0].id : null;
+
+      // 2. Mail naar de Hypotheekshop (CC Ton + doorgevende makelaar)
+      let mailOk = false;
+      try {
+        const cc = [...HYPOTHEEK_CC];
+        if (gevende_makelaar_email && !cc.includes(gevende_makelaar_email.toLowerCase())) {
+          cc.push(gevende_makelaar_email);
+        }
+        const html = renderHypotheekMail({
+          klantNaam:        klant_naam || '(geen naam)',
+          klantEmail:       klant_email || '',
+          klantTelefoon:    klant_telefoon || '',
+          voorkeurAdviseur: voorkeur_adviseur || '',
+          typeAdvies:       type_advies || '',
+          opmerking:        opmerking || '',
+          gevendeMakelaar:  gevende_makelaar_naam || 'een collega',
+          adres:            adres || '',
+        });
+        const mailRes = await stuurMail({
+          to:      HYPOTHEEK_ONTVANGERS,
+          cc,
+          subject: `Hypotheekdoorverwijzing: ${klant_naam || 'nieuwe klant'}`,
+          html,
+        });
+        mailOk = !!(mailRes && mailRes.ok);
+      } catch (e) {
+        console.warn('[verwijs_hypotheek] mail faalde (niet kritiek):', e.message);
+      }
+
+      // 3. Mail-status terugschrijven (best effort)
+      if (nieuweId && mailOk) {
+        try {
+          await sbPatch(`hypotheek_doorverwijzingen?id=eq.${nieuweId}`, { mail_verzonden: true });
+        } catch { /* niet kritiek */ }
+      }
+
+      return {
+        statusCode: 200, headers,
+        body: JSON.stringify({ ok: true, id: nieuweId, mail_verzonden: mailOk }),
       };
     }
 
