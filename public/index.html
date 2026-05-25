@@ -1215,6 +1215,13 @@
       cursor: pointer;
       text-align: left;
       transition: all .15s;
+      /* Gelijke blokjes: zelfde basishoogte + verticaal gecentreerde tekst,
+         ook als één knop naar twee regels wikkelt en de buur niet. */
+      display: flex;
+      align-items: center;
+      min-height: 48px;
+      box-sizing: border-box;
+      line-height: 1.25;
     }
     .btn-feedback:hover { background: #e8eaf6; }
     .btn-feedback.actief {
@@ -1937,6 +1944,7 @@
           cloze_id:           item.cloze_id || '',
           belpogingen:        Number(item.belpogingen) || 0,
           bron:               item.bron || '',
+          bez_type:           item.bez_type || 'ingepland',
           bezichtiging_id:    item.bezichtiging_id || null,
         };
       });
@@ -5044,7 +5052,7 @@
           </div>
 
           <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;flex-wrap:wrap">
-            ${lead.datum_bezichtiging ? `<span style="color:var(--navy);font-weight:500">🏠 Bezichtiging: <strong>${lead.datum_bezichtiging}</strong></span>` : ''}
+            ${lead.datum_bezichtiging ? `<span style="color:var(--navy);font-weight:500">🏠 ${lead.bez_type === 'open_huis' ? 'Open Huis' : 'Bezichtiging'}: <strong>${lead.datum_bezichtiging}</strong></span>` : ''}
             ${lead.datum ? `<span style="color:var(--grijs-tekst)">📥 In pool: <strong>${lead.datum}</strong></span>` : ''}
           </div>
 
