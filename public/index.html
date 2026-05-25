@@ -747,8 +747,22 @@
     .btn-rol:hover { border-color: var(--navy); background: #f8f9ff; }
     .btn-rol-geven:hover { border-color: var(--oranje); background: #fff8f5; }
     .rol-icon { font-size: 28px; }
-    .rol-titel { font-size: 14px; font-weight: 700; color: var(--navy); }
-    .rol-sub { font-size: 11px; color: var(--grijs-tekst); text-align: center; }
+    .rol-titel {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--navy);
+      text-align: center;
+      min-height: 1.4em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .rol-sub {
+      font-size: 11px;
+      color: var(--grijs-tekst);
+      text-align: center;
+      min-height: 1.4em;
+    }
 
     /* ── BEZICHTIGING KAART (gevende makelaar) ── */
     .bez-card {
@@ -1461,13 +1475,13 @@
       <div class="rol-keuze">
         <button class="btn-rol btn-rol-geven" onclick="login('geven')">
           <span class="rol-icon">📤</span>
-          <span class="rol-titel">Bezichtigingen</span>
-          <span class="rol-sub">Doorgeven of zelf opvolgen</span>
+          <span class="rol-titel">Doorgeven</span>
+          <span class="rol-sub">Bezichtiging opvolgen</span>
         </button>
         <button class="btn-rol" onclick="login('ontvangen')">
           <span class="rol-icon">📥</span>
-          <span class="rol-titel">Leads bellen</span>
-          <span class="rol-sub">Jouw bellijst bekijken</span>
+          <span class="rol-titel">Opvolging</span>
+          <span class="rol-sub">Jouw bellijst bellen</span>
         </button>
       </div>
       <button onclick="uitloggen()" style="width:100%;margin-top:14px;padding:10px;background:none;border:1px solid var(--grijs-mid);border-radius:10px;color:var(--grijs-tekst);font-size:13px;cursor:pointer">
