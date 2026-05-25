@@ -898,12 +898,24 @@ exports.handler = async (event) => {
 
       // Voor pool-leads: haal gevende makelaar erbij via bezichtigingen-tabel
       // (eigen leads bron='zelf' krijgen geen bij_wie — die zijn van henzelf)
+      // Daarnaast halen we voor ÁLLE items met een bezichtiging_id het type op
+      // (ingepland / open_huis), zodat de kaart "Open Huis" i.p.v. "Bezichtiging"
+      // kan tonen — ook voor eigen leads en open-huis-inschrijvingen.
       const poolItems = items.filter(it => it.bron === 'pool' && it.bezichtiging_id);
+      const itemsMetBez = items.filter(it => it.bezichtiging_id);
       let geverPerBezId = {};
-      if (poolItems.length > 0) {
-        const bezIds = [...new Set(poolItems.map(it => it.bezichtiging_id))].join(',');
-        const bezichtigingen = await sbGet(`bezichtigingen?select=id,gevende_makelaar_id&id=in.(${bezIds})`);
-        const geverIds = [...new Set(bezichtigingen.map(b => b.gevende_makelaar_id).filter(Boolean))];
+      let typePerBezId = {};
+      if (itemsMetBez.length > 0) {
+        const alleBezIds = [...new Set(itemsMetBez.map(it => it.bezichtiging_id))].join(',');
+        const bezichtigingen = await sbGet(`bezichtigingen?select=id,gevende_makelaar_id,type&id=in.(${alleBezIds})`);
+        typePerBezId = Object.fromEntries(
+          bezichtigingen.map(b => [b.id, b.type || 'ingepland'])
+        );
+        // Gever-naam alleen nodig voor pool-leads
+        const poolBezIds = new Set(poolItems.map(it => it.bezichtiging_id));
+        const geverIds = [...new Set(
+          bezichtigingen.filter(b => poolBezIds.has(b.id)).map(b => b.gevende_makelaar_id).filter(Boolean)
+        )];
         let gebruikersMap = {};
         if (geverIds.length > 0) {
           const gebruikers = await sbGet(`gebruikers?select=id,naam&id=in.(${geverIds.join(',')})`);
@@ -960,6 +972,7 @@ exports.handler = async (event) => {
           gever_opmerking:    it.gever_opmerking || '',
           no_shows:           noshowPerSleutel[persoonSleutel(it.bezichtiger_email, it.bezichtiger_telefoon)] || 0,
           bron:               it.bron, // 'zelf' of 'pool'
+          bez_type:           it.bezichtiging_id ? (typePerBezId[it.bezichtiging_id] || 'ingepland') : 'ingepland',
           bij_wie:            (it.bron === 'pool' && it.bezichtiging_id) ? (geverPerBezId[it.bezichtiging_id] || '') : '',
           belpogingen:        it.belpogingen || 0,
           afspraak_op:        it.afspraak_op || '',
