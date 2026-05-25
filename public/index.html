@@ -353,6 +353,18 @@
       font-family: 'Roboto', sans-serif;
       cursor: pointer;
     }
+    .btn-doorgeven {
+      padding: 12px 14px;
+      background: #fff3e0;
+      color: var(--oranje);
+      border: 1px solid var(--oranje);
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'Roboto', sans-serif;
+      cursor: pointer;
+    }
+    .btn-doorgeven:hover { background: #ffe7cc; }
     .btn-status:active { background: var(--grijs-mid); }
 
     /* Open in Cloze knop — verschijnt op kaart als lead.cloze_id gezet is */
@@ -4437,6 +4449,127 @@
   window.openToewijzenModal = openToewijzenModal;
   window.sluitToewijzenModal = sluitToewijzenModal;
 
+  // ── DOORGEVEN DOOR ONTVANGER ─────────────────────────────────────────
+  // Een makelaar die al een lead in zijn bellijst heeft, geeft 'm door —
+  // terug naar de pool (Round Robin, zichzelf uitgesloten) of direct aan
+  // een gekozen collega. Backend: action='herverdeel_lead'. Het bestaande
+  // bellijst_item wordt verplaatst (historie reist mee).
+  let doorgeefContext = null;
+
+  function openDoorgeefModal(leadId, naam, adres) {
+    doorgeefContext = { leadId, naam, adres };
+    document.getElementById('doorgeef-modal-titel').textContent = `Doorgeven: ${naam}`;
+    document.getElementById('doorgeef-modal-adres').textContent = adres ? `📍 ${adres}` : '';
+    // Reset naar stap 1
+    document.getElementById('doorgeef-keuze').style.display = '';
+    document.getElementById('doorgeef-collega-stap').style.display = 'none';
+    document.getElementById('doorgeef-modal-bg').classList.add('actief');
+  }
+
+  function sluitDoorgeefModal() {
+    document.getElementById('doorgeef-modal-bg').classList.remove('actief');
+    doorgeefContext = null;
+  }
+
+  function doorgeefTerugNaarKeuze() {
+    document.getElementById('doorgeef-collega-stap').style.display = 'none';
+    document.getElementById('doorgeef-keuze').style.display = '';
+  }
+
+  // Stap 2: toon collega-lijst (hergebruikt laadActieveMakelaars-cache)
+  async function doorgeefToonCollegas() {
+    document.getElementById('doorgeef-keuze').style.display = 'none';
+    const stap = document.getElementById('doorgeef-collega-stap');
+    const lijst = document.getElementById('doorgeef-makelaars-lijst');
+    stap.style.display = '';
+    lijst.innerHTML = '<div style="padding:20px;text-align:center;color:var(--grijs-tekst)">Makelaars laden...</div>';
+
+    const makelaars = await laadActieveMakelaars();
+    if (!makelaars.length) {
+      lijst.innerHTML = '<div style="padding:20px;text-align:center;color:var(--grijs-tekst)">Geen andere actieve makelaars gevonden.</div>';
+      return;
+    }
+    lijst.innerHTML = makelaars.map(m => `
+      <button class="toewijzen-makelaar-btn" data-email="${m.email}" data-naam="${(m.naam||'').replace(/"/g,'&quot;')}">
+        <span style="font-weight:600">${m.naam}</span>
+        <span style="font-size:11px;color:var(--grijs-tekst);margin-left:8px">${m.email}</span>
+      </button>
+    `).join('');
+    lijst.onclick = (ev) => {
+      const btn = ev.target.closest('.toewijzen-makelaar-btn');
+      if (!btn) return;
+      doorgeefNaarCollega(btn.dataset.email, btn.dataset.naam);
+    };
+  }
+
+  // Terug naar pool (Round Robin)
+  async function doorgeefNaarPool() {
+    if (!doorgeefContext) return;
+    const { leadId, naam } = doorgeefContext;
+    const ok = await mvaConfirm({
+      titel: '🔄 Terug naar de pool',
+      tekst: `Wil je ${naam} teruggeven aan de pool?\n\nRound Robin kiest een collega — jij wordt overgeslagen. De lead verdwijnt uit jouw lijst.`,
+      okTekst: 'Terug naar pool',
+    });
+    if (ok !== true) return;
+    await doeHerverdeel(leadId, null, null, naam);
+  }
+
+  // Direct aan gekozen collega
+  async function doorgeefNaarCollega(collegaEmail, collegaNaam) {
+    if (!doorgeefContext) return;
+    const { leadId, naam } = doorgeefContext;
+    const ok = await mvaConfirm({
+      titel: '👤 Doorgeven aan collega',
+      tekst: `Wil je ${naam} doorgeven aan ${collegaNaam}?\n\n${collegaNaam} krijgt een mail en de lead verschijnt in zijn/haar bellijst. De lead verdwijnt uit jouw lijst.`,
+      okTekst: `Doorgeven aan ${collegaNaam.split(' ')[0]}`,
+    });
+    if (ok !== true) return;
+    await doeHerverdeel(leadId, collegaEmail, collegaNaam, naam);
+  }
+
+  // Gedeelde uitvoering: roept de backend aan en ververst de lijst
+  async function doeHerverdeel(leadId, naarEmail, collegaNaam, klantNaam) {
+    sluitDoorgeefModal();
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'herverdeel_lead',
+          data: {
+            bellijst_item_id: leadId,
+            naar_email:       naarEmail || '',
+            doorgever_naam:   huidigeMakelaar?.naam || '',
+          }
+        })
+      });
+      const json = await res.json();
+
+      if (json.ok === false && json.reden === 'geen_kandidaat') {
+        toonToast('⚠️ Geen collega beschikbaar in de pool — lead blijft bij jou.', 'fout');
+        return;
+      }
+      if (json.error) throw new Error(json.error);
+
+      const naarNaam = json.nieuwe_eigenaar_naam || collegaNaam || 'een collega';
+      toonToast(`✅ ${klantNaam} doorgegeven aan ${naarNaam}`, 'succes');
+
+      // Lijst verversen — de doorgegeven lead heeft nu een andere eigenaar
+      // en verdwijnt daardoor uit deze weergave.
+      if (typeof laadLeads === 'function') laadLeads();
+    } catch (err) {
+      toonToast('Doorgeven mislukt: ' + (err.message || 'onbekend'), 'fout');
+    }
+  }
+
+  window.openDoorgeefModal = openDoorgeefModal;
+  window.sluitDoorgeefModal = sluitDoorgeefModal;
+  window.doorgeefNaarPool = doorgeefNaarPool;
+  window.doorgeefToonCollegas = doorgeefToonCollegas;
+  window.doorgeefNaarCollega = doorgeefNaarCollega;
+  window.doorgeefTerugNaarKeuze = doorgeefTerugNaarKeuze;
+
   // ── ROUND ROBIN AAN/UIT ─────────────────────────────────────────────
   // Eigen toggle in de bellijst-strook + admin-modal voor beheer van iedereen.
   // Backend: action='get_rr_status' / 'toggle_rr' / 'get_rr_status_alle'.
@@ -5071,6 +5204,9 @@
               </button>
               <button class="btn-status" onclick="openModal('${lead.id}')">
                 Status →
+              </button>
+              <button class="btn-doorgeven" onclick="openDoorgeefModal('${lead.id}', '${safeNaam}', '${(lead.adres||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}')" title="Geef deze lead door aan een collega of terug naar de pool">
+                📨 Doorgeven
               </button>
               ${lead.cloze_id ? `
                 <a class="btn-cloze" href="https://www.cloze.com/in/person/${lead.cloze_id}#section=people" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open klant in Cloze om te verrijken">
@@ -6461,6 +6597,38 @@
     <div id="toewijzen-makelaars-lijst" style="display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow-y:auto"></div>
     <div class="talent-modal-acties" style="margin-top:14px">
       <button class="annuleer" onclick="sluitToewijzenModal()">Annuleren</button>
+    </div>
+  </div>
+</div>
+
+<!-- DOORGEEF MODAL — ontvanger geeft een eigen lead door (pool of collega) -->
+<div class="talent-modal-bg" id="doorgeef-modal-bg" onclick="if(event.target===this)sluitDoorgeefModal()">
+  <div class="talent-modal" role="dialog" aria-labelledby="doorgeef-modal-titel" style="max-width:480px">
+    <h3 id="doorgeef-modal-titel">Lead doorgeven</h3>
+    <p id="doorgeef-modal-adres" style="color:var(--grijs-tekst);font-size:13px;margin-top:-8px;margin-bottom:14px"></p>
+
+    <!-- Stap 1: keuze pool of collega -->
+    <div id="doorgeef-keuze">
+      <p style="font-size:13px;color:var(--grijs-tekst);margin-bottom:12px">Hoe wil je deze lead doorgeven?</p>
+      <button class="toewijzen-makelaar-btn" style="width:100%;margin-bottom:8px" onclick="doorgeefNaarPool()">
+        <span style="font-weight:600">🔄 Terug naar de pool</span>
+        <span style="font-size:11px;color:var(--grijs-tekst);margin-left:8px">Round Robin kiest een collega (jij wordt overgeslagen)</span>
+      </button>
+      <button class="toewijzen-makelaar-btn" style="width:100%" onclick="doorgeefToonCollegas()">
+        <span style="font-weight:600">👤 Naar een specifieke collega</span>
+        <span style="font-size:11px;color:var(--grijs-tekst);margin-left:8px">Kies zelf wie de lead krijgt</span>
+      </button>
+    </div>
+
+    <!-- Stap 2: collega-lijst (verborgen tot keuze) -->
+    <div id="doorgeef-collega-stap" style="display:none">
+      <p style="font-size:13px;color:var(--grijs-tekst);margin-bottom:10px">Kies aan wie de lead moet:</p>
+      <div id="doorgeef-makelaars-lijst" style="display:flex;flex-direction:column;gap:6px;max-height:45vh;overflow-y:auto"></div>
+      <button class="annuleer" style="margin-top:10px;width:100%" onclick="doorgeefTerugNaarKeuze()">← Terug</button>
+    </div>
+
+    <div class="talent-modal-acties" style="margin-top:14px">
+      <button class="annuleer" onclick="sluitDoorgeefModal()">Annuleren</button>
     </div>
   </div>
 </div>
