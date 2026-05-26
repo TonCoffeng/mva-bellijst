@@ -91,6 +91,63 @@ exports.handler = async (event) => {
 
     const gefilterdeRows = rows.filter(r => !isLegeSlot(r));
 
+    // Stap 2b: BEZOEKTELLER + FEEDBACK-HISTORIE ───────────────────────
+    // Rogier-vraag: "hoe vaak komen mensen per woning langs, en staat de
+    // feedback van de vorige keer er ook?" We tellen over ALLE bezichtigingen
+    // heen (alle makelaars, ook gearchiveerd), gematcht op e-mail (voorkeur)
+    // of telefoon — bewust niet op naam (spelling varieert). Twee tellingen:
+    //   - bezoeken_totaal:    hoe vaak deze persoon ergens is geweest
+    //   - bezoeken_dit_adres: hoe vaak bij DIT specifieke adres
+    // Plus de feedback van eerdere bezoeken aan dit adres. Eén extra query,
+    // daarna in-memory tellen — geen query-per-kaart. Faalt stil (niet kritiek).
+    const persoonSleutel = (email, tel) => {
+      const e = (email || '').trim().toLowerCase();
+      if (e) return `e:${e}`;
+      const t = (tel || '').replace(/[^0-9+]/g, '');
+      if (t) return `t:${t}`;
+      return null;
+    };
+    const adresSleutel = (adres) =>
+      (adres || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+    const bezoekenTotaal = {};            // sleutel -> count
+    const bezoekenPerPersoonAdres = {};   // `${sleutel}||${adres}` -> count
+    const historiePerPersoonAdres = {};   // `${sleutel}||${adres}` -> [{...}]
+    try {
+      const alleRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/bezichtigingen?select=id,bezichtiger_email,bezichtiger_telefoon,adres,datum_tijd,feedback_keys,feedback_opmerking&order=datum_tijd.asc&limit=5000`,
+        {
+          headers: {
+            'apikey': SUPABASE_SERVICE_KEY,
+            'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+          },
+        }
+      );
+      if (alleRes.ok) {
+        const alle = await alleRes.json();
+        for (const b of alle) {
+          const sl = persoonSleutel(b.bezichtiger_email, b.bezichtiger_telefoon);
+          if (!sl) continue;
+          bezoekenTotaal[sl] = (bezoekenTotaal[sl] || 0) + 1;
+          const combo = `${sl}||${adresSleutel(b.adres)}`;
+          bezoekenPerPersoonAdres[combo] = (bezoekenPerPersoonAdres[combo] || 0) + 1;
+          const heeftFb = Array.isArray(b.feedback_keys) && b.feedback_keys.length > 0;
+          const heeftOpm = !!(b.feedback_opmerking || '').trim();
+          if (heeftFb || heeftOpm) {
+            (historiePerPersoonAdres[combo] = historiePerPersoonAdres[combo] || []).push({
+              bez_id:    String(b.id),
+              datum:     b.datum_tijd ? b.datum_tijd.slice(0, 10) : '',
+              feedback:  Array.isArray(b.feedback_keys) ? b.feedback_keys : [],
+              opmerking: b.feedback_opmerking || '',
+            });
+          }
+        }
+      }
+    } catch (e) {
+      // bezoekteller is een extraatje — nooit de hoofdrespons laten falen
+      console.warn('[bezichtigingen] bezoekteller faalde (niet kritiek):', e.message);
+    }
+
     // Stap 3: map naar Monday-style output (zodat frontend code ongewijzigd blijft)
     const bezichtigingen = gefilterdeRows.map(row => {
       // Splits datum_tijd naar datum + tijdstip in Europe/Amsterdam tijdzone
@@ -125,6 +182,16 @@ exports.handler = async (event) => {
         ? (row.open_huis_door_id === user.id)
         : true;
 
+      // Bezoekteller-velden voor deze bezichtiger
+      const sl = persoonSleutel(row.bezichtiger_email, row.bezichtiger_telefoon);
+      const combo = sl ? `${sl}||${adresSleutel(row.adres)}` : null;
+      const bezoekenTot  = sl ? (bezoekenTotaal[sl] || 0) : 0;
+      const bezoekenAdr  = combo ? (bezoekenPerPersoonAdres[combo] || 0) : 0;
+      // Eerdere feedback aan dit adres — exclusief de huidige bezichtiging zelf,
+      // oudste eerst, en zonder lege entries.
+      const eerdereFeedback = (combo ? (historiePerPersoonAdres[combo] || []) : [])
+        .filter(h => h.bez_id !== String(row.id));
+
       return {
         id: String(row.id),  // database primary key — matcht monday.js queries (push_naar_pool, push_naar_eigen_bellijst, etc.)
         realworks_id: row.realworks_id || null,  // beschikbaar als referentie maar niet als hoofdkey
@@ -146,6 +213,9 @@ exports.handler = async (event) => {
         publieke_token: row.publieke_token || null,
         open_huis_door_id: row.open_huis_door_id || null,
         mag_doorsturen: magDoorsturen,
+        bezoeken_totaal: bezoekenTot,
+        bezoeken_dit_adres: bezoekenAdr,
+        eerdere_feedback: eerdereFeedback,
       };
     });
 
