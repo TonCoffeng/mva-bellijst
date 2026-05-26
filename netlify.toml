@@ -11,6 +11,12 @@
 [functions."herinnering-check"]
   schedule = "*/15 * * * *"
 
+# Scheduled function: stuurt de gevende makelaar een push 0-5 min vóór de
+# geplande bezichtiging, zodat hij de kaart meteen kan openen en na afloop
+# direct feedback kan geven. Draait elke 5 minuten.
+[functions."bezichtiging-push-check"]
+  schedule = "*/5 * * * *"
+
 [[headers]]
   for = "/*"
   [headers.values]
