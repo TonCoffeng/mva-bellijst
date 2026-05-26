@@ -1493,6 +1493,17 @@
 
 <!-- GEVEN SCHERM -->
 <div id="geven-screen" class="hidden">
+  <!-- MELDINGEN-BALK — alleen zichtbaar als push nog niet aanstaat. Op iOS moet
+       requestPermission() uit een tik komen, daarom een knop i.p.v. automatisch. -->
+  <div class="meldingen-balk" data-meldingen-balk style="display:none;margin:0 16px 12px;padding:10px 14px;border:1px solid var(--oranje);border-radius:10px;background:#fff7ed;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12px;font-weight:700;color:var(--navy)">🔔 Meldingen staan uit</div>
+      <div style="font-size:11px;color:var(--grijs-tekst);margin-top:2px">Zet aan om een seintje te krijgen bij nieuwe leads en vlak vóór een bezichtiging.</div>
+    </div>
+    <button onclick="zetMeldingenAan(this)" style="background:var(--oranje);border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;white-space:nowrap">
+      Meldingen aanzetten
+    </button>
+  </div>
   <div class="stats-bar">
     <div class="stat-card filter-knop actief" id="filter-open" onclick="filterBezichtigingen('open')" title="Alleen open feedback">
       <div class="stat-number" id="stat-geven-nieuw">0</div>
@@ -1573,6 +1584,16 @@
 
 <!-- OVERZICHT SCHERM -->
 <div id="overzicht-screen" class="hidden">
+  <!-- MELDINGEN-BALK — zie toelichting in geven-screen. -->
+  <div class="meldingen-balk" data-meldingen-balk style="display:none;margin:0 16px 12px;padding:10px 14px;border:1px solid var(--oranje);border-radius:10px;background:#fff7ed;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12px;font-weight:700;color:var(--navy)">🔔 Meldingen staan uit</div>
+      <div style="font-size:11px;color:var(--grijs-tekst);margin-top:2px">Zet aan om een seintje te krijgen bij nieuwe leads en herinneringen.</div>
+    </div>
+    <button onclick="zetMeldingenAan(this)" style="background:var(--oranje);border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;white-space:nowrap">
+      Meldingen aanzetten
+    </button>
+  </div>
   <!-- RR STATUS-STROOK — eigen aan/uit toggle voor Round Robin -->
   <div id="rr-strook" style="margin:0 16px 12px;padding:10px 14px;border:1px solid var(--grijs-mid);border-radius:10px;background:var(--wit);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <div style="flex:1;min-width:0">
@@ -1953,7 +1974,7 @@
     // Reset eventuele open subpagina's
     document.getElementById('ontvangen-screen')?.classList.add('hidden');
 
-    // Registreer service worker en vraag push permissie
+    // Registreer service worker (permissie gaat via de Meldingen-knop, niet hier)
     registreerServiceWorker();
 
     if (rol === 'geven') {
@@ -6720,23 +6741,51 @@
   async function registreerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.register('/sw.js');
       console.log('SW geregistreerd');
+    } catch (err) {
+      console.log('SW registratie mislukt:', err);
+    }
+    // Permissie NIET hier automatisch vragen: iOS Safari weigert een
+    // requestPermission() die niet uit een gebruikerstik komt (stil, zonder
+    // pop-up). Daarom gaat dat via de knop → zetMeldingenAan(). Hier alleen
+    // de UI bijwerken zodat de "Meldingen aanzetten"-balk klopt.
+    werkbijMeldingenUI();
+  }
 
-      if (!huidigeMakelaar || !('Notification' in window)) return;
+  // Toont/verbergt de meldingen-balk(en) op basis van de huidige permissie.
+  function werkbijMeldingenUI() {
+    const aan = ('Notification' in window) && Notification.permission === 'granted';
+    document.querySelectorAll('[data-meldingen-balk]').forEach(el => {
+      el.style.display = aan ? 'none' : 'flex';
+    });
+  }
 
-      // Vraag push permissie
+  // Achter een gebruikerstik (knop): vraag permissie, abonneer, sla op.
+  // Dit is de iOS-veilige route — requestPermission() volgt direct op de tik.
+  async function zetMeldingenAan(btn) {
+    if (!('serviceWorker' in navigator) || !('Notification' in window)) {
+      toonToast('Dit apparaat ondersteunt geen meldingen', 'fout');
+      return;
+    }
+    if (!huidigeMakelaar) { toonToast('Log eerst in', 'fout'); return; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Even geduld...'; }
+
+    try {
       const perm = await Notification.requestPermission();
-      if (perm !== 'granted') return;
+      if (perm !== 'granted') {
+        toonToast('Meldingen niet toegestaan', 'fout');
+        if (btn) { btn.disabled = false; btn.textContent = 'Meldingen aanzetten'; }
+        return;
+      }
 
-      // Registreer subscription bij de server
+      const reg = await navigator.serviceWorker.ready;
       const subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       });
 
-      // Stuur subscription naar Netlify function voor opslag
-      await fetch('/.netlify/functions/push-subscribe', {
+      const res = await fetch('/.netlify/functions/push-subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -6745,13 +6794,18 @@
           makelaar_naam: huidigeMakelaar.naam,
         })
       });
+      if (!res.ok) throw new Error('opslaan mislukt (' + res.status + ')');
 
       console.log('Push subscription opgeslagen voor', huidigeMakelaar.naam);
-      toonToast('🔔 Push-meldingen ingeschakeld!', 'succes');
+      toonToast('🔔 Meldingen ingeschakeld!', 'succes');
+      werkbijMeldingenUI();
     } catch (err) {
-      console.log('SW/Push registratie mislukt:', err);
+      console.log('Meldingen aanzetten mislukt:', err);
+      toonToast('Meldingen aanzetten mislukt — probeer opnieuw', 'fout');
+      if (btn) { btn.disabled = false; btn.textContent = 'Meldingen aanzetten'; }
     }
   }
+  window.zetMeldingenAan = zetMeldingenAan;
 
   // ── TEST PUSH NOTIFICATIE ────────────────────────────────────────────
   async function stuurTestPush(naam, tijdstip, adres) {
