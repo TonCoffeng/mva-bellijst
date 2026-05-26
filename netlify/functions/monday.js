@@ -72,6 +72,15 @@ const sbInsert = async (path, body) => {
   return res.json();
 };
 
+const sbDelete = async (path) => {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    method: 'DELETE',
+    headers: { ...sbHeaders, Prefer: 'return=representation' },
+  });
+  if (!res.ok) throw new Error(`Supabase DELETE ${path} → ${res.status}: ${await res.text()}`);
+  return res.json();
+};
+
 // ── RESEND MAIL HELPER ────────────────────────────────────────────────
 // Stuurt notificatie-mail vanuit contact@makelaarsvan.nl. Faalt stilletjes —
 // een mail-fout mag de lead-toewijzing nooit blokkeren. Gebruikt in
@@ -850,6 +859,110 @@ exports.handler = async (event) => {
           pool_grootte:      rr.pool_grootte,
           bellijst_item_id:  bellijstItem?.id,
           via_cloze_routing: useDirectAssign,  // true = bypass RR
+        }),
+      };
+    }
+
+    // ── HERSTEL UIT POOL (undo "door naar pool") ─────────────────────
+    // Rogier-vraag: hij drukte per ongeluk "door naar pool". Deze action draait
+    // push_naar_pool terug: de bezichtiging komt terug in zijn gevende lijst.
+    //
+    // VEILIGHEID: alleen toegestaan zolang de ontvanger nog NIETS met de lead
+    // heeft gedaan (bel_status='nieuw' EN belpogingen=0). Heeft de ontvanger al
+    // gebeld/een status gezet, dan blokkeren we — anders gooien we werk van een
+    // collega weg. De mail die de ontvanger kreeg is al verstuurd; daarom geven
+    // we 'm via e-mail een seintje dat de lead is teruggetrokken (faalt stil).
+    if (action === 'herstel_uit_pool') {
+      const { item_id } = data; // = bezichtiging-id
+
+      // 1. Vind het bijbehorende bellijst_item (de pool-toewijzing)
+      const items = await sbGet(
+        `bellijst_items?select=*&bezichtiging_id=eq.${item_id}&bron=eq.pool&order=id.desc`
+      );
+      if (!items[0]) {
+        // Niets in de pool gevonden → mogelijk al hersteld of nooit gepusht.
+        // De-archiveer alsnog de bezichtiging zodat 'ie terugkomt in de lijst.
+        await sbPatch(`bezichtigingen?id=eq.${item_id}`, {
+          actie_status: '', gearchiveerd: false, status_gewijzigd_op: new Date().toISOString(),
+        });
+        return {
+          statusCode: 200, headers,
+          body: JSON.stringify({ ok: true, hersteld: true, info: 'geen pool-item gevonden, bezichtiging gede-archiveerd' }),
+        };
+      }
+      const item = items[0];
+
+      // 2. Veiligheidscheck: heeft de ontvanger de lead al opgepakt?
+      const alOpgepakt = (item.bel_status && item.bel_status !== 'nieuw') || (item.belpogingen || 0) > 0;
+      if (alOpgepakt) {
+        // Naam ontvanger ophalen voor een nette melding
+        let ontvangerNaam = 'de ontvangende makelaar';
+        try {
+          const u = await sbGet(`gebruikers?select=naam&id=eq.${item.eigenaar_id}`);
+          if (u[0]?.naam) ontvangerNaam = u[0].naam;
+        } catch { /* mag falen */ }
+        return {
+          statusCode: 200, headers,
+          body: JSON.stringify({
+            ok: false,
+            reden: 'al_opgepakt',
+            bericht: `Kan niet terughalen: ${ontvangerNaam} is al met deze lead aan de slag (status: ${item.bel_status}${item.belpogingen ? `, ${item.belpogingen} belpoging(en)` : ''}). Neem even contact op met je collega.`,
+          }),
+        };
+      }
+
+      // 3. Gegevens ontvanger ophalen (voor terugtrek-seintje) vóór we verwijderen
+      let ontvanger = null;
+      try {
+        const u = await sbGet(`gebruikers?select=naam,email&id=eq.${item.eigenaar_id}`);
+        if (u[0]) ontvanger = u[0];
+      } catch { /* mag falen */ }
+
+      // 4. Verwijder het bellijst_item (lead verdwijnt uit ontvangers bellijst)
+      try {
+        await sbDelete(`bellijst_items?id=eq.${item.id}`);
+      } catch (e) {
+        return { statusCode: 500, headers, body: JSON.stringify({ error: `Bellijst-item verwijderen faalde: ${e.message}` }) };
+      }
+
+      // 5. Trek de toewijzing in (audit-trail: status='ingetrokken' i.p.v. delete,
+      //    zodat de geschiedenis zichtbaar blijft). Alleen open toewijzingen.
+      try {
+        await sbPatch(
+          `toewijzingen?bezichtiging_id=eq.${item_id}&status=eq.open`,
+          { status: 'ingetrokken' }
+        );
+      } catch (e) {
+        console.warn('[herstel_uit_pool] toewijzing intrekken faalde (niet kritiek):', e.message);
+      }
+
+      // 6. De-archiveer de bezichtiging → terug in de gevende lijst
+      await sbPatch(`bezichtigingen?id=eq.${item_id}`, {
+        actie_status: '', gearchiveerd: false, status_gewijzigd_op: new Date().toISOString(),
+      });
+
+      // 7. Seintje naar ontvanger dat de lead is teruggetrokken (faalt stil)
+      if (ontvanger?.email) {
+        try {
+          await stuurMail({
+            to: ontvanger.email,
+            subject: `Lead teruggetrokken: ${item.bezichtiger_naam || 'bezichtiger'} · ${item.adres || ''}`.trim(),
+            html: `<p>Hoi ${ontvanger.naam || ''},</p>
+              <p>De lead <strong>${item.bezichtiger_naam || 'bezichtiger'}</strong>${item.adres ? ` (${item.adres})` : ''} is door de gevende makelaar teruggetrokken uit de pool — die houdt 'm zelf. Je hoeft hier niets mee te doen; de lead is uit je bellijst verdwenen.</p>
+              <p>— MVA Leadpool</p>`,
+          });
+        } catch (e) {
+          console.warn('[herstel_uit_pool] terugtrek-mail faalde (niet kritiek):', e.message);
+        }
+      }
+
+      return {
+        statusCode: 200, headers,
+        body: JSON.stringify({
+          ok: true,
+          hersteld: true,
+          item_id,
+          ontvanger_genotificeerd: !!ontvanger?.email,
         }),
       };
     }
