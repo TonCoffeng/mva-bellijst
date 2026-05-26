@@ -1815,6 +1815,24 @@
   let gekozenStatus = null;
   let leadsData = [];
 
+  // Deeplink vanuit een push-notificatie: /?lead=<id>. Wordt onthouden tot de
+  // leads geladen zijn, dan opent openModal() de juiste kaart. Eenmalig.
+  let deeplinkLeadId = (() => {
+    try {
+      const v = new URLSearchParams(window.location.search).get('lead');
+      return v ? String(v) : null;
+    } catch { return null; }
+  })();
+
+  // Deeplink vanuit de bezichtiging-push: /?bez=<id>. Onthouden tot de
+  // bezichtigingen geladen zijn, dan scrollen + highlighten we de kaart.
+  let deeplinkBezId = (() => {
+    try {
+      const v = new URLSearchParams(window.location.search).get('bez');
+      return v ? String(v) : null;
+    } catch { return null; }
+  })();
+
   // ── SUPABASE AUTH ─────────────────────────────────────────────────
   const SUPABASE_URL = 'https://olfcrzusdkijxroxvsgm.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_0OmJOAM_XZWCW8e_vgx2Qg_L3tdRsc4';
@@ -2022,6 +2040,24 @@
 
       // Async Cloze check per lead — badge verschijnt zodra resultaat er is
       checkClozeBestaand();
+
+      // Deeplink vanuit push: open de betreffende lead als die in deze lijst zit.
+      // Eenmalig — daarna wissen zodat een refresh 'm niet opnieuw opent.
+      if (deeplinkLeadId) {
+        const gevonden = leadsData.find(l => String(l.id) === deeplinkLeadId);
+        if (gevonden) {
+          const teOpenen = deeplinkLeadId;
+          deeplinkLeadId = null;
+          // Kleine timeout zodat de DOM-render zeker klaar is.
+          setTimeout(() => { try { openModal(teOpenen); } catch (e) {} }, 150);
+          // Haal ?lead= uit de URL-balk zonder reload.
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('lead');
+            window.history.replaceState({}, '', url);
+          } catch {}
+        }
+      }
 
     } catch (err) {
       // Demo-data als monday niet bereikbaar is
@@ -3377,6 +3413,33 @@
           if (badge) badge.innerHTML = '';
         });
       });
+
+      // Deeplink vanuit bezichtiging-push: scroll naar de kaart, highlight 'm,
+      // en klap 'm uit als spiekbrief-modus aanstaat. Eenmalig.
+      if (deeplinkBezId) {
+        const teTonen = deeplinkBezId;
+        deeplinkBezId = null;
+        setTimeout(() => {
+          const kaart = document.getElementById('bez-' + teTonen);
+          if (!kaart) return;
+          const container = document.getElementById('geven-container');
+          if (container && container.classList.contains('spiekbrief-modus')) {
+            container.querySelectorAll('.bez-card.uitgeklapt').forEach(c => c.classList.remove('uitgeklapt'));
+            kaart.classList.add('uitgeklapt');
+          }
+          kaart.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Korte highlight zodat de makelaar 'm direct ziet.
+          kaart.style.transition = 'box-shadow 0.3s';
+          kaart.style.boxShadow = '0 0 0 3px var(--oranje)';
+          setTimeout(() => { kaart.style.boxShadow = ''; }, 2600);
+        }, 200);
+        // Haal ?bez= uit de URL-balk zonder reload.
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('bez');
+          window.history.replaceState({}, '', url);
+        } catch {}
+      }
 
     } catch (err) {
       container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--rood)">Kon bezichtigingen niet laden. Probeer opnieuw.</div>';
@@ -6643,7 +6706,7 @@
   }
 
   // ── SERVICE WORKER + PUSH ────────────────────────────────────────────
-  const VAPID_PUBLIC_KEY = 'BPnjL9NWOY5abuWusCqEez8765vTG8jNn1V5rtEoll6MqiNznTzUDKNHd1pSbDYhYTpg9sWISVZnZ2Q3uO7-TMU';
+  const VAPID_PUBLIC_KEY = 'BIPNRG2I7hQc6NZ-R9YN1wLqUyR8Pd--9AXgphp5Y0m0J3dzCAJivVJkv5VLk0R2VIN4xNXLNBA4pnBR8UaqTYs';
 
   function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
