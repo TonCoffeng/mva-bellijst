@@ -31,6 +31,9 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const RESEND_API_KEY       = process.env.RESEND_API_KEY;
 const MAIL_FROM            = 'MVA Leadpool <contact@makelaarsvan.nl>';
 
+// Push naast de herinneringsmail (zelfde moment). Faalt stilletjes.
+const { pushNaarMakelaar } = require('./push-send');
+
 const sbHeaders = {
   apikey:        SUPABASE_SERVICE_KEY,
   Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
@@ -273,6 +276,16 @@ exports.handler = async () => {
           to: eigenaar.email,
           subject: onderwerp,
           html,
+        });
+
+        // Push naast de mail. Onafhankelijk van mailResult: push en mail zijn
+        // aparte kanalen. Deeplink opent de lead direct in de bellijst.
+        await pushNaarMakelaar(eigenaar.email, {
+          title: teVerzendenNiveau === 1
+            ? '⏰ Vergeten te bellen?'
+            : '⏰ Lead wacht nog steeds',
+          body:  `${item.bezichtiger_naam || 'Een lead'} · ${item.adres || ''}`.trim(),
+          url:   `/?lead=${item.id}`,
         });
 
         if (mailResult.ok) {
