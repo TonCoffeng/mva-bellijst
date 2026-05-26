@@ -2828,23 +2828,40 @@
 
   // ── FEEDBACK BEWERKEN ────────────────────────────────────────────────
   function bewerkFeedback(bezId) {
-    // Toon het grid en de opslaan/annuleer knoppen weer
-    document.getElementById(`fg-${bezId}`).style.display = 'grid';
+    // Toon het grid en de opslaan/annuleer knoppen weer.
+    // BELANGRIJK: in spiekbrief-modus geldt de CSS-regel
+    //   .feedback-grid:not(.verborgen) { display:grid !important }
+    // Een inline style.display='grid' wint NIET van die !important-regel zolang
+    // de class 'verborgen' er nog op staat. Daarom moeten we hier ook de class
+    // 'verborgen' verwijderen — anders gebeurt er zichtbaar niets bij het
+    // openen van "Feedback aanpassen" in spiekbrief-modus.
+    const grid = document.getElementById(`fg-${bezId}`);
+    if (grid) {
+      grid.classList.remove('verborgen');
+      grid.style.display = 'grid';
+    }
     const opslaanBtn = document.getElementById(`fbo-${bezId}`);
-    opslaanBtn.style.display = 'block';
-    // Reset opslaan-knop naar verse staat (was mogelijk 'Opslaan...' van vorige keer)
-    opslaanBtn.disabled = false;
-    opslaanBtn.textContent = '💾 Feedback opslaan';
+    if (opslaanBtn) {
+      opslaanBtn.classList.remove('verborgen');
+      opslaanBtn.style.display = 'block';
+      // Reset opslaan-knop naar verse staat (was mogelijk 'Opslaan...' van vorige keer)
+      opslaanBtn.disabled = false;
+      opslaanBtn.textContent = '💾 Feedback opslaan';
+    }
     const annBtn = document.getElementById(`bann-${bezId}`);
-    if (annBtn) annBtn.style.display = 'block';
+    if (annBtn) {
+      annBtn.classList.remove('verborgen');
+      annBtn.style.display = 'block';
+    }
     const opmEl = document.getElementById(`opmerking-${bezId}`);
     if (opmEl) opmEl.style.display = 'block';
 
     // Bewaar oorspronkelijke staat zodat we kunnen annuleren
-    const grid = document.getElementById(`fg-${bezId}`);
-    const oorspronkelijk = Array.from(grid.querySelectorAll('.btn-feedback.actief'))
-      .map(b => b.id);
-    grid.dataset.oorspronkelijk = JSON.stringify(oorspronkelijk);
+    if (grid) {
+      const oorspronkelijk = Array.from(grid.querySelectorAll('.btn-feedback.actief'))
+        .map(b => b.id);
+      grid.dataset.oorspronkelijk = JSON.stringify(oorspronkelijk);
+    }
     if (opmEl) opmEl.dataset.oorspronkelijk = opmEl.value || '';
   }
 
@@ -2865,10 +2882,13 @@
 
     // Als er oorspronkelijk feedback was → sluit bewerk-modus en toon groene balk
     if (origIds.length > 0) {
-      grid.style.display = 'none';
+      // Class 'verborgen' terugzetten zodat de spiekbrief-CSS-regel
+      // (.feedback-grid:not(.verborgen)) het grid weer verbergt — anders blijft
+      // het in spiekbrief-modus zichtbaar na annuleren.
+      if (grid) { grid.classList.add('verborgen'); grid.style.display = 'none'; }
       if (opmEl) opmEl.style.display = 'none';
-      opslaanBtn.style.display = 'none';
-      if (annBtn) annBtn.style.display = 'none';
+      if (opslaanBtn) { opslaanBtn.classList.add('verborgen'); opslaanBtn.style.display = 'none'; }
+      if (annBtn) { annBtn.classList.add('verborgen'); annBtn.style.display = 'none'; }
     }
     // Als er geen oorspronkelijke feedback was → laat alles open (gebruiker is nooit eerder klaar geweest)
   }
@@ -2971,13 +2991,16 @@
           `;
         }
         // Verberg het invul-gedeelte; behoud de opmerking in de textarea voor latere edits
+        // Class 'verborgen' terugzetten i.v.m. spiekbrief-CSS (zie bewerkFeedback).
+        grid.classList.add('verborgen');
         grid.style.display = 'none';
         if (opmerkingEl) {
           opmerkingEl.value = opmerking; // bewaar getypte tekst zodat bewerken werkt
           opmerkingEl.style.display = 'none';
         }
+        opslaanBtn.classList.add('verborgen');
         opslaanBtn.style.display = 'none';
-        if (annBtn) annBtn.style.display = 'none';
+        if (annBtn) { annBtn.classList.add('verborgen'); annBtn.style.display = 'none'; }
         card.classList.remove('bez-open');
         card.classList.add('bez-gedaan');
       } else {
@@ -3206,6 +3229,49 @@
               <span style="font-size:11px;color:var(--grijs-tekst)">⏳ Cloze check...</span>
             </div>
 
+            ${(() => {
+              // ── BEZOEKTELLER (melding Rogier) ──
+              // Toont hoe vaak deze persoon bij DIT adres is geweest en totaal
+              // over alle woningen. Alleen tonen als er meer dan 1 bezoek is —
+              // anders ruis. Bij dit adres ≥2 = relevant signaal ("alweer terug").
+              const adr = Number(b.bezoeken_dit_adres) || 0;
+              const tot = Number(b.bezoeken_totaal) || 0;
+              const chips = [];
+              if (adr >= 2) {
+                chips.push(`<span style="background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap">🔁 ${adr}× bij deze woning</span>`);
+              }
+              // Totaal alleen tonen als het méér is dan de bezoeken aan dit adres
+              // (anders dubbelop) en groter dan 1.
+              if (tot > adr && tot >= 2) {
+                chips.push(`<span style="background:#f1f5f9;color:#475569;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap">👁️ ${tot}× bij MVA totaal</span>`);
+              }
+              if (!chips.length) return '';
+              return `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${chips.join('')}</div>`;
+            })()}
+
+            ${(() => {
+              // ── EERDERE FEEDBACK aan dit adres (melding Rogier 2b) ──
+              // Toont wat er bij vorige bezoeken aan dit pand is vastgelegd.
+              const hist = Array.isArray(b.eerdere_feedback) ? b.eerdere_feedback : [];
+              if (!hist.length) return '';
+              const rijen = hist.map(h => {
+                const labels = (h.feedback || []).map(k => feedbackMap[k] || k).join(' · ');
+                const opm = (h.opmerking || '').trim();
+                const datumLabel = h.datum
+                  ? h.datum.split('-').reverse().join('-') // YYYY-MM-DD → DD-MM-YYYY
+                  : '';
+                return `<div style="padding:6px 0;border-top:1px solid #e2e8f0">
+                    <div style="font-size:11px;color:var(--grijs-tekst);margin-bottom:2px">${datumLabel}</div>
+                    ${labels ? `<div style="font-size:12px;color:var(--navy);font-weight:500">${labels}</div>` : ''}
+                    ${opm ? `<div style="font-size:12px;color:var(--navy);font-style:italic;margin-top:2px">💬 ${esc(opm)}</div>` : ''}
+                  </div>`;
+              }).join('');
+              return `<div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px">
+                  <div style="font-size:11px;font-weight:700;color:#92400e;letter-spacing:.04em;margin-bottom:2px">📋 EERDER BIJ DEZE WONING</div>
+                  ${rijen}
+                </div>`;
+            })()}
+
             <!-- FEEDBACK WEERGAVE / INVOER -->
             <div style="margin-top:12px">
               <div id="feedback-status-${b.id}">
@@ -3309,6 +3375,16 @@
                 ${alGedeeld ? 'style="opacity:0.45;cursor:not-allowed" disabled' : ''}>
                 <span class="lbl-vol">→ Toewijzen</span><span class="lbl-kort">→ Toew.</span>
               </button>
+              ${actieStatus==='pool' ? `
+              <button
+                class="btn-naar-pool"
+                id="btn-herstel-${b.id}"
+                style="background:#fff;border:1px solid var(--oranje);color:var(--oranje)"
+                onclick="herstelUitPool('${b.id}', '${b.naam.replace(/'/g, "\\'")}', '${b.adres?.replace(/'/g, "\\'") || ''}')"
+                title="Haal deze lead terug uit de pool — bijv. als je per ongeluk hebt doorgezet">
+                <span class="lbl-vol">↩️ Terughalen uit pool</span><span class="lbl-kort">↩️ Terug</span>
+              </button>
+              ` : ''}
             </div>
           </div>`;
       }).join('');
@@ -4288,6 +4364,53 @@
       toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
     }
   }
+
+  // == TERUGHALEN UIT POOL (undo "door naar pool") ======================
+  // Rogier drukte per ongeluk "door naar pool". Deze knop verschijnt alleen
+  // op een kaart die in de pool staat. Backend ('herstel_uit_pool') draait de
+  // toewijzing terug, maar BLOKKEERT als de ontvanger de lead al heeft opgepakt
+  // (dan tonen we de melding van de backend i.p.v. werk weg te gooien).
+  async function herstelUitPool(itemId, naam, adres) {
+    const ok = await mvaConfirm({
+      titel: 'Terughalen uit de pool?',
+      tekst: `"${naam}"${adres ? ` (${adres})` : ''} wordt teruggehaald uit de pool en komt weer bij jou te staan. Dit kan alleen zolang je collega de lead nog niet heeft opgepakt.`,
+      okTekst: '↩️ Ja, terughalen',
+    });
+    if (!ok) return;
+
+    const btn = document.getElementById(`btn-herstel-${itemId}`);
+    if (btn) { btn.disabled = true; const v = btn.querySelector('.lbl-vol'); if (v) v.textContent = 'Bezig...'; }
+
+    try {
+      const res = await fetch('/.netlify/functions/monday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'herstel_uit_pool',
+          data: { item_id: itemId }
+        })
+      });
+      const json = await res.json();
+
+      if (json.error) throw new Error(json.error);
+
+      // Backend blokkeerde: ontvanger is al aan de slag
+      if (json.ok === false && json.reden === 'al_opgepakt') {
+        if (btn) { btn.disabled = false; const v = btn.querySelector('.lbl-vol'); if (v) v.textContent = '↩️ Terughalen uit pool'; }
+        toonToast(json.bericht || 'Kan niet terughalen — collega is al aan de slag.', 'fout');
+        return;
+      }
+
+      // Succes → kaart terug in eigen lijst. Eenvoudigst en betrouwbaarst:
+      // herlaad de bezichtigingen zodat alle states (knoppen, tellers) kloppen.
+      toonToast(`↩️ ${naam} is teruggehaald uit de pool.`, 'succes');
+      laadBezichtigingen();
+    } catch (err) {
+      if (btn) { btn.disabled = false; const v = btn.querySelector('.lbl-vol'); if (v) v.textContent = '↩️ Terughalen uit pool'; }
+      toonToast('Terughalen mislukte. Probeer opnieuw.', 'fout');
+    }
+  }
+  window.herstelUitPool = herstelUitPool;
   // == AFGEHANDELD (niet doorsturen) ====================================
   // Toont een nette MVA-modal voor stage-keuze en opmerking ipv browser prompt()
   let afhandelContext = null; // { itemId, naam, adres }
