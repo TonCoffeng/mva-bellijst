@@ -129,6 +129,60 @@
       transition: border-color 0.2s;
     }
     .form-group select:focus, .form-group input:focus { border-color: var(--navy); }
+
+    /* ── Wachtwoordveld met oog-toggle ── */
+    .pw-wrap { position: relative; }
+    .pw-wrap input { padding-right: 48px; }   /* ruimte voor het oogje */
+    .pw-oog {
+      position: absolute;
+      top: 50%;
+      right: 6px;
+      transform: translateY(-50%);
+      width: 38px;
+      height: 38px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      color: var(--grijs-tekst);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .pw-oog:active { background: var(--grijs); }
+
+    /* ── Hulp bij inloggen ((?)-knop + uitklap) ── */
+    .login-hulp-knop {
+      background: none;
+      border: none;
+      color: var(--navy);
+      font-size: 13px;
+      cursor: pointer;
+      padding: 4px 0;
+      margin-top: 4px;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .login-hulp-paneel {
+      display: none;
+      margin-top: 12px;
+      padding: 14px 16px;
+      background: var(--grijs);
+      border: 1px solid var(--grijs-mid);
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--navy);
+    }
+    .login-hulp-paneel.open { display: block; }
+    .login-hulp-paneel h4 { font-size: 13px; margin: 0 0 4px; color: var(--navy); }
+    .login-hulp-paneel p { font-size: 13px; color: var(--grijs-tekst); margin: 0 0 10px; }
+    .login-hulp-paneel ol { margin: 0 0 12px; padding-left: 18px; }
+    .login-hulp-paneel li { margin-bottom: 3px; }
+    .login-hulp-paneel .laatste { margin-bottom: 0; }
     .btn-primary {
       width: 100%;
       padding: 16px;
@@ -1456,18 +1510,43 @@
 
     <!-- STAP 1: Email + wachtwoord -->
     <div id="login-stap-auth">
-      <div class="form-group">
-        <label for="login-email">E-mailadres</label>
-        <input type="email" id="login-email" placeholder="naam@makelaarsvan.nl" autocomplete="username" inputmode="email" />
-      </div>
-      <div class="form-group">
-        <label for="login-wachtwoord">Wachtwoord</label>
-        <input type="password" id="login-wachtwoord" placeholder="••••••••" autocomplete="current-password" />
-      </div>
-      <div id="login-fout" style="display:none;color:#c2410c;font-size:13px;margin-bottom:10px"></div>
-      <button class="btn-rol btn-rol-geven" style="width:100%" onclick="probeerInloggen()" id="login-btn">
-        <span class="rol-titel">🔐 Inloggen</span>
+      <form id="login-form" onsubmit="event.preventDefault(); probeerInloggen();">
+        <div class="form-group">
+          <label for="login-email">E-mailadres</label>
+          <input type="email" id="login-email" name="email" placeholder="naam@makelaarsvan.nl" autocomplete="username" inputmode="email" />
+        </div>
+        <div class="form-group">
+          <label for="login-wachtwoord">Wachtwoord</label>
+          <div class="pw-wrap">
+            <input type="password" id="login-wachtwoord" name="password" placeholder="••••••••" autocomplete="current-password" />
+            <button type="button" class="pw-oog" id="pw-oog" onclick="toggleWachtwoord()" aria-label="Wachtwoord tonen of verbergen" title="Wachtwoord tonen">👁️</button>
+          </div>
+        </div>
+        <div id="login-fout" style="display:none;color:#c2410c;font-size:13px;margin-bottom:10px"></div>
+        <button type="submit" class="btn-rol btn-rol-geven" style="width:100%" id="login-btn">
+          <span class="rol-titel">🔐 Inloggen</span>
+        </button>
+      </form>
+
+      <button type="button" class="login-hulp-knop" onclick="toggleLoginHulp()" id="login-hulp-knop">
+        ❓ Wachtwoord opslaan / app op beginscherm
       </button>
+      <div class="login-hulp-paneel" id="login-hulp-paneel">
+        <h4>🔑 Wachtwoord laten onthouden</h4>
+        <p>Zo hoef je niet elke keer je wachtwoord in te typen:</p>
+        <ol>
+          <li>Vul je e-mail en wachtwoord in en log in.</li>
+          <li>Safari vraagt dan: <strong>"Wachtwoord bewaren?"</strong> — kies <strong>Bewaar</strong>.</li>
+          <li>Volgende keer tikt Safari het wachtwoord automatisch voor je in.</li>
+        </ol>
+        <h4>📲 App op je beginscherm zetten</h4>
+        <p>Dan blijf je langer ingelogd en open je 'm met één tik:</p>
+        <ol>
+          <li>Tik onderin Safari op het <strong>deel-icoon</strong> (vierkantje met pijl omhoog).</li>
+          <li>Kies <strong>"Zet op beginscherm"</strong>.</li>
+          <li class="laatste">Open de app voortaan via dat icoon, niet via Safari.</li>
+        </ol>
+      </div>
     </div>
 
     <!-- STAP 2: Rol kiezen (verschijnt na login) -->
@@ -1857,7 +1936,12 @@
   // ── SUPABASE AUTH ─────────────────────────────────────────────────
   const SUPABASE_URL = 'https://olfcrzusdkijxroxvsgm.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_0OmJOAM_XZWCW8e_vgx2Qg_L3tdRsc4';
-  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: {
+      persistSession: true,      // sessie bewaren in localStorage (blijf ingelogd)
+      autoRefreshToken: true,    // token automatisch verversen
+    },
+  });
 
   // Bij opstart: check of er al een sessie is
   (async () => {
@@ -1950,6 +2034,25 @@
     document.getElementById('login-fout').style.display = 'none';
   }
 
+  // Wachtwoord tonen/verbergen (oogje)
+  function toggleWachtwoord() {
+    const inp = document.getElementById('login-wachtwoord');
+    const knop = document.getElementById('pw-oog');
+    if (!inp) return;
+    const tonen = inp.type === 'password';
+    inp.type = tonen ? 'text' : 'password';
+    knop.textContent = tonen ? '🙈' : '👁️';
+    knop.title = tonen ? 'Wachtwoord verbergen' : 'Wachtwoord tonen';
+  }
+  window.toggleWachtwoord = toggleWachtwoord;
+
+  // Hulp-paneel onder login in-/uitklappen
+  function toggleLoginHulp() {
+    const paneel = document.getElementById('login-hulp-paneel');
+    if (paneel) paneel.classList.toggle('open');
+  }
+  window.toggleLoginHulp = toggleLoginHulp;
+
   async function uitloggen() {
     await sb.auth.signOut();
     location.reload();
@@ -1957,12 +2060,9 @@
   window.uitloggen = uitloggen;
   window.probeerInloggen = probeerInloggen;
 
-  // Enter-toets in login-velden = inloggen
-  document.addEventListener('DOMContentLoaded', () => {
-    const handleEnter = (ev) => { if (ev.key === 'Enter') probeerInloggen(); };
-    document.getElementById('login-email')?.addEventListener('keydown', handleEnter);
-    document.getElementById('login-wachtwoord')?.addEventListener('keydown', handleEnter);
-  });
+  // Enter-toets handelt het <form onsubmit> nu zelf af (zie login-form).
+  // De oude losse keydown-handlers zijn verwijderd om dubbele inlog-aanroepen
+  // te voorkomen.
 
   // ── LOGIN (rol-keuze, na succesvolle auth) ──────────────────────────
   function login(rol) {
