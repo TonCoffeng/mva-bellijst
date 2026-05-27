@@ -179,7 +179,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Ongeldige aanvraag' }) };
   }
 
-  const { token, naam, email, telefoon, segment, opmerking } = data;
+  const { token, naam, email, telefoon, segment, hypotheek, aankoopmakelaar, opmerking } = data;
 
   // ── Validatie ────────────────────────────────────────────────────
   if (!isUuid(token)) {
@@ -219,8 +219,14 @@ exports.handler = async (event) => {
 
   // ── Inschrijving wegschrijven als bellijst_item ──────────────────
   // Volledige kaart bij de OPVOLGER (de open-huis-draaier).
+  // De keuze-antwoorden worden als leesbare labels in het opmerking-veld
+  // samengevoegd (geen aparte DB-kolommen — bewuste keuze voor V1, zie
+  // CHANGELOG. Later eventueel uitsplitsen naar eigen kolommen).
   const segmentLabel = segment ? `Interesse: ${segment}` : '';
-  const opm = [segmentLabel, (opmerking || '').trim()].filter(Boolean).join(' · ');
+  const hypotheekLabel = hypotheek ? `Hypotheek: ${hypotheek}` : '';
+  const aankoopmakelaarLabel = aankoopmakelaar ? `Eigen aankoopmakelaar: ${aankoopmakelaar}` : '';
+  const opm = [segmentLabel, hypotheekLabel, aankoopmakelaarLabel, (opmerking || '').trim()]
+    .filter(Boolean).join(' · ');
 
   try {
     const created = await sbInsert('bellijst_items', {
