@@ -1339,6 +1339,45 @@ exports.handler = async (event) => {
         console.warn('[get_leads] no-show telling faalde (niet kritiek):', e.message);
       }
 
+      // ── HYPOTHEEK-DOORVERWIJZING LOOKUP ──────────────────────────
+      // Toon op de leadkaart of er voor deze klant al een hypotheek-
+      // doorverwijzing loopt (Rogier-feedback 26 mei: een collega die de
+      // lead doorkrijgt zag niet dat de hypotheek al naar de Hypotheekshop
+      // was gestuurd → risico op dubbel doorsturen).
+      //
+      // Koppeling kan via bellijst_item_id OF bezichtiging_id (een
+      // doorverwijzing vanaf een bezichtiging maakt later een NIEUW
+      // bellijst-item bij de ontvanger — daarom matchen we ook op
+      // bezichtiging_id zodat de info de lead "volgt"). Eén batch-query.
+      let hypByItemId = {};   // bellijst_item_id → doorverwijzing
+      let hypByBezId  = {};   // bezichtiging_id  → doorverwijzing
+      try {
+        const itemIds = items.map(it => it.id).filter(Boolean);
+        const bezIds  = [...new Set(items.map(it => it.bezichtiging_id).filter(Boolean))];
+        if (itemIds.length > 0 || bezIds.length > 0) {
+          // PostgREST or(): match op een van beide id-sets
+          const orDelen = [];
+          if (itemIds.length > 0) orDelen.push(`bellijst_item_id.in.(${itemIds.join(',')})`);
+          if (bezIds.length  > 0) orDelen.push(`bezichtiging_id.in.(${bezIds.join(',')})`);
+          const hypRijen = await sbGet(
+            `hypotheek_doorverwijzingen?select=id,bellijst_item_id,bezichtiging_id,gevende_makelaar_naam,aangemaakt_op,status&or=(${orDelen.join(',')})`
+          );
+          for (const h of hypRijen) {
+            // Nieuwste wint als er meerdere zijn voor hetzelfde id
+            if (h.bellijst_item_id) {
+              const best = hypByItemId[h.bellijst_item_id];
+              if (!best || (h.aangemaakt_op || '') > (best.aangemaakt_op || '')) hypByItemId[h.bellijst_item_id] = h;
+            }
+            if (h.bezichtiging_id) {
+              const best = hypByBezId[h.bezichtiging_id];
+              if (!best || (h.aangemaakt_op || '') > (best.aangemaakt_op || '')) hypByBezId[h.bezichtiging_id] = h;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[get_leads] hypotheek-lookup faalde (niet kritiek):', e.message);
+      }
+
       // Transformeer naar Monday-stijl shape voor frontend backwards compat
       const leads = items
         // Filter Gearchiveerd weg (kan ook server-side via .neq= maar PostgREST or-syntax is fragiel met null)
@@ -1365,6 +1404,17 @@ exports.handler = async (event) => {
           afspraak_op:        it.afspraak_op || '',
           deal_op:            it.deal_op || '',
           bezichtiging_id:    it.bezichtiging_id, // referentie terug naar origineel
+          // Hypotheek-doorverwijzing (null als die er niet is). Match op
+          // eigen item-id eerst, anders op gedeeld bezichtiging-id.
+          hypotheek:          (() => {
+            const h = hypByItemId[it.id] || (it.bezichtiging_id ? hypByBezId[it.bezichtiging_id] : null);
+            if (!h) return null;
+            return {
+              door:  h.gevende_makelaar_naam || '',
+              datum: h.aangemaakt_op ? h.aangemaakt_op.split('T')[0] : '',
+              status: h.status || 'aangevraagd',
+            };
+          })(),
         }));
 
       return { statusCode: 200, headers, body: JSON.stringify({ leads }) };
