@@ -2154,6 +2154,7 @@
           bron:               item.bron || '',
           bez_type:           item.bez_type || 'ingepland',
           bezichtiging_id:    item.bezichtiging_id || null,
+          hypotheek:          item.hypotheek || null,
         };
       });
 
@@ -5637,6 +5638,9 @@
               : (lead.no_shows > 0
                   ? `<span class="lead-chip" style="background:#f1f5f9;color:#64748b">🚫 ${lead.no_shows}× no-show</span>`
                   : '')}
+            ${lead.hypotheek
+              ? `<span class="lead-chip" style="background:#dbeafe;color:#1e40af;font-weight:600" title="Deze klant is al naar de Hypotheekshop doorgestuurd${lead.hypotheek.door ? ' door ' + lead.hypotheek.door : ''}${lead.hypotheek.datum ? ' op ' + lead.hypotheek.datum : ''} — niet nogmaals doorsturen">🏦 Hypotheek loopt al${lead.hypotheek.door ? ' · ' + lead.hypotheek.door.split(' ')[0] : ''}</span>`
+              : ''}
           </div>
 
           <div id="cloze-badge-${lead.id}" style="margin-top:8px;min-height:20px" onclick="event.stopPropagation()">
