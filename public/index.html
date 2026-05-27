@@ -5343,7 +5343,19 @@
     // ── 0. Verberg gearchiveerde leads uit alle overzichten ─────────────
     // Soft archive via lead_status='Gearchiveerd' (zie archiveerLeadsSelectie).
     // Gearchiveerde leads worden later zichtbaar in een eigen "Archief"-view.
-    const zichtbareDataset = leadsData.filter(l => l.lead_status !== 'Gearchiveerd');
+    //
+    // 'Lost' = de "📦 Archief"-knop op de leadkaart (zetLeadStatus → 'Lost').
+    // Die hoort net als 'Gearchiveerd' direct uit de actieve lijst te verdwijnen
+    // — anders blijft de lead met een Archief-chip in beeld staan (bug Anthonie,
+    // 26 mei: lead op archief gedrukt maar bleef in de lijst). We houden 'Lost'
+    // wél zichtbaar zodra de makelaar bewust op het Archief-statusfilter klikt,
+    // zodat het archief doorzoekbaar blijft.
+    const toontArchief = leadsLeadStatusFilter === 'Lost';
+    const zichtbareDataset = leadsData.filter(l => {
+      if (l.lead_status === 'Gearchiveerd') return false;
+      if (l.lead_status === 'Lost' && !toontArchief) return false;
+      return true;
+    });
 
     // ── 1. Sortering ───────────────────────────────────────────────────
     // Hot/Warm bovenaan, dan leads zonder status (default 99 valt naar
@@ -6208,7 +6220,11 @@
         }
       }
       // 2c. Archief/Lost of geen Cloze-link: alleen Supabase
-      else {
+      else if (LOST) {
+        // 'Lost' wordt aan de makelaar getoond als "Archief". renderLeads()
+        // haalt de kaart nu ook echt uit de actieve lijst (zie filter boven).
+        toonToast('📦 Naar archief verplaatst', 'succes');
+      } else {
         toonToast(`✅ Status: ${nieuweStatus}`, 'succes');
       }
     } catch (err) {
