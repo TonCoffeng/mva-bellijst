@@ -5,6 +5,58 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-27
+
+### ⚠️ Actiepunt (infra/security, GEEN code-wijziging) — Supabase: grants worden opt-in
+
+**Wat verandert er (Supabase platform-breaking-change):**
+Supabase stopt met het automatisch blootstellen van nieuwe `public`-tabellen aan de Data API (de auto-gegenereerde REST/GraphQL-laag die `supabase-js` aanroept). Voortaan heeft elke **nieuwe** tabel een expliciete Postgres-`GRANT` nodig voordat hij via de API bereikbaar is.
+
+**Belangrijk — wat NIET geraakt wordt:**
+- Bestaande tabellen behouden hun huidige grants en blijven gewoon werken (`bellijst_items`, `bezichtigingen`, `panden`, `communicatie_events`, `push_subscriptions`, etc.).
+- Directe Postgres-connecties (psql/ORM/connection string) vallen sowieso buiten deze wijziging — alleen Data API-toegang is betrokken.
+- Niets breekt automatisch. Vergeet je een grant, dan geeft PostgREST een duidelijke foutmelding mét de exacte GRANT die ontbreekt (geen stille fout).
+
+**Rollout-data:**
+- **30 mei 2026** — opt-out wordt de standaard voor alle *nieuwe* projecten. Dus een nieuw project (SaaS-pilot 't Gooi, aparte OTD-omgeving) heeft dit gedrag meteen.
+- **30 oktober 2026** — afgedwongen op *nieuwe* tabellen in álle bestaande projecten (`olfcrzusdkijxroxvsgm`, `ehqtyhoeubchcwfavdzr`, MVA-OTD).
+
+**TE DOEN vóór 30 oktober 2026:**
+1. Per project de **Security Advisor** in het Supabase-dashboard langslopen om te zien welke tabellen nu zijn blootgesteld.
+2. Vanaf nu bij élke nieuwe tabel het sjabloon hieronder gebruiken (grant + RLS in dezelfde migratie).
+
+**Standaard tabel-creatie sjabloon (grant + RLS samen — ze horen bij elkaar):**
+```sql
+-- Run statements één voor één in de SQL Editor (multi-statement voert
+-- alleen het laatste uit — bekend Supabase-gedrag).
+
+-- 1. Tabel
+CREATE TABLE public.mijn_tabel (
+  id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  -- ... kolommen ...
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- 2. RLS aan (ALTIJD — een tabel met grant zonder RLS is open voor anon)
+ALTER TABLE public.mijn_tabel ENABLE ROW LEVEL SECURITY;
+
+-- 3. Data API-grant (dit is wat straks niet meer automatisch gebeurt)
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON public.mijn_tabel
+  TO anon, authenticated, service_role;
+
+-- 4. RLS-policy (bepaalt WELKE rijen zichtbaar zijn; pas aan per situatie)
+CREATE POLICY "lezen_voor_ingelogde_gebruikers"
+  ON public.mijn_tabel FOR SELECT
+  TO authenticated USING (true);
+```
+
+**Begrip voor later (toekomstige-Ton / Roemer):** grant = mág deze rol de tabel überhaupt benaderen. RLS = wélke rijen mag die rol zien. Twee aparte lagen. Bij de multi-tenant SaaS-opzet (`kantoor_id` + RLS) is dit precies het mechanisme dat kantoren van elkaar scheidt — grant + RLS standaard samen zetten betaalt zich daar dubbel terug.
+
+Bron: Supabase changelog "Breaking Change: Tables not exposed to Data and GraphQL API automatically" (28 apr 2026) + docs `guides/api/securing-your-api`.
+
+---
+
 ## 2026-05-26
 
 Drie meldingen van Rogier opgepakt in één ronde.
