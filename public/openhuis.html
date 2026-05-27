@@ -82,9 +82,9 @@
     /* ── Keuzeknoppen (segment / hypotheek / aankoopmakelaar) ── */
     .keuze { display: flex; gap: 8px; flex-wrap: wrap; }
     .keuze button {
-      flex: 1 1 0;
-      min-width: 0;
-      padding: 12px 8px;
+      flex: 1 1 auto;
+      min-width: max-content;
+      padding: 12px 14px;
       border: 1px solid var(--grijs-mid);
       border-radius: 10px;
       background: var(--wit);
@@ -92,6 +92,7 @@
       font-family: inherit;
       font-size: 14px;
       font-weight: 500;
+      line-height: 1.2;
       cursor: pointer;
       transition: background 0.12s, border-color 0.12s;
     }
