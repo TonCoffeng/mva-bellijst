@@ -5,6 +5,19 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-28
+
+### Deal-bevestiging bij lead-status "Deal" + Cloze-fout onderdrukt
+
+**Wat is er gewijzigd (`public/index.html`, functie `zetLeadStatus`):**
+- Bij het zetten van een lead op **Deal** verschijnt nu een professionele bevestiging: *"Deal geregistreerd. De afwikkeling en de vergoeding van € 175 voor de gevende makelaar worden verwerkt."* Deze melding wordt getoond zodra de status in Supabase is opgeslagen, **onafhankelijk van** de Cloze-stap die daarna volgt.
+- De **Cloze stage-update** kan bij sommige (test)leads falen met *"No identifiers are available in the submitted person"* (geen geldige naam/e-mail voor Cloze). Bij een Deal wordt die fout niet meer als rode melding aan de makelaar getoond — hij wordt stil gelogd in de console (voor diagnose). Bij andere statussen blijft de Cloze-foutmelding wél zichtbaar.
+- Alle overige statussen (Warm/Hot/Afspraak/Lost) zijn ongewijzigd.
+
+**Waarom:** voorheen kreeg de makelaar bij een Deal geen bevestiging — alleen (bij testleads) een verwarrende rode Cloze-fout, terwijl de deal wél correct werd vastgelegd. De €175-verrekening voor de gevende makelaar loopt via de Finance-app (module Beloningen); de mail-flow naar gevende + ontvangende makelaar volgt later via de communicatie-app.
+
+---
+
 ## 2026-05-27
 
 ### ⚠️ Actiepunt (infra/security, GEEN code-wijziging) — Supabase: grants worden opt-in
