@@ -374,6 +374,18 @@
     .btn-deal:hover     { background: #d1fae5; border-color: #6ee7b7; }
     .btn-lost:hover     { background: #f3f4f6; border-color: #d1d5db; }
 
+    /* ── Actieve status-knop: duidelijk kader zodat je op de kaart ziet waar de lead staat ── */
+    .btn-leadstatus.actief {
+      font-weight: 700;
+      border-width: 2px;
+      box-shadow: 0 0 0 1px currentColor inset;
+    }
+    .btn-warm.actief     { background: #fef3c7; border-color: #d97706; color: #92400e; }
+    .btn-hot.actief      { background: #fee2e2; border-color: #dc2626; color: #991b1b; }
+    .btn-afspraak.actief { background: #e0e7ff; border-color: #4f46e5; color: #3730a3; }
+    .btn-deal.actief     { background: #d1fae5; border-color: #059669; color: #065f46; }
+    .btn-lost.actief     { background: #e5e7eb; border-color: #6b7280; color: #374151; }
+
     .lead-acties {
       display: flex;
       gap: 8px;
@@ -5682,11 +5694,11 @@
             </div>
 
             <div class="leadstatus-knoppen" onclick="event.stopPropagation()" style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-              <button class="btn-leadstatus btn-warm"       onclick="zetLeadStatus('${lead.id}', 'Warm')">🌡️ Warm</button>
-              <button class="btn-leadstatus btn-hot"        onclick="zetLeadStatus('${lead.id}', 'Hot')">🔥 Hot</button>
-              <button class="btn-leadstatus btn-afspraak"   onclick="zetLeadStatus('${lead.id}', 'Afspraak')">📅 Afspraak</button>
-              <button class="btn-leadstatus btn-deal"       onclick="zetLeadStatus('${lead.id}', 'Deal')">✅ Deal</button>
-              <button class="btn-leadstatus btn-lost"       onclick="zetLeadStatus('${lead.id}', 'Lost')">📦 Archief</button>
+              <button class="btn-leadstatus btn-warm ${lead.lead_status === 'Warm' ? 'actief' : ''}"       onclick="zetLeadStatus('${lead.id}', 'Warm')">🌡️ Warm</button>
+              <button class="btn-leadstatus btn-hot ${lead.lead_status === 'Hot' ? 'actief' : ''}"        onclick="zetLeadStatus('${lead.id}', 'Hot')">🔥 Hot</button>
+              <button class="btn-leadstatus btn-afspraak ${lead.lead_status === 'Afspraak' ? 'actief' : ''}"   onclick="zetLeadStatus('${lead.id}', 'Afspraak')">📅 Afspraak</button>
+              <button class="btn-leadstatus btn-deal ${lead.lead_status === 'Deal' ? 'actief' : ''}"       onclick="zetLeadStatus('${lead.id}', 'Deal')">✅ Deal</button>
+              <button class="btn-leadstatus btn-lost ${lead.lead_status === 'Lost' ? 'actief' : ''}"       onclick="zetLeadStatus('${lead.id}', 'Lost')">📦 Archief</button>
             </div>
           `}
         </div>
@@ -6307,9 +6319,14 @@
       // ── DEAL-bevestiging ──────────────────────────────────────────────
       // Bij een Deal tonen we direct een professionele bevestiging, onafhankelijk
       // van de Cloze-stap die hierna volgt. De deal is nu vastgelegd in Supabase.
-      // De €175-verrekening voor de gevende makelaar wordt via Finance verwerkt.
+      // Doorgegeven lead (lead.bij_wie gezet) → €175 voor de gevende makelaar.
+      // Eigen lead (geen gever) → geen vergoeding, dus geen €175-tekst.
       if (nieuweStatus === 'Deal') {
-        toonToast('✅ Deal geregistreerd. De afwikkeling en de vergoeding van € 175 voor de gevende makelaar worden verwerkt.', 'succes');
+        const gever = (lead.bij_wie && lead.bij_wie !== (huidigeMakelaar?.naam || '')) ? lead.bij_wie : null;
+        const dealTekst = gever
+          ? `✅ Gefeliciteerd! Deal geregistreerd in Finance. Zodra de klant daadwerkelijk koopt, stuurt ${gever} een factuur van € 175.`
+          : `✅ Gefeliciteerd! Deal geregistreerd in Finance.`;
+        toonToast(dealTekst, 'succes');
       }
 
       // 2a. Eerste keer: Cloze klant aanmaken/zoeken (achter de schermen)

@@ -7,12 +7,12 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ## 2026-05-28
 
-### Deal-bevestiging bij lead-status "Deal" + Cloze-fout onderdrukt
+### Deal-bevestiging bij lead-status "Deal" + actieve-status-knop gemarkeerd + Cloze-fout onderdrukt
 
-**Wat is er gewijzigd (`public/index.html`, functie `zetLeadStatus`):**
-- Bij het zetten van een lead op **Deal** verschijnt nu een professionele bevestiging: *"Deal geregistreerd. De afwikkeling en de vergoeding van € 175 voor de gevende makelaar worden verwerkt."* Deze melding wordt getoond zodra de status in Supabase is opgeslagen, **onafhankelijk van** de Cloze-stap die daarna volgt.
-- De **Cloze stage-update** kan bij sommige (test)leads falen met *"No identifiers are available in the submitted person"* (geen geldige naam/e-mail voor Cloze). Bij een Deal wordt die fout niet meer als rode melding aan de makelaar getoond — hij wordt stil gelogd in de console (voor diagnose). Bij andere statussen blijft de Cloze-foutmelding wél zichtbaar.
-- Alle overige statussen (Warm/Hot/Afspraak/Lost) zijn ongewijzigd.
+**Wat is er gewijzigd (`public/index.html`):**
+- **Deal-bevestiging** (`zetLeadStatus`): bij het zetten van een lead op **Deal** verschijnt nu een bevestiging. Bij een doorgegeven lead: *"Gefeliciteerd! Deal geregistreerd in Finance. Zodra de klant daadwerkelijk koopt, stuurt [gevende makelaar] een factuur van € 175."* — met de naam van de gever (`lead.bij_wie`). Bij een eigen lead (geen gever): *"Gefeliciteerd! Deal geregistreerd in Finance."* zonder de €175-tekst, want dan is er geen vergoeding. De melding wordt getoond zodra de status in Supabase is opgeslagen, onafhankelijk van de Cloze-stap.
+- **Actieve status-knop gemarkeerd** (CSS + render): de knop van de huidige lead-status (Warm/Hot/Afspraak/Deal/Lost) krijgt een dik gekleurd kader + opvulling in de statuskleur, zodat op de kaart in één oogopslag zichtbaar is waar de lead staat.
+- **Cloze-fout onderdrukt bij Deal**: de Cloze stage-update kan bij sommige (test)leads falen met *"No identifiers are available..."*. Bij een Deal wordt die fout niet meer als rode melding getoond — alleen stil gelogd in de console. Bij andere statussen blijft de Cloze-foutmelding zichtbaar.
 
 **Waarom:** voorheen kreeg de makelaar bij een Deal geen bevestiging — alleen (bij testleads) een verwarrende rode Cloze-fout, terwijl de deal wél correct werd vastgelegd. De €175-verrekening voor de gevende makelaar loopt via de Finance-app (module Beloningen); de mail-flow naar gevende + ontvangende makelaar volgt later via de communicatie-app.
 
