@@ -470,6 +470,66 @@ exports.handler = async (event) => {
       };
     }
 
+    // ── KLANT AANMAKEN OF UPDATEN — vanuit lead-status flow (Deal etc.) ──
+    // Wordt aangeroepen door clozeKlantFlow in de frontend wanneer een lead
+    // een status krijgt (Warm/Hot/Afspraak/Deal) en nog geen cloze_id heeft.
+    // Maakt/merget de klant in Cloze (Cloze merget automatisch op email/telefoon),
+    // zet de stage en — best effort — het segment (Aankoop/Verkoop).
+    // GEEN feedback-drempel hier: de makelaar heeft bewust een status gezet.
+    if (action === 'klant_aanmaken_of_updaten') {
+      const { naam, email, telefoon, adres, segment, stage, makelaar_email } = data;
+
+      // Cloze verlangt minimaal naam + (email of telefoon) om identifiers te hebben.
+      if (!naam || (!email && !telefoon)) {
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            ok: false,
+            error: 'Onvoldoende gegevens (naam + email of telefoon vereist)',
+          }),
+        };
+      }
+
+      // Segment-mapping: UI-label → Cloze interne key.
+      // (Bevestigd 10 mei 2026 via /v1/segments: Aankoop=custom1, Verkoop=custom2.)
+      const SEGMENT_MAP = { 'Aankoop': 'custom1', 'Verkoop': 'custom2' };
+      const segmentKey = segment ? SEGMENT_MAP[segment] : null;
+
+      const personBody = {
+        name: naam,
+        ...(email    && { emails: [{ value: email }] }),
+        ...(telefoon && { phones: [{ value: telefoon, type: 'mobile' }] }),
+        ...(stage    && { stage }),
+        ...(segmentKey && { segment: segmentKey }),
+        ...(makelaar_email && { assignedTo: makelaar_email }),
+        ...(adres && { atAGlanceNotes: `Adres bezichtiging: ${adres}` }),
+      };
+
+      const personResult = await cloze('people/create', personBody);
+
+      // portableId uit het resultaat halen (Cloze geeft 'person' of platte velden terug)
+      const portableId =
+        personResult?.person?.portableId ||
+        personResult?.portableId ||
+        personResult?.person?.id ||
+        null;
+
+      const gelukt = !!portableId || personResult?.errorcode === 0 || personResult?.ok === true;
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          ok: gelukt,
+          actie: 'aangemaakt',
+          portableId,
+          cloze_response: personResult,
+          ...(gelukt ? {} : { error: personResult?.message || 'Cloze aanmaak mislukt' }),
+        }),
+      };
+    }
+
     return {
       statusCode: 400,
       headers,
