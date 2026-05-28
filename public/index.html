@@ -5446,6 +5446,7 @@
   let leadsSpiekbriefAan     = false;
   let leadsSelectieModusAan  = false;
   let leadsSortering         = 'hot';        // 'hot' (standaard) / 'datum' (nieuwste eerst)
+  let behoudVolgordeBijRender = false;       // true = sla hersortering één render over (na directe statuswijziging, zodat de kaart niet wegspringt)
   let leadsGeselecteerd      = new Set();    // ids van geselecteerde leads
   let leadsIngeklapt         = new Set();    // ids die inklapt zijn (in spiekbrief-modus)
 
@@ -5482,7 +5483,15 @@
       'Lost': 6,
     };
     let sorted = [...zichtbareDataset];
-    if (leadsSortering === 'hot') {
+    // Na een directe statuswijziging (zetLeadStatus) slaan we de hersortering
+    // één render over, zodat de zojuist gewijzigde kaart NIET wegspringt en de
+    // makelaar het kader/de bevestiging meteen op z'n plek ziet. Bij de volgende
+    // (verse) render sorteert alles weer normaal.
+    if (behoudVolgordeBijRender) {
+      // bewaar de huidige DOM-volgorde: sorteer op bestaande positie in leadsData
+      // (leadsData wordt niet geherordend, dus de natuurlijke volg-index volstaat)
+      behoudVolgordeBijRender = false;
+    } else if (leadsSortering === 'hot') {
       sorted.sort((a, b) => {
         const pa = prioriteit[a.lead_status] || 3;  // geen status = priority 3 (na Warm, voor Afspraak)
         const pb = prioriteit[b.lead_status] || 3;
@@ -6200,6 +6209,16 @@
     const lead = leadsData.find(l => l.id === leadId);
     if (!lead) return;
 
+    // ── DUBBELE-DEAL-BLOKKADE ────────────────────────────────────────
+    // Een deal kan maar één keer gemaakt worden. Staat de lead al op Deal
+    // en klikt de makelaar nóg een keer op Deal, dan tonen we een melding
+    // en stoppen we — geen tweede felicitatie, geen tweede Cloze-actie,
+    // geen risico op een dubbele €175-registratie in Finance.
+    if (nieuweStatus === 'Deal' && lead.lead_status === 'Deal') {
+      toonToast('ℹ️ Deze lead staat al op Deal — de deal is al geregistreerd.', 'info');
+      return;
+    }
+
     // Bij 'Lost': Cloze niet aanraken, alleen Supabase lead_status updaten
     const LOST = nieuweStatus === 'Lost';
 
@@ -6300,6 +6319,7 @@
     // Optimistisch updaten — voelt sneller
     const oudeStatus = lead.lead_status;
     lead.lead_status = nieuweStatus;
+    behoudVolgordeBijRender = true;  // kaart niet laten wegspringen — kader meteen zichtbaar op z'n plek
     renderLeads();
 
     try {
