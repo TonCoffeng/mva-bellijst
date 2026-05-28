@@ -6322,10 +6322,16 @@
       // Doorgegeven lead (lead.bij_wie gezet) → €175 voor de gevende makelaar.
       // Eigen lead (geen gever) → geen vergoeding, dus geen €175-tekst.
       if (nieuweStatus === 'Deal') {
-        const gever = (lead.bij_wie && lead.bij_wie !== (huidigeMakelaar?.naam || '')) ? lead.bij_wie : null;
-        const dealTekst = gever
-          ? `✅ Gefeliciteerd! Deal geregistreerd in Finance. Zodra de klant daadwerkelijk koopt, stuurt ${gever} een factuur van € 175.`
-          : `✅ Gefeliciteerd! Deal geregistreerd in Finance.`;
+        const geverVol = (lead.bij_wie && lead.bij_wie !== (huidigeMakelaar?.naam || '')) ? lead.bij_wie : null;
+        // Voornaam tonen; bij "Maurits" de volledige naam (er zijn twee Maurits'en).
+        let geverWeergave = null;
+        if (geverVol) {
+          const voornaam = geverVol.trim().split(/\s+/)[0];
+          geverWeergave = (voornaam.toLowerCase() === 'maurits') ? geverVol : voornaam;
+        }
+        const dealTekst = geverWeergave
+          ? `✅ Gefeliciteerd! Deal wordt geregistreerd in Finance. Zodra de klant daadwerkelijk aankoopt of verkocht heeft, stuurt ${geverWeergave} een factuur van € 175 ex btw.`
+          : `✅ Gefeliciteerd! Deal wordt geregistreerd in Finance.`;
         toonToast(dealTekst, 'succes');
       }
 
@@ -6537,13 +6543,24 @@
           // Forceer re-render zodat de knop direct verschijnt
           renderLeads();
         }
-        // Geen "Open in Cloze →" actie meer — gebruiker gebruikt de Cloze-knop op de kaart
-        toonToast(actieTekst, 'succes');
+        // Bij Deal staat de felicitatie al — geen Cloze-toast er overheen.
+        if (leadStatus !== 'Deal') {
+          toonToast(actieTekst, 'succes');
+        }
       } else {
-        toonToast(`Cloze-actie mislukt: ${json.error || json.cloze_response?.message || 'onbekend'}`, 'fout');
+        // Cloze-hapering bij Deal niet als rode fout tonen — deal is al geregistreerd.
+        if (leadStatus === 'Deal') {
+          console.warn('Cloze klant-flow bij Deal faalde (onderdrukt voor makelaar):', json.error || json.cloze_response?.message || 'onbekend');
+        } else {
+          toonToast(`Cloze-actie mislukt: ${json.error || json.cloze_response?.message || 'onbekend'}`, 'fout');
+        }
       }
     } catch (e) {
-      toonToast(`Cloze-actie mislukt: ${e.message}`, 'fout');
+      if (leadStatus === 'Deal') {
+        console.warn('Cloze klant-flow bij Deal faalde (onderdrukt voor makelaar):', e.message);
+      } else {
+        toonToast(`Cloze-actie mislukt: ${e.message}`, 'fout');
+      }
     }
   }
 
