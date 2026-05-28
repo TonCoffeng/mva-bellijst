@@ -6304,23 +6304,36 @@
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error || 'Update mislukt');
 
+      // ── DEAL-bevestiging ──────────────────────────────────────────────
+      // Bij een Deal tonen we direct een professionele bevestiging, onafhankelijk
+      // van de Cloze-stap die hierna volgt. De deal is nu vastgelegd in Supabase.
+      // De €175-verrekening voor de gevende makelaar wordt via Finance verwerkt.
+      if (nieuweStatus === 'Deal') {
+        toonToast('✅ Deal geregistreerd. De afwikkeling en de vergoeding van € 175 voor de gevende makelaar worden verwerkt.', 'succes');
+      }
+
       // 2a. Eerste keer: Cloze klant aanmaken/zoeken (achter de schermen)
       if (moetClozeKlantAanmaken) {
         clozeKlantFlow(lead, aankoopOfVerkoop, nieuweStatus).catch(e => {
           console.warn('Cloze-flow faalde:', e);
         });
-        toonToast(`✅ Aangemaakt in Cloze (${nieuweStatus})`, 'succes');
+        // Bij Deal is de felicitatie al getoond — geen Cloze-toast er overheen.
+        if (nieuweStatus !== 'Deal') {
+          toonToast(`✅ Aangemaakt in Cloze (${nieuweStatus})`, 'succes');
+        }
       }
       // 2b. Vervolgkeer: alleen Cloze stage doorschuiven (geen modal, geen aanmaak)
       else if (moetAlleenStageBijwerken) {
         // Detecteer: zelfde stage als al ingesteld → geen Cloze-call, alleen melding
         if (oudeStatus === nieuweStatus) {
-          toonToast(`ℹ️ Al aangemaakt in Cloze — stage staat al op ${nieuweStatus}`, 'info');
+          if (nieuweStatus !== 'Deal') {
+            toonToast(`ℹ️ Al aangemaakt in Cloze — stage staat al op ${nieuweStatus}`, 'info');
+          }
         } else {
           clozeStageUpdate(lead, nieuweStatus, oudeStatus).catch(e => {
             console.warn('Cloze-stage-update faalde:', e);
           });
-          // Toast komt vanuit clozeStageUpdate met "gewijzigd" tekst
+          // Toast komt vanuit clozeStageUpdate (bij Deal onderdrukt — felicitatie staat al)
         }
       }
       // 2c. Archief/Lost of geen Cloze-link: alleen Supabase
@@ -6328,7 +6341,7 @@
         // 'Lost' wordt aan de makelaar getoond als "Archief". renderLeads()
         // haalt de kaart nu ook echt uit de actieve lijst (zie filter boven).
         toonToast('📦 Naar archief verplaatst', 'succes');
-      } else {
+      } else if (nieuweStatus !== 'Deal') {
         toonToast(`✅ Status: ${nieuweStatus}`, 'succes');
       }
     } catch (err) {
@@ -6369,14 +6382,22 @@
     });
     const json = await res.json();
     if (json.ok || json.errorcode === 0) {
-      // Toon transitie als oudeStatus bekend is en verschilt
-      const tekst = (oudeStatus && oudeStatus !== nieuweLeadStatus)
-        ? `🔄 Cloze stage gewijzigd: ${oudeStatus} → ${nieuweLeadStatus}`
-        : `📋 Cloze stage bijgewerkt (${nieuweLeadStatus})`;
-      // Geen "Open in Cloze →" actie meer — gebruiker gebruikt de Cloze-knop op de kaart
-      toonToast(tekst, 'succes');
+      // Bij Deal tonen we de felicitatie al apart (zie zetLeadStatus) — geen
+      // dubbele Cloze-toast er overheen. Voor andere statussen wel de transitie tonen.
+      if (nieuweLeadStatus !== 'Deal') {
+        const tekst = (oudeStatus && oudeStatus !== nieuweLeadStatus)
+          ? `🔄 Cloze stage gewijzigd: ${oudeStatus} → ${nieuweLeadStatus}`
+          : `📋 Cloze stage bijgewerkt (${nieuweLeadStatus})`;
+        toonToast(tekst, 'succes');
+      }
     } else {
-      toonToast(`Cloze stage updaten faalde: ${json.error || json.message || 'onbekend'}`, 'fout');
+      // Cloze-hapering bij Deal niet als rode fout aan de makelaar tonen —
+      // de deal is al geregistreerd in Supabase. Wel loggen voor diagnose.
+      if (nieuweLeadStatus === 'Deal') {
+        console.warn('Cloze stage-update bij Deal faalde (onderdrukt voor makelaar):', json.error || json.message || 'onbekend');
+      } else {
+        toonToast(`Cloze stage updaten faalde: ${json.error || json.message || 'onbekend'}`, 'fout');
+      }
     }
   }
 
