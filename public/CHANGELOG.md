@@ -5,6 +5,22 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-30
+
+### Bel-uitkomst direct zichtbaar op de kaart + "← Terug" i.p.v. "Annuleren"
+
+**Wat is er gewijzigd (`public/index.html`):**
+- **`slaOpEnSluit` omgedraaid — status eerst, Cloze daarna (best-effort).** De bel-status (bereikt_ja / niet_bereikbaar / voicemail / etc.) wordt nu als **eerste** naar Supabase geschreven (`update_status`), waarna de kaart meteen wordt bijgewerkt, de modal sluit en de chip verschijnt. Cloze (`log_call_v2`), de follow-up-todo en de bedankmail draaien **daarna** als best-effort op de achtergrond — fouten worden alleen gelogd (`console.warn`) en kunnen de opslag of de zichtbaarheid niet meer blokkeren. Voorheen stond de status-write + kaart-update helemaal achteraan, áán de afgewachte Cloze-calls: hapette Cloze, dan sprong de functie naar de `catch` en werd de kaart nooit bijgewerkt — de makelaar zag niets veranderen (Wilma's "knop werkte niet" / onzichtbare `niet_bereikbaar`-chip).
+- **Echte foutdetectie op de status-write** (`if (!statusRes.ok) throw`): een 4xx/5xx van de backend toont nu een echte foutmelding i.p.v. een valse "opgeslagen".
+- **Succesmelding versimpeld** naar één "✅ Opgeslagen". Voorheen varieerde de tekst op het Cloze-resultaat ("+ notitie in Cloze-timeline" e.d.); omdat Cloze nu ná de opslag draait, is dat detail uit de directe toast gehaald. Functioneel identiek.
+- **`Annuleren` → `← Terug`** op de annuleer-knop van de bel-modal (Uber-gevoel, consistent met de bestaande ← Terug-knoppen elders in de app).
+
+**Waarom:** één oorzaak achter drie symptomen (Wilma's "werkte niet", onzichtbare niet_bereikbaar-chip, trage status-highlight): de kernactie hing achter Cloze. Opslaan + zichtbaarheid zijn nu losgekoppeld van Cloze.
+
+**Nog op de rol (volgend blok):** niet-geïnteresseerd-popup (archiveren / naar Cloze), lead-status-highlight direct op de kaart, deal-annuleren + bijbehorende beloning op `vervallen` in de Finance-app, en de "Status"-knop links op het belscherm (wacht op printscreen).
+
+---
+
 ## 2026-05-28
 
 ### Deal-bevestiging bij lead-status "Deal" + actieve-status-knop gemarkeerd + Cloze-fout onderdrukt
