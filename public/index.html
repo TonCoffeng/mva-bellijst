@@ -1912,7 +1912,7 @@
     <button class="btn-opslaan" id="btn-opslaan" disabled onclick="slaOpEnSluit()">
       Opslaan
     </button>
-    <button class="btn-annuleer" onclick="sluitModalDirect()">Annuleren</button>
+    <button class="btn-annuleer" onclick="sluitModalDirect()">← Terug</button>
   </div>
 </div>
 
@@ -6880,139 +6880,144 @@
     }
 
     try {
-      // 1. Cloze actie via log_call_v2 — backend past drempel toe
-      // (zie cloze.js: bestaande persoon krijgt call log zonder stage,
-      // niet-bestaande persoon wordt alleen aangemaakt bij bereikt_ja)
-      const clozeRes = await fetch('/.netlify/functions/cloze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'log_call_v2',
-          data: {
-            naam: huidigeLead.naam,
-            email: huidigeLead.email,
-            telefoon: huidigeLead.telefoon,
-            adres: huidigeLead.adres,
-            outcome: gekozenStatus,
-            notitie,
-            makelaar_email: huidigeMakelaar.email,
-          }
-        })
-      });
-      const clozeJson = await clozeRes.json().catch(() => ({}));
+      // ── KERNACTIE EERST — bel-status opslaan, dan pas Cloze ──────────────
+      // De status-opslag mag NOOIT afhangen van Cloze. We schrijven 'm als
+      // eerste weg, werken meteen de kaart bij (chip direct zichtbaar) en
+      // doen Cloze + follow-up + bedankmail daarna als best-effort. Een
+      // Cloze-hapering kan de opslag of de zichtbaarheid niet meer blokkeren.
 
-      // Als nieuwe persoon is aangemaakt → portableId opslaan in Supabase
-      // zodat de "🔗 Cloze" knop persistent op de lead-kaart blijft staan
-      if (clozeJson.mode === 'nieuwe_persoon' && clozeJson.portableId) {
-        huidigeLead.cloze_id = clozeJson.portableId;
-        huidigeLead.cloze_bestaand = true;
-        const leadInData = leadsData.find(l => l.id === huidigeLead.id);
-        if (leadInData) {
-          leadInData.cloze_id = clozeJson.portableId;
-          leadInData.cloze_bestaand = true;
-        }
-        // Async — niet awaiten, blokkeer UI niet
-        fetch('/.netlify/functions/monday', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'set_cloze_id',
-            data: { item_id: huidigeLead.id, cloze_id: clozeJson.portableId }
-          })
-        }).catch(e => console.warn('cloze_id opslaan faalde:', e));
-      }
+      // Snapshot van wat de achtergrond-stap nodig heeft, voordat we de modal
+      // sluiten (huidigeLead/gekozenStatus kunnen daarna gereset zijn).
+      const snap = {
+        id:             huidigeLead.id,
+        naam:           huidigeLead.naam,
+        email:          huidigeLead.email,
+        telefoon:       huidigeLead.telefoon,
+        adres:          huidigeLead.adres,
+        bij_wie:        huidigeLead.bij_wie,
+        outcome:        gekozenStatus,
+        makelaar_email: huidigeMakelaar.email,
+        makelaar_naam:  huidigeMakelaar.naam,
+      };
 
-      // 2. Follow-up todo aanmaken indien nodig — alleen als persoon in
-      //    Cloze bestaat (anders heeft een todo geen contact om aan te koppelen)
-      const persoonInCloze = clozeJson.mode === 'bestaande_persoon'
-                          || clozeJson.mode === 'nieuwe_persoon';
-      if (persoonInCloze && ['niet_bereikbaar', 'voicemail', 'bereikt_later', 'wellicht_later'].includes(gekozenStatus)) {
-        let followUpDatum;
-        if (gekozenStatus === 'bereikt_later') {
-          followUpDatum = new Date(terugbelDatum).toISOString();
-        } else if (gekozenStatus === 'wellicht_later') {
-          followUpDatum = new Date(Date.now() + 14 * 86400000).toISOString();
-        } else {
-          followUpDatum = new Date(Date.now() + 86400000).toISOString();
-        }
-
-        await fetch('/.netlify/functions/cloze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'create_todo',
-            data: {
-              naam: huidigeLead.naam,
-              telefoon: huidigeLead.telefoon,
-              datum: followUpDatum,
-              omschrijving: `Nabellen: ${huidigeLead.naam} | ${huidigeLead.adres}`,
-              makelaar_email: huidigeMakelaar.email,
-            }
-          })
-        });
-      }
-
-      // 3. Status updaten in monday (Supabase via Netlify function)
-      // De beller-notitie gaat mee zodat 'ie op de kaart bewaard blijft
-      // (los van de gever-opmerking).
-      await fetch('/.netlify/functions/monday', {
+      // 1. Status opslaan in Supabase (via monday function)
+      const statusRes = await fetch('/.netlify/functions/monday', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'update_status',
           data: {
-            item_id: huidigeLead.id,
-            board_id: huidigeMakelaar.boardId,
-            status: gekozenStatus,
+            item_id:   snap.id,
+            board_id:  huidigeMakelaar.boardId,
+            status:    snap.outcome,
             opmerking: notitie,
           }
         })
       });
+      if (!statusRes.ok) throw new Error('update_status → ' + statusRes.status);
 
-      // 4. Bedank-mail naar gevende makelaar bij bereikt_ja
-      if (gekozenStatus === 'bereikt_ja' && huidigeLead.bij_wie) {
+      // 2. Kaart meteen bijwerken + modal sluiten → chip direct zichtbaar
+      const lead = leadsData.find(l => l.id === snap.id);
+      if (lead) lead.status = snap.outcome;
+      sluitModalDirect();
+      renderLeads();
+      toonToast('✅ Opgeslagen', 'succes');
+
+      // 3. Cloze (log_call_v2 + eventueel follow-up todo) — BEST-EFFORT.
+      //    Draait op de achtergrond; fouten worden alleen gelogd.
+      (async () => {
+        try {
+          const clozeRes = await fetch('/.netlify/functions/cloze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'log_call_v2',
+              data: {
+                naam:           snap.naam,
+                email:          snap.email,
+                telefoon:       snap.telefoon,
+                adres:          snap.adres,
+                outcome:        snap.outcome,
+                notitie,
+                makelaar_email: snap.makelaar_email,
+              }
+            })
+          });
+          const clozeJson = await clozeRes.json().catch(() => ({}));
+
+          // Nieuwe persoon aangemaakt → portableId opslaan zodat de
+          // "🔗 Cloze"-knop persistent op de kaart blijft staan.
+          if (clozeJson.mode === 'nieuwe_persoon' && clozeJson.portableId) {
+            if (lead) {
+              lead.cloze_id = clozeJson.portableId;
+              lead.cloze_bestaand = true;
+            }
+            renderLeads();
+            fetch('/.netlify/functions/monday', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'set_cloze_id',
+                data: { item_id: snap.id, cloze_id: clozeJson.portableId }
+              })
+            }).catch(e => console.warn('cloze_id opslaan faalde:', e));
+          }
+
+          // Follow-up todo — alleen als de persoon in Cloze bestaat.
+          const persoonInCloze = clozeJson.mode === 'bestaande_persoon'
+                              || clozeJson.mode === 'nieuwe_persoon';
+          if (persoonInCloze && ['niet_bereikbaar', 'voicemail', 'bereikt_later', 'wellicht_later'].includes(snap.outcome)) {
+            let followUpDatum;
+            if (snap.outcome === 'bereikt_later') {
+              followUpDatum = new Date(terugbelDatum).toISOString();
+            } else if (snap.outcome === 'wellicht_later') {
+              followUpDatum = new Date(Date.now() + 14 * 86400000).toISOString();
+            } else {
+              followUpDatum = new Date(Date.now() + 86400000).toISOString();
+            }
+            await fetch('/.netlify/functions/cloze', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'create_todo',
+                data: {
+                  naam:           snap.naam,
+                  telefoon:       snap.telefoon,
+                  datum:          followUpDatum,
+                  omschrijving:   `Nabellen: ${snap.naam} | ${snap.adres}`,
+                  makelaar_email: snap.makelaar_email,
+                }
+              })
+            });
+          }
+        } catch (clozeErr) {
+          console.warn('Cloze-stap (best-effort) faalde:', clozeErr);
+        }
+      })();
+
+      // 4. Bedank-mail naar gevende makelaar bij bereikt_ja — fire-and-forget
+      if (snap.outcome === 'bereikt_ja' && snap.bij_wie) {
         fetch('/.netlify/functions/mail', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'bedank_mail',
             data: {
-              ontvangende_makelaar: huidigeMakelaar.naam,
-              ontvangende_email:    huidigeMakelaar.email,
-              gevende_makelaar:     huidigeLead.bij_wie,
-              lead_naam:            huidigeLead.naam,
-              lead_adres:           huidigeLead.adres,
+              ontvangende_makelaar: snap.makelaar_naam,
+              ontvangende_email:    snap.makelaar_email,
+              gevende_makelaar:     snap.bij_wie,
+              lead_naam:            snap.naam,
+              lead_adres:           snap.adres,
               notitie:              notitie || '',
             }
           })
-        }); // fire-and-forget, niet awaiten zodat UI niet wacht
+        }).catch(e => console.warn('bedank_mail faalde:', e));
       }
-
-      // 5. Lokaal updaten
-      const lead = leadsData.find(l => l.id === huidigeLead.id);
-      if (lead) lead.status = gekozenStatus;
-
-      sluitModalDirect();
-      renderLeads();
-
-      // 6. Toast — vertel duidelijk wat er gebeurd is
-      let bericht;
-      if (clozeJson.mode === 'skip') {
-        bericht = '✅ Opgeslagen — niet doorgezet naar Cloze (geen klantsignaal)';
-      } else if (clozeJson.mode === 'nieuwe_persoon') {
-        bericht = '✅ Opgeslagen + nieuw contact in Cloze';
-      } else if (clozeJson.mode === 'bestaande_persoon') {
-        bericht = '✅ Opgeslagen + notitie in Cloze-timeline';
-      } else if (gekozenStatus === 'bereikt_ja' && huidigeLead.bij_wie) {
-        bericht = `✅ Opgeslagen — bedankmail naar ${huidigeLead.bij_wie}`;
-      } else {
-        bericht = '✅ Opgeslagen';
-      }
-      toonToast(bericht, 'succes');
 
     } catch (err) {
-      console.warn('slaOpEnSluit error:', err);
-      toonToast('Er ging iets mis. Probeer opnieuw.', 'fout');
+      // Hier komt alleen een echte fout in de status-opslag terecht.
+      console.warn('slaOpEnSluit — status opslaan mislukt:', err);
+      toonToast('Opslaan mislukt. Probeer opnieuw.', 'fout');
       btn.disabled = false;
       btn.textContent = 'Opslaan in Cloze →';
     }
