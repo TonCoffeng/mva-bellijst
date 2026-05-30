@@ -5,6 +5,31 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-05-30 — (2) Dagoverzicht vervangt per-lead herinneringsmails
+
+### Van losse "vergeten te bellen"-mails naar één dagoverzicht per makelaar
+
+**Aanleiding:** de per-lead herinneringsmails (elke 15 min, niveau 1 na 24 werkuren + niveau 2 na 48) werden als opdringerig ervaren — "het voelt als nagezeten worden".
+
+**Nieuw bestand `netlify/functions/dagoverzicht-check.js`:**
+- Stuurt elke makelaar één mail per dag (rond 09:00 NL) met **zijn eigen** openstaande leads.
+- Drie groepen: **Nog niet gebeld** (`bel_status=nieuw` & `belpogingen=0`) · **Opvolgen** (`niet_bereikbaar`, `voicemail`, `bel_terug`, `wellicht_later`) · **Afspraak staat** (`lead_status=Afspraak`).
+- Uitgesloten: `lead_status` Deal/Lost/Gearchiveerd en `bel_status` bereikt/niet_geinteresseerd.
+- **Geen openstaande leads → geen mail** (een leeg overzicht zou zelf weer irritatie worden).
+- Knop "Open de Leadpool →" linkt naar `mvaleadpool.netlify.app`. Haalt alles in één query op en groepeert per `eigenaar_id` in code (geen N+1).
+
+**`netlify.toml`:**
+- Schedule van `herinnering-check` **verwijderd** (`*/15 * * * *`) → die functie draait niet meer.
+- Schedule voor `dagoverzicht-check` toegevoegd: `0 7 * * *` (UTC) ≈ 09:00 NL zomertijd / 08:00 wintertijd.
+
+**Bewust NIET gewijzigd:**
+- `herinnering-check.js` blijft als bestand staan (referentie / makkelijk terugzetten), maar wordt zonder schedule nooit meer aangeroepen.
+- De **push bij een nieuwe lead** (in `monday.js`, `push_naar_pool`) blijft volledig intact — alleen de herinnerings-*mails* zijn vervangen.
+
+**Timing-noot:** Netlify cron is UTC. Bij overgang naar wintertijd verschuift de mail naar 08:00 NL. Indien exact 09:00 jaarrond gewenst: seizoenscorrectie nodig (nu bewust simpel gehouden).
+
+---
+
 ## 2026-05-30
 
 ### Bel-uitkomst direct zichtbaar op de kaart + "← Terug" i.p.v. "Annuleren"
