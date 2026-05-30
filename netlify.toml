@@ -5,11 +5,12 @@
 [functions]
   node_bundler = "esbuild"
 
-# Scheduled function: stuurt herinneringsmails naar makelaars die een lead
-# uit de pool hebben gekregen maar er nog niet mee aan de slag zijn.
-# Draait elke 15 minuten — checkt zelf welke leads aan de beurt zijn.
-[functions."herinnering-check"]
-  schedule = "*/15 * * * *"
+# Scheduled function: één rustig dagoverzicht per makelaar, 's ochtends rond
+# 09:00 NL, met zijn eigen openstaande leads in drie groepen (nog niet gebeld /
+# opvolgen / afspraak). Vervangt de losse per-lead herinneringsmails.
+# Netlify cron draait in UTC: '0 7 * * *' ≈ 09:00 NL zomertijd (08:00 wintertijd).
+[functions."dagoverzicht-check"]
+  schedule = "0 7 * * *"
 
 # Scheduled function: stuurt de gevende makelaar een push 0-5 min vóór de
 # geplande bezichtiging, zodat hij de kaart meteen kan openen en na afloop
