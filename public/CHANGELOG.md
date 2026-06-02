@@ -5,6 +5,39 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-06-02 — Bezoekteller telt alleen echte bezoeken + alert bij persoonlijk doorgegeven lead
+
+Twee meldingen van Rogier opgepakt.
+
+### Gerepareerd — "X× bij deze woning" telde verzette en dubbele afspraken mee (`netlify/functions/bezichtigingen.js`)
+
+**Aanleiding:** Rogiers melding dat een bezichtiger "2× bij deze woning" kreeg, terwijl het ging om één geannuleerde afspraak die was verzet naar een nieuwe datum — feitelijk dus één bezoek.
+
+**Oorzaak:** de bezoekteller telde ruwe rijen per persoon+adres over álle bezichtigingen. Bij een verzette afspraak maakt Realworks een nieuwe agenda-regel aan en blijft de oude (geannuleerde) regel staan; die wordt in de database niet afgevoerd. Ook exact dubbel-ingeschoten regels (zelfde persoon+adres+tijd) telden dubbel. Een scan toonde 15+ van zulke gevallen.
+
+**Fix:** de teller telt nu alleen afspraken die **daadwerkelijk hebben plaatsgevonden** (datum in het verleden, Europe/Amsterdam) en telt **unieke dagen** i.p.v. ruwe rijen.
+- Toekomstige afspraken tellen niet mee — een afspraak die naar later is verzet telt niet als extra bezoek.
+- Exact/dubbel op dezelfde dag → telt als één.
+- Een échte herhaalbezoeker (twee verschillende dagen écht geweest) toont nog steeds correct "2× bij deze woning" — het oorspronkelijke signaal blijft heel.
+- De feedback-historie ("eerdere feedback aan dit adres") blijft ongewijzigd op alle bezoeken staan.
+
+**Nog open (structureel, in de sync):** geannuleerde/verzette Realworks-afspraken worden niet gearchiveerd en dubbelen niet ontdubbeld in `mva-roundrobin-sync`. De teller-fix dekt het symptoom; de fantoomrijen zelf staan nog in `bezichtigingen`.
+
+### Nieuw — alert-mail bij een persoonlijk doorgegeven lead (`netlify/functions/monday.js`)
+
+**Aanleiding:** Rogier geeft tijdens/na een bezichtiging een lead gericht door aan een specifieke collega (knop "Direct toewijzen aan een collega"). De ontvanger (Wilma) kreeg hiervan geen melding — de lead verscheen alleen in de leadlijst.
+
+**Oorzaak:** in `push_naar_pool` werd de notificatiemail **alleen bij Round Robin** verstuurd, en juist niet bij een directe toewijzing (`useDirectAssign`).
+
+**Fix:** bij een directe toewijzing gaat nu een **urgente alert-mail** naar de ontvangende makelaar (nieuwe template `renderHotLeadAlertMail`): oranje kop "🔥 Bel deze lead direct", melding "[gever] heeft zojuist met deze persoon gesproken", bel-knop op het telefoonnummer, klant/adres + notitie van de gever, en de herinnering "Na je gesprek: zet de lead in de juiste status".
+- Round Robin houdt de bestaande "Nieuwe lead voor jou"-mail (ongewijzigd).
+- Gebruikt de bestaande `RESEND_API_KEY` — geen nieuwe env-var.
+- Vuurt ook op de automatische Cloze-routing (die kreeg voorheen géén mail).
+
+**Op de rol:** WhatsApp-alert op hetzelfde triggerpunt zodra dat kanaal live is (WhatsApp Business-briefing WPTC), plus een los hot-lead-signaal binnen de app zelf.
+
+---
+
 ## 2026-05-30 — (2) Dagoverzicht vervangt per-lead herinneringsmails
 
 ### Van losse "vergeten te bellen"-mails naar één dagoverzicht per makelaar
