@@ -175,6 +175,65 @@ const renderLeadNotificatieMail = ({
 </body></html>`;
 };
 
+// Bouwt de HTML-body voor een ALERT bij een persoonlijk doorgegeven lead.
+// Urgenter dan de gewone pool-mail: de gever heeft de persoon zelf gesproken
+// (bv. tijdens een bezichtiging) en geeft 'm gericht door — bel direct.
+const renderHotLeadAlertMail = ({
+  ontvangerNaam, klantNaam, adres, telefoon, email,
+  gevendeMakelaar, opmerking, leadpoolUrl,
+}) => {
+  const esc = s => String(s || '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+  const veiligeTel = esc(telefoon || '—');
+  const veiligEmail = esc(email || '—');
+  const telKnop = telefoon
+    ? `<a href="tel:${veiligeTel}" style="display:inline-block;background:#E8500A;color:white;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;font-size:15px">📞 Bel ${esc(klantNaam)} direct</a>`
+    : '';
+  const opmerkingBlok = opmerking
+    ? `<tr><td style="padding:8px 0;color:#64748b;font-size:13px;width:150px;vertical-align:top">Notitie ${esc(gevendeMakelaar)}</td>
+         <td style="padding:8px 0;color:#1A2B5F;font-size:14px;font-style:italic">${esc(opmerking)}</td></tr>`
+    : '';
+  return `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f4f6fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f4f6fa;padding:24px 0">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;border:2px solid #E8500A">
+        <tr><td style="background:#E8500A;padding:20px 24px;color:white">
+          <div style="font-size:12px;letter-spacing:0.05em;opacity:0.9;text-transform:uppercase">MVA Leadpool · Persoonlijk doorgegeven</div>
+          <div style="font-size:21px;font-weight:800;margin-top:4px">🔥 Bel deze lead direct</div>
+        </td></tr>
+        <tr><td style="padding:24px">
+          <div style="font-size:15px;color:#1A2B5F;margin-bottom:18px">
+            Hoi ${esc(ontvangerNaam)}, <strong>${esc(gevendeMakelaar)}</strong> heeft zojuist met deze persoon gesproken en geeft de lead gericht aan jou door. Bel zo snel mogelijk.
+          </div>
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse">
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px;width:150px">Klant</td>
+                <td style="padding:8px 0;color:#1A2B5F;font-size:15px;font-weight:600">${esc(klantNaam)}</td></tr>
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px">Telefoon</td>
+                <td style="padding:8px 0;color:#1A2B5F;font-size:14px"><a href="tel:${veiligeTel}" style="color:#E8500A;text-decoration:none;font-weight:600">${veiligeTel}</a></td></tr>
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px">Email</td>
+                <td style="padding:8px 0;color:#1A2B5F;font-size:14px"><a href="mailto:${veiligEmail}" style="color:#E8500A;text-decoration:none">${veiligEmail}</a></td></tr>
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px">Adres bezichtiging</td>
+                <td style="padding:8px 0;color:#1A2B5F;font-size:14px">${esc(adres)}</td></tr>
+            ${opmerkingBlok}
+          </table>
+          <div style="margin-top:24px;text-align:center">
+            ${telKnop}
+          </div>
+          <div style="margin-top:14px;text-align:center">
+            <a href="${leadpoolUrl}" style="display:inline-block;color:#E8500A;text-decoration:none;font-weight:600;font-size:13px">Open in Leadpool →</a>
+          </div>
+          <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center">
+            Na je gesprek: zet de lead in de juiste status in de Leadpool-app.
+          </div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+};
+
 // ── HYPOTHEEK-DOORVERWIJZING: vaste ontvangers + mail-template ─────────
 const HYPOTHEEK_ONTVANGERS = ['amsterdam547@hypotheekshop.nl', 'e.bitter@hypotheekshop.nl'];
 const HYPOTHEEK_CC          = ['toncoffeng@makelaarsvan.nl'];
@@ -816,11 +875,13 @@ exports.handler = async (event) => {
       await archiveerBezichtiging(item_id, 'pool');
 
       // ── Notificatie-mail naar ontvangende makelaar ──────────────────
-      // ALLEEN bij echte Round Robin, niet bij direct-assign (Cloze-routing).
-      // Faalt stilletjes — een mail-fout mag de pool-flow niet blokkeren.
-      if (!useDirectAssign && rr.gekozen_email) {
-        // Haal naam gevende makelaar op (niet altijd bekend in bez-row)
-        let gevendeMakelaar = 'een collega';
+      // DIRECTE toewijzing (gever geeft tijdens/na een bezichtiging een lead
+      // persoonlijk door aan een specifieke collega) → urgente ALERT-mail
+      // "bel direct". Round Robin → de gewone "nieuwe lead"-mail.
+      // Faalt stilletjes — een mail-fout mag de pool-flow nooit blokkeren.
+      if (rr.gekozen_email) {
+        // Naam gevende makelaar: betrouwbaar uit gebruikers, anders uit payload.
+        let gevendeMakelaar = data.makelaar_naam || 'een collega';
         if (bez.gevende_makelaar_id) {
           try {
             const gRows = await sbGet(
@@ -829,23 +890,33 @@ exports.handler = async (event) => {
             if (gRows[0]?.naam) gevendeMakelaar = gRows[0].naam;
           } catch { /* mag falen */ }
         }
-        const html = renderLeadNotificatieMail({
-          ontvangerNaam:    rr.gekozen_naam,
-          klantNaam:        bez.bezichtiger_naam || 'Onbekend',
-          adres:            bez.adres || '—',
-          telefoon:         bez.bezichtiger_telefoon || '',
-          email:            bez.bezichtiger_email || '',
+
+        const mailData = {
+          ontvangerNaam: rr.gekozen_naam,
+          klantNaam:     bez.bezichtiger_naam || 'Onbekend',
+          adres:         bez.adres || '—',
+          telefoon:      bez.bezichtiger_telefoon || '',
+          email:         bez.bezichtiger_email || '',
           gevendeMakelaar,
-          opmerking:        bez.feedback_opmerking || '',
-          leadpoolUrl:      'https://mvaleadpool.netlify.app/',
-        });
-        // Niet awaiten zou cleaner zijn, maar Netlify Functions kunnen geen
-        // async werk na response. Dus wel awaiten en falen-stilletjes.
-        await stuurMail({
-          to:      rr.gekozen_email,
-          subject: `Nieuwe lead: ${bez.bezichtiger_naam || 'bezichtiger'} · ${bez.adres || ''}`.trim(),
-          html,
-        });
+          opmerking:     bez.feedback_opmerking || '',
+          leadpoolUrl:   'https://mvaleadpool.netlify.app/',
+        };
+
+        // Netlify Functions kunnen geen async werk ná de response doen, dus
+        // awaiten we (stuurMail faalt stilletjes bij een fout).
+        if (useDirectAssign) {
+          await stuurMail({
+            to:      rr.gekozen_email,
+            subject: `🔥 ${gevendeMakelaar} geeft je een lead door — bel direct: ${bez.bezichtiger_naam || 'bezichtiger'}`.trim(),
+            html:    renderHotLeadAlertMail(mailData),
+          });
+        } else {
+          await stuurMail({
+            to:      rr.gekozen_email,
+            subject: `Nieuwe lead: ${bez.bezichtiger_naam || 'bezichtiger'} · ${bez.adres || ''}`.trim(),
+            html:    renderLeadNotificatieMail(mailData),
+          });
+        }
       }
 
       return {
