@@ -96,8 +96,9 @@ exports.handler = async (event) => {
     // feedback van de vorige keer er ook?" We tellen over ALLE bezichtigingen
     // heen (alle makelaars, ook gearchiveerd), gematcht op e-mail (voorkeur)
     // of telefoon — bewust niet op naam (spelling varieert). Twee tellingen:
-    //   - bezoeken_totaal:    hoe vaak deze persoon ergens is geweest
-    //   - bezoeken_dit_adres: hoe vaak bij DIT specifieke adres
+    //   - bezoeken_totaal:    op hoeveel unieke dagen deze persoon ergens is geweest
+    //   - bezoeken_dit_adres: op hoeveel unieke dagen bij DIT specifieke adres
+    // Alleen reeds plaatsgevonden afspraken (datum in het verleden) tellen mee.
     // Plus de feedback van eerdere bezoeken aan dit adres. Eén extra query,
     // daarna in-memory tellen — geen query-per-kaart. Faalt stil (niet kritiek).
     const persoonSleutel = (email, tel) => {
@@ -110,8 +111,22 @@ exports.handler = async (event) => {
     const adresSleutel = (adres) =>
       (adres || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
-    const bezoekenTotaal = {};            // sleutel -> count
-    const bezoekenPerPersoonAdres = {};   // `${sleutel}||${adres}` -> count
+    // Bezoekteller telt alleen afspraken die ÉCHT hebben plaatsgevonden
+    // (datum in het verleden) en telt UNIEKE DAGEN, niet ruwe rijen. Zo tellen
+    // verzette afspraken (Realworks maakt een nieuwe agenda-regel in de
+    // toekomst, oude blijft staan) en dubbel-ingeschoten regels niet als extra
+    // bezoek, terwijl een echte herhaalbezoeker (twee verschillende dagen écht
+    // geweest) wél meetelt.
+    const nu = Date.now();
+    const isVerleden = (ts) => { const t = ts ? Date.parse(ts) : NaN; return Number.isFinite(t) && t < nu; };
+    const dagSleutel = (ts) => {
+      if (!ts) return null;
+      try { return new Date(ts).toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' }); }
+      catch { return String(ts).slice(0, 10); }
+    };
+
+    const bezoekenTotaal = {};            // sleutel -> Set van "dag||adres" (unieke bezoekdagen per pand)
+    const bezoekenPerPersoonAdres = {};   // `${sleutel}||${adres}` -> Set van "dag" (unieke bezoekdagen aan dit adres)
     const historiePerPersoonAdres = {};   // `${sleutel}||${adres}` -> [{...}]
     try {
       const alleRes = await fetch(
@@ -128,9 +143,9 @@ exports.handler = async (event) => {
         for (const b of alle) {
           const sl = persoonSleutel(b.bezichtiger_email, b.bezichtiger_telefoon);
           if (!sl) continue;
-          bezoekenTotaal[sl] = (bezoekenTotaal[sl] || 0) + 1;
           const combo = `${sl}||${adresSleutel(b.adres)}`;
-          bezoekenPerPersoonAdres[combo] = (bezoekenPerPersoonAdres[combo] || 0) + 1;
+
+          // Feedback-historie: van ALLE bezoeken (ook toekomst) — informatief.
           const heeftFb = Array.isArray(b.feedback_keys) && b.feedback_keys.length > 0;
           const heeftOpm = !!(b.feedback_opmerking || '').trim();
           if (heeftFb || heeftOpm) {
@@ -141,6 +156,13 @@ exports.handler = async (event) => {
               opmerking: b.feedback_opmerking || '',
             });
           }
+
+          // Teller: alleen reeds plaatsgevonden afspraken, geteld als unieke dagen.
+          if (!isVerleden(b.datum_tijd)) continue;
+          const dag = dagSleutel(b.datum_tijd);
+          if (!dag) continue;
+          (bezoekenTotaal[sl] = bezoekenTotaal[sl] || new Set()).add(`${dag}||${adresSleutel(b.adres)}`);
+          (bezoekenPerPersoonAdres[combo] = bezoekenPerPersoonAdres[combo] || new Set()).add(dag);
         }
       }
     } catch (e) {
@@ -185,8 +207,8 @@ exports.handler = async (event) => {
       // Bezoekteller-velden voor deze bezichtiger
       const sl = persoonSleutel(row.bezichtiger_email, row.bezichtiger_telefoon);
       const combo = sl ? `${sl}||${adresSleutel(row.adres)}` : null;
-      const bezoekenTot  = sl ? (bezoekenTotaal[sl] || 0) : 0;
-      const bezoekenAdr  = combo ? (bezoekenPerPersoonAdres[combo] || 0) : 0;
+      const bezoekenTot  = sl ? (bezoekenTotaal[sl] ? bezoekenTotaal[sl].size : 0) : 0;
+      const bezoekenAdr  = combo ? (bezoekenPerPersoonAdres[combo] ? bezoekenPerPersoonAdres[combo].size : 0) : 0;
       // Eerdere feedback aan dit adres — exclusief de huidige bezichtiging zelf,
       // oudste eerst, en zonder lege entries.
       const eerdereFeedback = (combo ? (historiePerPersoonAdres[combo] || []) : [])
