@@ -232,6 +232,7 @@ exports.handler = async (event) => {
         in_pool: inPool,
         actie_status: status === 'open' ? '' : status,  // '' betekent "nog geen actie" voor frontend
         type,
+        afspraak_status: row.afspraak_status || 'gepland',  // 'gepland' | 'geannuleerd' — gevuld door de agenda-sync
         publieke_token: row.publieke_token || null,
         open_huis_door_id: row.open_huis_door_id || null,
         mag_doorsturen: magDoorsturen,
