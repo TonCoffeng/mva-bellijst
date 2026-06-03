@@ -935,6 +935,17 @@
     }
     .spiekbrief-rij .sb-status.is-feedback { color: var(--groen); }
     .spiekbrief-rij .sb-status.is-doorgezet { color: var(--oranje); }
+    /* Geannuleerde Realworks-afspraak — blijft een lead, maar duidelijk gemarkeerd */
+    .spiekbrief-rij .sb-geannuleerd {
+      flex-shrink: 0;
+      background: #fee2e2;
+      color: #991b1b;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
     /* Lead-geblokkeerd: sterke klant van een collega — niet meegaan in bulk */
     .bez-card.lead-geblokkeerd .spiekbrief-rij::before {
       content: "🔒";
@@ -3294,6 +3305,7 @@
               ${b.datum ? `<span class="sb-datum">${(b.datum.split('-')[2] || '')}/${(b.datum.split('-')[1] || '')}</span>` : ''}
               <span class="sb-tijd">${b.tijdstip || '—'}</span>
               <span class="sb-naam">${b.naam}</span>
+              ${b.afspraak_status === 'geannuleerd' ? `<span class="sb-geannuleerd">✕ geannuleerd</span>` : ''}
               ${b.adres ? `<span class="sb-adres">${esc(b.adres)}</span>` : ''}
               ${b.telefoon ? `<span class="sb-tel">${b.telefoon}</span>` : ''}
               <span class="sb-status ${heeftFeedback ? 'is-feedback' : (alGedeeld ? 'is-doorgezet' : '')}">${heeftFeedback ? '✓' : (alGedeeld ? '↗' : '●')}</span>
@@ -3311,6 +3323,7 @@
                     : (b.type === 'open_huis_bezoeker'
                       ? `<span style="display:inline-block;margin-left:6px;vertical-align:middle;background:#fff3e0;color:#e65100;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">🏠 OPEN HUIS</span>`
                       : `<span style="display:inline-block;margin-left:6px;vertical-align:middle;background:#eef2ff;color:#3730a3;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">INGEPLAND</span>`)}
+                  ${b.afspraak_status === 'geannuleerd' ? `<span style="display:inline-block;margin-left:6px;vertical-align:middle;background:#fee2e2;color:#991b1b;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">✕ GEANNULEERD</span>` : ''}
                 </div>
                 <div class="bez-adres">📍 ${b.adres || '—'}</div>
               </div>
