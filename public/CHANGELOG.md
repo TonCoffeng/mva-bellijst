@@ -5,6 +5,33 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-06-03 — Geannuleerde bezichtigingen blijven zichtbaar als lead
+
+Melding van Rogier: geannuleerde afspraken verdwenen uit de app, terwijl het wél leads zijn.
+
+### Oorzaak (in de sync, repo `mva-roundrobin-sync`)
+
+De reconciliatie-stap (`archiveerVerdwenenBezichtigingen` in `lib/db.js`, aangeroepen door `sync.js`) zette `gearchiveerd=true` op elke bezichtiging in het venster die Realworks niet meer als open afspraak (`status=Definitief`) teruggaf. Een annulering valt uit die open-set → werd dus stilletjes gearchiveerd → `bezichtigingen.js` filtert op `gearchiveerd=false`, dus weg uit de lijst. De rij bleef wel in de DB staan (vandaar dat de bezoekteller 'm nog meetelde), maar was onzichtbaar.
+
+### Fix — onderscheid lead vs. leeg slot in de reconciliatie
+
+- **Lead** (rij mét persoon: naam/email/telefoon) die uit Realworks verdwijnt → niet meer archiveren, maar `afspraak_status='geannuleerd'` met `gearchiveerd=false`. Blijft dus zichtbaar én doorstuurbaar naar de pool. Idempotent (al-geannuleerde rijen worden overgeslagen).
+- **Leeg planner-slot** (geen persoon) dat verdwijnt → wél gewoon archiveren, zoals voorheen.
+- `upsertBezichtigingen` zet `afspraak_status` terug op `'gepland'` zodra Realworks de afspraak weer als `Definitief` teruggeeft (her-bevestigd/opnieuw gepland). `gearchiveerd` wordt door de upsert bewust niet aangeraakt.
+- Meegenomen: tijd-bug in `getAmsterdamOffsetMinutes` — `hour12:false` rendert het middernachtuur als `24:xx` (en-CA) → ongeldige datum → `NaN`-offset → upsert-fail. Vervangen door `hourCycle:'h23'`.
+
+### App-kant (`mva-bellijst`)
+
+- **Nieuwe kolom** `bezichtigingen.afspraak_status text not null default 'gepland'` (geen CHECK, voor flexibiliteit).
+- `netlify/functions/bezichtigingen.js` geeft `afspraak_status` mee in de API-output.
+- `public/index.html` toont een rood **"geannuleerd"-label** op de kaart — zowel in de compacte spiekbrief-rij als in de uitgeklapte kaart. Geen card-greying (conform conventie: status via chip). Doorsturen blijft actief.
+
+**Gedragswijziging (akkoord Ton):** leads worden niet meer auto-gearchiveerd; de actieve lijst houdt geannuleerde leads vast tot de makelaar ze zelf archiveert.
+
+**Niet teruggehaald:** de al eerder auto-gearchiveerde leads (onderdeel van de bestaande 88) blijven gearchiveerd — selectief terughalen (`actie_status='open'` + geen feedback) is een optionele losse actie.
+
+---
+
 ## 2026-06-02 — Bezoekteller telt alleen echte bezoeken + alert bij persoonlijk doorgegeven lead
 
 Twee meldingen van Rogier opgepakt.
