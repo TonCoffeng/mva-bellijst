@@ -2674,33 +2674,69 @@
       const hooi = ((b.adres || '') + ' ' + (b.naam || '') + ' ' + (b.datum || '')).toLowerCase();
       const toon = !t || hooi.includes(t);
       card.style.display = toon ? '' : 'none';
+      // Verborgen kaart nooit geselecteerd laten — anders herstel je iets onzichtbaars
+      if (!toon) { const x = card.querySelector('.archief-chk'); if (x) x.checked = false; }
       if (toon) zichtbaar++;
     });
     const titel = document.getElementById('archief-titel');
     if (titel) titel.textContent = t
       ? `📦 Archief — ${zichtbaar} van ${alle.length}`
       : `📦 Archief (${alle.length})`;
-    const herstelBtn = document.getElementById('btn-herstel-zichtbaar');
-    if (herstelBtn) {
-      herstelBtn.style.display = zichtbaar > 0 ? '' : 'none';
-      herstelBtn.textContent = (t && zichtbaar < alle.length)
-        ? `♻️ Herstel ${zichtbaar} zichtbare`
-        : '♻️ Herstel alle zichtbare';
-    }
+    archiefSelectieUpdate();
   }
   window.pasArchiefZoekToe = pasArchiefZoekToe;
+
+  // Werk de herstel-knop en "selecteer alles"-checkbox bij op basis van de selectie.
+  // Geen selectie → knop herstelt alle zichtbare; wél selectie → alleen de selectie.
+  function archiefSelectieUpdate() {
+    const container = document.getElementById('archief-container');
+    if (!container) return;
+    const zichtbare = Array.from(container.querySelectorAll('.bez-card')).filter(c => c.style.display !== 'none');
+    const checks = zichtbare.map(c => c.querySelector('.archief-chk')).filter(Boolean);
+    const aangevinkt = checks.filter(cb => cb.checked).length;
+    const btn = document.getElementById('btn-herstel-zichtbaar');
+    if (btn) {
+      btn.style.display = zichtbare.length > 0 ? '' : 'none';
+      btn.textContent = aangevinkt > 0
+        ? `♻️ Herstel geselecteerde (${aangevinkt})`
+        : '♻️ Herstel alle zichtbare';
+    }
+    const allesCb = document.getElementById('archief-alles-chk');
+    if (allesCb) {
+      if (checks.length === 0 || aangevinkt === 0) { allesCb.checked = false; allesCb.indeterminate = false; }
+      else if (aangevinkt === checks.length) { allesCb.checked = true; allesCb.indeterminate = false; }
+      else { allesCb.checked = false; allesCb.indeterminate = true; }
+    }
+  }
+  window.archiefSelectieUpdate = archiefSelectieUpdate;
+
+  // Vink alle zichtbare archief-kaarten aan/uit
+  function toggleAllArchief(cb) {
+    const container = document.getElementById('archief-container');
+    if (!container) return;
+    const aan = cb.checked;
+    Array.from(container.querySelectorAll('.bez-card'))
+      .filter(c => c.style.display !== 'none')
+      .forEach(c => { const x = c.querySelector('.archief-chk'); if (x) x.checked = aan; });
+    archiefSelectieUpdate();
+  }
+  window.toggleAllArchief = toggleAllArchief;
 
   // Herstel alle nu-zichtbare archief-kaarten (handig na zoeken op straat/adres).
   // Ververst daarna de actieve lijst live — geen pagina-refresh nodig.
   async function herstelAlleZichtbareArchief() {
     const container = document.getElementById('archief-container');
     if (!container) return;
-    const cards = Array.from(container.querySelectorAll('.bez-card')).filter(c => c.style.display !== 'none');
-    const ids = cards.map(c => c.id.replace('archief-', ''));
+    const zichtbare = Array.from(container.querySelectorAll('.bez-card')).filter(c => c.style.display !== 'none');
+    // Geselecteerde kaarten hebben voorrang; zonder selectie → alle zichtbare
+    const geselecteerd = zichtbare.filter(c => c.querySelector('.archief-chk')?.checked);
+    const doelen = geselecteerd.length > 0 ? geselecteerd : zichtbare;
+    const ids = doelen.map(c => c.id.replace('archief-', ''));
     if (ids.length === 0) return;
+    const watTekst = geselecteerd.length > 0 ? 'geselecteerde' : 'zichtbare';
     const ok = await mvaConfirm({
       titel: 'Herstellen uit archief?',
-      tekst: `${ids.length} bezichtiging${ids.length === 1 ? '' : 'en'} terugzetten naar de actieve lijst (Open feedback)?`,
+      tekst: `${ids.length} ${watTekst} bezichtiging${ids.length === 1 ? '' : 'en'} terugzetten naar de actieve lijst (Open feedback)?`,
       okTekst: '♻️ Herstel',
     });
     if (!ok) return;
@@ -3138,16 +3174,24 @@
             </button>
           </div>
         </div>
-        <div style="font-size:12px;color:var(--grijs-tekst);margin:0 0 12px">💡 Zoek hierboven (bv. een straatnaam) en zet met één klik alleen de zichtbare panden terug naar je actieve lijst.</div>`;
+        <div style="font-size:12px;color:var(--grijs-tekst);margin:0 0 8px">💡 Vink panden aan om een selectie terug te zetten, of zoek hierboven (bv. een straatnaam) en herstel alle zichtbare in één klik.</div>
+        <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--navy);font-weight:600;cursor:pointer;margin:0 0 12px">
+          <input type="checkbox" id="archief-alles-chk" onchange="toggleAllArchief(this)" style="width:18px;height:18px;cursor:pointer;accent-color:var(--oranje)" />
+          Selecteer alle zichtbare
+        </label>`;
       archiefContainer.innerHTML = headerHtml + items.map(b => `
         <div class="bez-card al-gedeeld" id="archief-${b.id}" style="margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-            <div style="flex:1;min-width:0">
-              <div class="bez-naam" style="font-weight:600;color:var(--navy);margin-bottom:4px">${esc(b.naam)}</div>
-              <div class="bez-adres" style="font-size:13px;color:var(--grijs-tekst);margin-bottom:6px">📍 ${esc(b.adres)}</div>
-              <div style="font-size:12px;color:var(--grijs-tekst)">
-                📅 ${esc(b.datum||'')}${b.tijdstip ? ' om ' + esc(b.tijdstip) : ''}
-                ${b.feedback ? ' &middot; <span style="color:var(--navy);font-weight:500">' + esc(b.feedback.replace(/,/g,', ')) + '</span>' : ''}
+            <div style="display:flex;align-items:flex-start;gap:12px;flex:1;min-width:0">
+              <input type="checkbox" class="archief-chk" data-id="${b.id}" onchange="archiefSelectieUpdate()"
+                style="width:20px;height:20px;margin-top:2px;cursor:pointer;accent-color:var(--oranje);flex:0 0 auto" />
+              <div style="flex:1;min-width:0">
+                <div class="bez-naam" style="font-weight:600;color:var(--navy);margin-bottom:4px">${esc(b.naam)}</div>
+                <div class="bez-adres" style="font-size:13px;color:var(--grijs-tekst);margin-bottom:6px">📍 ${esc(b.adres)}</div>
+                <div style="font-size:12px;color:var(--grijs-tekst)">
+                  📅 ${esc(b.datum||'')}${b.tijdstip ? ' om ' + esc(b.tijdstip) : ''}
+                  ${b.feedback ? ' &middot; <span style="color:var(--navy);font-weight:500">' + esc(b.feedback.replace(/,/g,', ')) + '</span>' : ''}
+                </div>
               </div>
             </div>
             <button onclick="herstelUitArchief('${b.id}')"

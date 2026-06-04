@@ -37,6 +37,11 @@ Eerste versie had twee filterrijen boven elkaar (stat-tegels + pillen) ver bóve
 - **Telling-badges uit de pillen** (oogde druk). De `x van y`-regel onder het zoekveld geeft de telling waar nodig. De IDs `stat-geven-nieuw`/`stat-geven-archief` blijven verborgen bestaan zodat de tel-logica intact blijft.
 - **Doorgegeven-lijst filtert nu mee op de zoekterm.** Voorheen negeerde die view de zoekbalk (toonde alle 59). Elke rij heeft een `data-zoek`-attribuut (naam + adres + ontvanger + datum); `pasDoorgegevenZoekToe()` filtert client-side bovenop de eigen datum/status/ontvanger-filters en toont "x van y zichtbaar — gefilterd op …". Wordt toegepast bij typen én bij wisselen naar Doorgegeven met actieve zoekterm.
 
+### Archief-selectie — één voor één of een selectie herstellen
+- **Checkbox per archief-kaart** + **"Selecteer alle zichtbare"** in de header. Vink panden aan en de groene knop wordt `♻️ Herstel geselecteerde (n)`; zonder selectie blijft 'ie `♻️ Herstel alle zichtbare`.
+- `archiefSelectieUpdate()` houdt knoplabel en de "alles"-checkbox (incl. indeterminate) bij; `toggleAllArchief()` vinkt alle zichtbare aan/uit; `herstelAlleZichtbareArchief()` geeft de selectie voorrang en valt anders terug op alle zichtbare.
+- Zoeken vinkt verborgen kaarten automatisch uit, zodat je nooit iets onzichtbaars herstelt. De losse per-item `♻️ Herstel` blijft voor de snelle één-klik.
+
 
 
 Melding van Rogier: de teller toonde "48 open feedback", maar bij klikken verschenen er veel minder.
