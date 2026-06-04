@@ -27,6 +27,12 @@ Drie losse werelden die niet samenwerkten: open feedback (`geven-container`), de
 - **`laadBezichtigingen()`** rondt status-bewust af: bij herladen op de achtergrond (na herstel) blijft de archief-/doorgegeven-weergave intact.
 - Datum-navigator wordt verborgen in Gearchiveerd/Doorgegeven (daar niet relevant).
 
+### Layout-iteratie (variant A) — filter pal onder het zoekveld
+Eerste versie had twee filterrijen boven elkaar (stat-tegels + pillen) ver bóven het zoekveld → rommelig, je moest zoeken wat er gefilterd was. Opgeruimd:
+- **Dubbele tegelrij verwijderd.** De tellingen (open / archief) zitten nu ín de pillen als badge: `📋 Open feedback (80) · 🔁 Alles · 📂 Doorgegeven · 📦 Archief (71)`.
+- **Volgorde van boven naar beneden:** zoekveld → filter-pillen → resultaat-teller → datum-nav → actiebalk → lijst. Eén kolom, één logica; de filter zit waar je 'm verwacht.
+- Modusdetectie en actieve-staat lopen nu volledig via `window._statusFilter` en de pillen; alle `.filter-knop`-afhankelijkheid voor bezichtigingen is verwijderd (de Leads-tab houdt z'n eigen tegels).
+
 
 
 Melding van Rogier: de teller toonde "48 open feedback", maar bij klikken verschenen er veel minder.

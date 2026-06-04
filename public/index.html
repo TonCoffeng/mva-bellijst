@@ -285,6 +285,21 @@
       border-color: var(--navy);
       color: #fff;
     }
+    .pill-count {
+      display: inline-block;
+      min-width: 18px;
+      padding: 0 6px;
+      margin-left: 5px;
+      border-radius: 999px;
+      background: var(--grijs-mid);
+      color: var(--navy);
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 18px;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .status-pill.actief .pill-count { background: rgba(255,255,255,0.25); color: #fff; }
     @media (max-width: 600px) {
       .status-pills { gap: 6px; padding: 0 12px 4px; }
       .status-pill { flex: 1 1 0; padding: 8px 4px; font-size: 12px; text-align: center; }
@@ -1636,27 +1651,24 @@
       Meldingen aanzetten
     </button>
   </div>
-  <div class="stats-bar">
-    <div class="stat-card filter-knop actief" id="filter-open" onclick="zetStatusFilter('open')" title="Alleen open feedback">
-      <div class="stat-number" id="stat-geven-nieuw">0</div>
-      <div class="stat-label">Open feedback</div>
-    </div>
-    <div class="stat-card filter-knop" id="filter-doorgegeven" onclick="zetStatusFilter('doorgegeven')" title="Bekijk wat je hebt doorgegeven aan de leadpool">
-      <div class="stat-number">📂</div>
-      <div class="stat-label">Doorgegeven aan leadpool</div>
-    </div>
-    <div class="stat-card filter-knop" id="filter-archief" onclick="zetStatusFilter('gearchiveerd')" title="Bekijk gearchiveerde bezichtigingen">
-      <div class="stat-number" id="stat-geven-archief">0</div>
-      <div class="stat-label">📦 Archief</div>
+  <!-- ZOEKEN — zoekveld bovenaan; de filter zit er pal onder -->
+  <div style="padding:0 16px 8px">
+    <div style="position:relative">
+      <input id="filter-adres" type="search" autocomplete="off" placeholder="Zoek op pandadres, naam of datum..."
+        oninput="zoekFilter()"
+        style="width:100%;padding:11px 36px 11px 14px;border:1px solid var(--grijs-mid);border-radius:10px;font-size:14px;font-family:inherit;color:var(--navy);background:var(--wit);box-sizing:border-box" />
+      <button id="filter-wissen" onclick="wisFilter()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;cursor:pointer;color:var(--grijs-tekst);padding:4px 8px">&#10005;</button>
     </div>
   </div>
-  <!-- STATUS-FILTER — primaire filter; bepaalt welke status getoond wordt -->
+
+  <!-- STATUS-FILTER — primaire filter, pal onder het zoekveld; telling per status ingebouwd -->
   <div class="status-pills" id="status-pills">
-    <button class="status-pill actief" id="pill-open" onclick="zetStatusFilter('open')">📋 Open feedback</button>
+    <button class="status-pill actief" id="pill-open" onclick="zetStatusFilter('open')">📋 Open feedback <span class="pill-count" id="stat-geven-nieuw">0</span></button>
     <button class="status-pill" id="pill-alle" onclick="zetStatusFilter('alle')">🔁 Alles</button>
     <button class="status-pill" id="pill-doorgegeven" onclick="zetStatusFilter('doorgegeven')">📂 Doorgegeven</button>
-    <button class="status-pill" id="pill-archief" onclick="zetStatusFilter('gearchiveerd')">📦 Gearchiveerd</button>
+    <button class="status-pill" id="pill-archief" onclick="zetStatusFilter('gearchiveerd')">📦 Archief <span class="pill-count" id="stat-geven-archief">0</span></button>
   </div>
+  <div id="filter-teller" style="display:none;font-size:11px;color:var(--grijs-tekst);margin:2px 0 10px;padding-left:16px"></div>
 
   <!-- DATUM-NAVIGATOR — pijltjes om door dagen te bladeren -->
   <div class="datum-nav" id="datum-nav">
@@ -1685,15 +1697,6 @@
         <span class="lbl-vol">&#9744; Selectie</span><span class="lbl-kort" style="display:none">&#9744;</span>
       </button>
     </div>
-  </div>
-  <div style="padding:0 16px 10px">
-    <div style="position:relative">
-      <input id="filter-adres" type="search" autocomplete="off" placeholder="Zoek op pandadres, naam of datum..."
-        oninput="zoekFilter()"
-        style="width:100%;padding:10px 36px 10px 14px;border:1px solid var(--grijs-mid);border-radius:10px;font-size:13px;font-family:inherit;color:var(--navy);background:var(--wit);box-sizing:border-box" />
-      <button id="filter-wissen" onclick="wisFilter()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;cursor:pointer;color:var(--grijs-tekst);padding:4px 8px">&#10005;</button>
-    </div>
-    <div id="filter-teller" style="display:none;font-size:11px;color:var(--grijs-tekst);margin-top:6px;padding-left:4px"></div>
   </div>
   <!-- ALLES SELECTEREN — verschijnt alleen als selectiemodus aan staat -->
   <div id="alles-selecteren-bar" style="display:none;padding:0 16px 10px">
@@ -2326,7 +2329,7 @@
     const label = document.getElementById('datum-label');
     if (!label) return;
     // 'Open feedback'-filter actief? Dan toont de lijst alle open feedback ongeacht datum.
-    const openActief = document.getElementById('filter-open')?.classList.contains('actief');
+    const openActief = (window._statusFilter === 'open');
     if (openActief) {
       const zichtbaarOpen = document.querySelectorAll('#geven-container .bez-card:not([style*="display: none"])').length;
       label.innerHTML = `📋 Alle open feedback<span class="datum-nav-teller">(${zichtbaarOpen})</span>`;
@@ -2506,24 +2509,12 @@
   // Klik op Open feedback toggle't alleen die filter; verder geen modi.
   // 'alles' = standaard (geen filter actief), 'open' = alleen open feedback.
   function filterBezichtigingen(modus, viaKlik) {
-    // Als geen modus opgegeven, herken de huidige actieve filter (voor zoek-input)
+    // Als geen modus opgegeven, leid af uit de actieve status-filter.
     if (!modus) {
-      const actiefEl = document.querySelector('.filter-knop.actief');
-      modus = (actiefEl?.id === 'filter-open') ? 'open' : 'alles';
+      modus = (window._statusFilter === 'open') ? 'open' : 'alles';
     }
-
-    // Toggle alleen bij directe klik (legacy). Programmatische aanroepen
-    // (zoekbalk, status-pillen) togglen NOOIT — zo blijft 'open' ook echt 'open'.
-    if (viaKlik && modus === 'open') {
-      const huidigActief = document.getElementById('filter-open')?.classList.contains('actief');
-      if (huidigActief) modus = 'alles';
-    }
-
-    // Visuele staat van filter-knoppen
-    document.querySelectorAll('.filter-knop').forEach(el => el.classList.remove('actief'));
-    if (modus === 'open') {
-      document.getElementById('filter-open')?.classList.add('actief');
-    }
+    // De actieve staat wordt beheerd door de status-pillen (zetStatusFilter);
+    // filterBezichtigingen filtert alleen de lijst, het stuurt geen knoppen meer.
 
     // Zorg dat hoofd-container weer zichtbaar is (na evt. doorgegeven-pagina)
     document.getElementById('geven-container').style.display = '';
@@ -2604,8 +2595,6 @@
 
     if (status === 'gearchiveerd') {
       document.getElementById('geven-container').style.display = 'none';
-      document.querySelectorAll('.filter-knop').forEach(el => el.classList.remove('actief'));
-      document.getElementById('filter-archief')?.classList.add('actief');
       laadArchief().then(() => {
         const term = (document.getElementById('filter-adres')?.value || '').trim().toLowerCase();
         pasArchiefZoekToe(term);
@@ -2617,7 +2606,6 @@
     // 'open' of 'alle' → actieve lijst tonen
     document.getElementById('archief-container')?.remove();
     document.getElementById('geven-container').style.display = '';
-    document.querySelectorAll('.filter-knop').forEach(el => el.classList.remove('actief'));
 
     if (status === 'open') {
       filterBezichtigingen('open');            // zet filter-open .actief; geen toggle
@@ -2765,8 +2753,6 @@
   };
 
   async function openDoorgegevenPagina() {
-    document.querySelectorAll('.filter-knop').forEach(el => el.classList.remove('actief'));
-    document.getElementById('filter-doorgegeven')?.classList.add('actief');
     // Activeer breed-modus zodat de tabel meer ruimte krijgt
     document.getElementById('overzicht-screen')?.classList.add('breed');
 
@@ -3413,8 +3399,7 @@
 
       // Als "Open feedback" filter actief is, opnieuw toepassen zodat
       // een net-afgehandelde kaart uit die view verdwijnt
-      const actieveFilter = document.querySelector('.filter-knop.actief');
-      if (actieveFilter && actieveFilter.id === 'filter-open') {
+      if (window._statusFilter === 'open') {
         filterBezichtigingen('open');
       }
 
@@ -3961,7 +3946,7 @@
       return;
     }
 
-    // 'open' of 'alle' — filter de actieve lijst (volgt de actieve filter-knop)
+    // 'open' of 'alle' — filter de actieve lijst (volgt de actieve status-pil)
     filterBezichtigingen();
     updateBulkTeller();
 
@@ -4542,8 +4527,7 @@
 
     // Pas huidige filter opnieuw toe — als gebruiker op "Open feedback" staat
     // verdwijnt de kaart nu visueel; anders blijft 'ie zichtbaar.
-    const actiefFilter = document.querySelector('.filter-knop.actief');
-    if (actiefFilter && actiefFilter.id === 'filter-open') {
+    if (window._statusFilter === 'open') {
       filterBezichtigingen('open');
     }
   }
