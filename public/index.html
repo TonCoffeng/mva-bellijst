@@ -1965,9 +1965,24 @@
     },
   });
 
-  // Bij opstart: check of er al een sessie is
+  // Bij opstart: check of er al een sessie is (incl. gedeelde portal-sessie via cookie op .makelaarsvan.nl)
   (async () => {
-    const { data: { session } } = await sb.auth.getSession();
+    let { data: { session } } = await sb.auth.getSession();
+    // SSO: op het eigen domein de portal-sessie overnemen als er lokaal nog geen sessie is.
+    // Op *.netlify.app gebeurt dit niet -> daar blijft de bestaande login ongewijzigd (vangnet).
+    if (!session && location.hostname.endsWith('makelaarsvan.nl')) {
+      try {
+        const { createBrowserClient } = await import('https://esm.sh/@supabase/ssr@0.5.2');
+        const sso = createBrowserClient(SUPABASE_URL, SUPABASE_KEY, {
+          cookieOptions: { domain: '.makelaarsvan.nl', path: '/', sameSite: 'lax', secure: true, maxAge: 60*60*24*30 }
+        });
+        const { data: { session: cookieSession } } = await sso.auth.getSession();
+        if (cookieSession && cookieSession.access_token && cookieSession.refresh_token) {
+          await sb.auth.setSession({ access_token: cookieSession.access_token, refresh_token: cookieSession.refresh_token });
+          session = (await sb.auth.getSession()).data.session;
+        }
+      } catch (e) { console.warn('SSO-overname mislukt, val terug op normale login:', e); }
+    }
     if (session) {
       // Sessie bestaat — haal user-info op uit gebruikers tabel
       const ok = await ladenIngelogdeMakelaar(session.user.email);
