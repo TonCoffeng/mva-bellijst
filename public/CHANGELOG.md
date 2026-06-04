@@ -5,7 +5,29 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
-## 2026-06-04 — 'Open feedback'-teller en -lijst lopen nu gelijk
+## 2026-06-04 — Statusfilter-pillen + zoeken over alle statussen (incl. archief)
+
+Melding van Rogier: de bezichtigingen waren een "zoekplaatje". Zoeken op een straat (bv. "iepen") gaf "0 van 80 zichtbaar" terwijl het archief er ongefilterd onder bleef staan — verwarrend. Hij wil na een bezichtigingsronde makkelijk opschonen, panden uit het archief terugzetten en doorsturen naar collega's.
+
+### Oorzaak
+Drie losse werelden die niet samenwerkten: open feedback (`geven-container`), de Doorgegeven-pagina en het Archief (`archief-container`, verving de lijst). De zoekbalk filterde alleen de *actieve* lijst; bij geopend archief telde hij de verborgen actieve lijst → tegenstrijdige "0 van 80" naast een volledig, ongefilterd archief. Bijkomend: een verraderlijke toggle in `filterBezichtigingen` (tweede klik op Open feedback → alles), waardoor programmatische heraanroepen "open" stiekem naar "alles" flipten.
+
+### Toegevoegd
+- **Statusfilter-pillen** boven de lijst als primaire bediening: `📋 Open feedback · 🔁 Alles · 📂 Doorgegeven · 📦 Gearchiveerd`. De stat-tegels blijven als teller maar sturen nu dezelfde orchestrator (`zetStatusFilter`) aan.
+- **`zetStatusFilter(status)`** — één bron van waarheid voor de getoonde status. Houdt pillen, filter-knoppen, datum-nav en zoekbalk consistent.
+- **Zoeken over álle statussen** via de `🔁 Alles`-pil: filtert actieve lijst én archief tegelijk (Rogiers "laat alles van die straat zien").
+- **Archief is nu doorzoekbaar** (`pasArchiefZoekToe`) — de titel toont "x van y" en de zoekteller telt wat echt zichtbaar is, ongeacht status (`werkZoekTellerBij`).
+- **Knop "♻️ Herstel alle zichtbare"** in de archiefweergave: zoek op straat → zet in één klik alleen de zichtbare panden terug naar Open feedback (`herstelAlleZichtbareArchief`). De actieve lijst wordt **live** ververst (geen pagina-refresh meer).
+- **Hint bij 0 treffers in Open feedback**: klikbare link "🔁 Zoek in Alles (incl. archief)".
+
+### Gewijzigd
+- **Toggle in `filterBezichtigingen` alleen nog bij directe klik** (`viaKlik`-parameter). Programmatische aanroepen togglen nooit meer → "open" blijft "open".
+- **Per-item `herstelUitArchief`** ververst nu ook live i.p.v. "herlaad de pagina". Toast: "hersteld — staat nu in Open feedback".
+- **`sluitArchief()` en Terug-knoppen** (archief leeg/gevuld, Doorgegeven) lopen nu via `zetStatusFilter('open')` zodat de pillen synchroon blijven.
+- **`laadBezichtigingen()`** rondt status-bewust af: bij herladen op de achtergrond (na herstel) blijft de archief-/doorgegeven-weergave intact.
+- Datum-navigator wordt verborgen in Gearchiveerd/Doorgegeven (daar niet relevant).
+
+
 
 Melding van Rogier: de teller toonde "48 open feedback", maar bij klikken verschenen er veel minder.
 

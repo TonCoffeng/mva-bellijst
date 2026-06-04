@@ -259,6 +259,37 @@
     .filter-knop.actief.oranje { border-color: var(--oranje); }
     .filter-knop.actief.groen { border-color: var(--groen); }
 
+    /* ── STATUS-FILTER PILLEN (primaire filter boven bezichtigingen) ── */
+    .status-pills {
+      display: flex;
+      gap: 8px;
+      padding: 0 16px 4px;
+      flex-wrap: wrap;
+    }
+    .status-pill {
+      background: var(--wit);
+      border: 1.5px solid var(--grijs-mid);
+      color: var(--grijs-tekst);
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .status-pill:hover { border-color: var(--navy); color: var(--navy); }
+    .status-pill.actief {
+      background: var(--navy);
+      border-color: var(--navy);
+      color: #fff;
+    }
+    @media (max-width: 600px) {
+      .status-pills { gap: 6px; padding: 0 12px 4px; }
+      .status-pill { flex: 1 1 0; padding: 8px 4px; font-size: 12px; text-align: center; }
+    }
+
     /* Bel-status filter-pillen op de Leads-bellen tab */
     .leads-statusfilter-pil {
       background: var(--wit);
@@ -1606,19 +1637,27 @@
     </button>
   </div>
   <div class="stats-bar">
-    <div class="stat-card filter-knop actief" id="filter-open" onclick="filterBezichtigingen('open')" title="Alleen open feedback">
+    <div class="stat-card filter-knop actief" id="filter-open" onclick="zetStatusFilter('open')" title="Alleen open feedback">
       <div class="stat-number" id="stat-geven-nieuw">0</div>
       <div class="stat-label">Open feedback</div>
     </div>
-    <div class="stat-card filter-knop" id="filter-doorgegeven" onclick="openDoorgegevenPagina()" title="Bekijk wat je hebt doorgegeven aan de leadpool">
+    <div class="stat-card filter-knop" id="filter-doorgegeven" onclick="zetStatusFilter('doorgegeven')" title="Bekijk wat je hebt doorgegeven aan de leadpool">
       <div class="stat-number">📂</div>
       <div class="stat-label">Doorgegeven aan leadpool</div>
     </div>
-    <div class="stat-card filter-knop" id="filter-archief" onclick="laadArchief()" title="Bekijk gearchiveerde bezichtigingen">
+    <div class="stat-card filter-knop" id="filter-archief" onclick="zetStatusFilter('gearchiveerd')" title="Bekijk gearchiveerde bezichtigingen">
       <div class="stat-number" id="stat-geven-archief">0</div>
       <div class="stat-label">📦 Archief</div>
     </div>
   </div>
+  <!-- STATUS-FILTER — primaire filter; bepaalt welke status getoond wordt -->
+  <div class="status-pills" id="status-pills">
+    <button class="status-pill actief" id="pill-open" onclick="zetStatusFilter('open')">📋 Open feedback</button>
+    <button class="status-pill" id="pill-alle" onclick="zetStatusFilter('alle')">🔁 Alles</button>
+    <button class="status-pill" id="pill-doorgegeven" onclick="zetStatusFilter('doorgegeven')">📂 Doorgegeven</button>
+    <button class="status-pill" id="pill-archief" onclick="zetStatusFilter('gearchiveerd')">📦 Gearchiveerd</button>
+  </div>
+
   <!-- DATUM-NAVIGATOR — pijltjes om door dagen te bladeren -->
   <div class="datum-nav" id="datum-nav">
     <button class="datum-nav-btn" id="datum-vorige" onclick="datumNav(-1)" title="Vorige dag">←</button>
@@ -2466,15 +2505,16 @@
   // ── FILTER BEZICHTIGINGEN ─────────────────────────────────────────────
   // Klik op Open feedback toggle't alleen die filter; verder geen modi.
   // 'alles' = standaard (geen filter actief), 'open' = alleen open feedback.
-  function filterBezichtigingen(modus) {
+  function filterBezichtigingen(modus, viaKlik) {
     // Als geen modus opgegeven, herken de huidige actieve filter (voor zoek-input)
     if (!modus) {
       const actiefEl = document.querySelector('.filter-knop.actief');
       modus = (actiefEl?.id === 'filter-open') ? 'open' : 'alles';
     }
 
-    // Toggle: tweede klik op Open feedback zet 'm uit (alles tonen)
-    if (modus === 'open') {
+    // Toggle alleen bij directe klik (legacy). Programmatische aanroepen
+    // (zoekbalk, status-pillen) togglen NOOIT — zo blijft 'open' ook echt 'open'.
+    if (viaKlik && modus === 'open') {
       const huidigActief = document.getElementById('filter-open')?.classList.contains('actief');
       if (huidigActief) modus = 'alles';
     }
@@ -2530,6 +2570,184 @@
     if (typeof werkAllesSelecterenBijTellerBij === 'function') werkAllesSelecterenBijTellerBij();
   }
   window.filterBezichtigingen = filterBezichtigingen;
+
+  // ── STATUS-FILTER ORKESTRATIE ─────────────────────────────────────────
+  // Eén bron van waarheid voor welke status getoond wordt. Stuurt de bestaande
+  // views aan (open lijst / alles / doorgegeven-pagina / archief) en houdt de
+  // zoekbalk consistent: wat je ziet = wat de teller telt, ongeacht status.
+  window._statusFilter = 'open';
+  function zetStatusFilter(status) {
+    window._statusFilter = status;
+
+    // Pillen-staat bijwerken
+    document.querySelectorAll('.status-pill').forEach(p => p.classList.remove('actief'));
+    const pillId = { open:'pill-open', alle:'pill-alle', doorgegeven:'pill-doorgegeven', gearchiveerd:'pill-archief' }[status];
+    document.getElementById(pillId)?.classList.add('actief');
+
+    // Losse zoek-archief-sectie opruimen (wordt indien nodig opnieuw opgebouwd)
+    document.getElementById('zoek-archief-sectie')?.remove();
+
+    // Datum-navigator is alleen relevant in 'open'/'alle'
+    const datumNav = document.getElementById('datum-nav');
+    if (datumNav) datumNav.style.display = (status === 'open' || status === 'alle') ? '' : 'none';
+
+    if (status === 'doorgegeven') {
+      document.getElementById('archief-container')?.remove();
+      openDoorgegevenPagina();
+      werkZoekTellerBij();
+      return;
+    }
+
+    // Vanaf hier: lijst-modus (uit doorgegeven/breed)
+    document.getElementById('doorgegeven-container')?.remove();
+    document.getElementById('overzicht-screen')?.classList.remove('breed');
+
+    if (status === 'gearchiveerd') {
+      document.getElementById('geven-container').style.display = 'none';
+      document.querySelectorAll('.filter-knop').forEach(el => el.classList.remove('actief'));
+      document.getElementById('filter-archief')?.classList.add('actief');
+      laadArchief().then(() => {
+        const term = (document.getElementById('filter-adres')?.value || '').trim().toLowerCase();
+        pasArchiefZoekToe(term);
+        werkZoekTellerBij();
+      });
+      return;
+    }
+
+    // 'open' of 'alle' → actieve lijst tonen
+    document.getElementById('archief-container')?.remove();
+    document.getElementById('geven-container').style.display = '';
+    document.querySelectorAll('.filter-knop').forEach(el => el.classList.remove('actief'));
+
+    if (status === 'open') {
+      filterBezichtigingen('open');            // zet filter-open .actief; geen toggle
+    } else {
+      // 'alle' — alle actieve bezichtigingen over álle datums + archief erbij
+      window._datumFilter = null;
+      filterBezichtigingen('alles');
+      const term = (document.getElementById('filter-adres')?.value || '').trim().toLowerCase();
+      toonArchiefTreffers(term);               // lege term → volledig archief tonen
+    }
+    werkZoekTellerBij();
+  }
+  window.zetStatusFilter = zetStatusFilter;
+
+  // Werk de zoek-teller bij op basis van de huidige status — telt wat zichtbaar is
+  function werkZoekTellerBij() {
+    const teller = document.getElementById('filter-teller');
+    if (!teller) return;
+    const term = (document.getElementById('filter-adres')?.value || '').trim();
+    const status = window._statusFilter || 'open';
+    if (!term || status === 'doorgegeven') { teller.style.display = 'none'; return; }
+    let zichtbaar = 0, totaal = 0, label = '';
+    if (status === 'gearchiveerd') {
+      const cards = document.querySelectorAll('#archief-container .bez-card');
+      totaal = cards.length;
+      zichtbaar = Array.from(cards).filter(c => c.style.display !== 'none').length;
+      label = ' in archief';
+    } else if (status === 'alle') {
+      const act = document.querySelectorAll('#geven-container .bez-card');
+      const actZ = Array.from(act).filter(c => c.style.display !== 'none').length;
+      const archZ = document.querySelectorAll('#zoek-archief-sectie .bez-card').length;
+      zichtbaar = actZ + archZ;
+      totaal = act.length + (Array.isArray(window._archiefCache) ? window._archiefCache.length : 0);
+      label = ' (actief + archief)';
+    } else { // open
+      const cards = document.querySelectorAll('#geven-container .bez-card');
+      totaal = cards.length;
+      zichtbaar = Array.from(cards).filter(c => c.style.display !== 'none').length;
+      label = ' open feedback';
+      if (zichtbaar === 0) {
+        teller.style.display = 'block';
+        teller.innerHTML = `0 van ${totaal} open feedback — niets gevonden. `
+          + `<a href="#" onclick="zetStatusFilter('alle');return false;" style="color:var(--oranje);font-weight:700">🔁 Zoek in Alles</a> (incl. archief)`;
+        return;
+      }
+    }
+    teller.style.display = 'block';
+    teller.textContent = `${zichtbaar} van ${totaal}${label} zichtbaar`;
+  }
+  window.werkZoekTellerBij = werkZoekTellerBij;
+
+  // Filter de zichtbare archief-kaarten in #archief-container op zoekterm.
+  // Werkt de titel bij en toont/verbergt de "herstel alle zichtbare"-knop.
+  function pasArchiefZoekToe(term) {
+    const container = document.getElementById('archief-container');
+    if (!container) return;
+    const t = (term || '').trim().toLowerCase();
+    const cache = Array.isArray(window._archiefCache) ? window._archiefCache : [];
+    const byId = {};
+    cache.forEach(b => { byId[String(b.id)] = b; });
+    const alle = container.querySelectorAll('.bez-card');
+    let zichtbaar = 0;
+    alle.forEach(card => {
+      const id = card.id.replace('archief-', '');
+      const b = byId[id] || {};
+      const hooi = ((b.adres || '') + ' ' + (b.naam || '') + ' ' + (b.datum || '')).toLowerCase();
+      const toon = !t || hooi.includes(t);
+      card.style.display = toon ? '' : 'none';
+      if (toon) zichtbaar++;
+    });
+    const titel = document.getElementById('archief-titel');
+    if (titel) titel.textContent = t
+      ? `📦 Archief — ${zichtbaar} van ${alle.length}`
+      : `📦 Archief (${alle.length})`;
+    const herstelBtn = document.getElementById('btn-herstel-zichtbaar');
+    if (herstelBtn) {
+      herstelBtn.style.display = zichtbaar > 0 ? '' : 'none';
+      herstelBtn.textContent = (t && zichtbaar < alle.length)
+        ? `♻️ Herstel ${zichtbaar} zichtbare`
+        : '♻️ Herstel alle zichtbare';
+    }
+  }
+  window.pasArchiefZoekToe = pasArchiefZoekToe;
+
+  // Herstel alle nu-zichtbare archief-kaarten (handig na zoeken op straat/adres).
+  // Ververst daarna de actieve lijst live — geen pagina-refresh nodig.
+  async function herstelAlleZichtbareArchief() {
+    const container = document.getElementById('archief-container');
+    if (!container) return;
+    const cards = Array.from(container.querySelectorAll('.bez-card')).filter(c => c.style.display !== 'none');
+    const ids = cards.map(c => c.id.replace('archief-', ''));
+    if (ids.length === 0) return;
+    const ok = await mvaConfirm({
+      titel: 'Herstellen uit archief?',
+      tekst: `${ids.length} bezichtiging${ids.length === 1 ? '' : 'en'} terugzetten naar de actieve lijst (Open feedback)?`,
+      okTekst: '♻️ Herstel',
+    });
+    if (!ok) return;
+    const btn = document.getElementById('btn-herstel-zichtbaar');
+    const oud = btn?.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = 'Bezig...'; }
+    let gelukt = 0, mislukt = 0;
+    for (const id of ids) {
+      try {
+        const res = await fetch('/.netlify/functions/monday', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'archiveer_bezichtiging', data: { item_id: id, archiveer: false } })
+        });
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
+        document.getElementById('archief-' + id)?.remove();
+        if (Array.isArray(window._archiefCache)) {
+          window._archiefCache = window._archiefCache.filter(b => String(b.id) !== String(id));
+        }
+        gelukt++;
+      } catch (err) { console.warn('Herstel mislukt', id, err); mislukt++; }
+    }
+    werkArchiefTellerBij(-gelukt);
+    if (btn) { btn.disabled = false; btn.textContent = oud || '♻️ Herstel alle zichtbare'; }
+    // Actieve lijst live verversen zodat de herstelde panden direct klaarstaan
+    await laadBezichtigingen();
+    pasArchiefZoekToe((document.getElementById('filter-adres')?.value || '').trim().toLowerCase());
+    if (mislukt === 0) {
+      toonToast(`♻️ ${gelukt} hersteld — staan nu in Open feedback`, 'succes');
+    } else {
+      toonToast(`${gelukt} hersteld, ${mislukt} mislukt`, 'fout');
+    }
+  }
+  window.herstelAlleZichtbareArchief = herstelAlleZichtbareArchief;
 
   // ── DOORGEGEVEN AAN LEADPOOL — placeholder fase 1 ─────────────────────
   // In fase 2 vult dit een echte database-pagina met JOIN op toewijzingen +
@@ -2676,7 +2894,7 @@
       <div style="background:#fff;border:1px solid var(--rand);border-radius:14px;padding:20px;margin-top:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
           <div style="font-weight:700;color:var(--navy);font-size:18px">📂 Doorgegeven aan leadpool</div>
-          <button onclick="filterBezichtigingen('alles')"
+          <button onclick="zetStatusFilter('open')"
                   style="background:var(--grijs);color:var(--navy);border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500;font-size:13px">
             ← Terug naar bezichtigingen
           </button>
@@ -2882,9 +3100,9 @@
         archiefContainer.innerHTML = `
           <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0;flex-wrap:wrap;gap:10px">
             <div style="font-weight:700;color:var(--navy);font-size:18px">📦 Archief</div>
-            <button onclick="sluitArchief()"
+            <button onclick="zetStatusFilter('open')"
                     style="background:var(--grijs);color:var(--navy);border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500;font-size:13px">
-              ← Terug naar bezichtigingen
+              ← Terug
             </button>
           </div>
           <div style="padding:40px 20px;text-align:center;color:var(--grijs-tekst);background:white;border-radius:12px;margin-top:10px">
@@ -2897,13 +3115,20 @@
 
       const esc = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
       const headerHtml = `
-        <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0;flex-wrap:wrap;gap:10px">
-          <div style="font-weight:700;color:var(--navy);font-size:18px">📦 Archief (${items.length})</div>
-          <button onclick="sluitArchief()"
-                  style="background:var(--grijs);color:var(--navy);border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500;font-size:13px">
-            ← Terug naar bezichtigingen
-          </button>
-        </div>`;
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 6px;flex-wrap:wrap;gap:10px">
+          <div id="archief-titel" style="font-weight:700;color:var(--navy);font-size:18px">📦 Archief (${items.length})</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button id="btn-herstel-zichtbaar" onclick="herstelAlleZichtbareArchief()"
+                    style="background:var(--groen);color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;white-space:nowrap">
+              ♻️ Herstel alle zichtbare
+            </button>
+            <button onclick="zetStatusFilter('open')"
+                    style="background:var(--grijs);color:var(--navy);border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500;font-size:13px;white-space:nowrap">
+              ← Terug
+            </button>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--grijs-tekst);margin:0 0 12px">💡 Zoek hierboven (bv. een straatnaam) en zet met één klik alleen de zichtbare panden terug naar je actieve lijst.</div>`;
       archiefContainer.innerHTML = headerHtml + items.map(b => `
         <div class="bez-card al-gedeeld" id="archief-${b.id}" style="margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
@@ -2931,11 +3156,7 @@
 
   // Sluit het archief en toon weer de actieve bezichtigingen-lijst
   function sluitArchief() {
-    document.getElementById('archief-container')?.remove();
-    document.getElementById('geven-container').style.display = '';
-    document.querySelectorAll('.filter-knop').forEach(el => el.classList.remove('actief'));
-    document.getElementById('filter-open')?.classList.add('actief');
-    filterBezichtigingen('open');
+    zetStatusFilter('open');
   }
   window.sluitArchief = sluitArchief;
 
@@ -2966,7 +3187,13 @@
       if (Array.isArray(window._archiefCache)) {
         window._archiefCache = window._archiefCache.filter(b => String(b.id) !== String(itemId));
       }
-      toonToast(`♻️ ${naam} hersteld — herlaad de pagina om in de actieve lijst te zien`, 'succes');
+      // Titel/teller in archiefweergave verversen
+      if (document.getElementById('archief-container')) {
+        pasArchiefZoekToe((document.getElementById('filter-adres')?.value || '').trim().toLowerCase());
+      }
+      // Actieve lijst live verversen — staat direct klaar in Open feedback
+      await laadBezichtigingen();
+      toonToast(`♻️ ${naam} hersteld — staat nu in Open feedback`, 'succes');
     } catch (err) {
       toonToast('Herstellen mislukt: ' + err.message, 'fout');
     }
@@ -3697,9 +3924,19 @@
     }
     const filterInput = document.getElementById('filter-adres');
     if (filterInput && filterInput.value) filterBezichtigingen();
-    // Pas het datum-filter altijd toe na laden — anders blijven alle datums zichtbaar
-    // bij opstart, ook al staat window._datumFilter op vandaag.
-    filterBezichtigingen();
+    // Pas na (her)laden de juiste weergave toe op basis van de actieve status.
+    // Zo blijft de archief-/doorgegeven-weergave intact als de actieve lijst op
+    // de achtergrond wordt ververst (bv. na een herstel-actie).
+    const _st = window._statusFilter || 'open';
+    if (_st === 'open') {
+      filterBezichtigingen('open');
+    } else if (_st === 'alle') {
+      filterBezichtigingen('alles');
+    } else {
+      // gearchiveerd/doorgegeven: actieve lijst is voorbereid maar blijft verborgen
+      filterBezichtigingen();
+      document.getElementById('geven-container').style.display = 'none';
+    }
   }
 
   // Zoek-input filter — wordt aangeroepen vanuit de zoekbalk (oninput)
@@ -3709,30 +3946,33 @@
     const input = document.getElementById('filter-adres');
     const term = (input.value || '').trim().toLowerCase();
     const wisBtn = document.getElementById('filter-wissen');
-    const teller = document.getElementById('filter-teller');
     if (wisBtn) wisBtn.style.display = term ? 'block' : 'none';
-    // Roep de stat-card filter zonder modus aan — die leest de actieve filter en
-    // combineert met de zoekterm uit het input-veld.
-    filterBezichtigingen();
-    // Update teller op basis van zichtbare kaarten na filtering
-    const cards = document.querySelectorAll('#geven-container .bez-card');
-    const zichtbaar = Array.from(cards).filter(c => c.style.display !== 'none').length;
-    if (teller) {
-      if (term) {
-        teller.style.display = 'block';
-        teller.textContent = zichtbaar + ' van ' + cards.length + ' bezichtigingen zichtbaar';
-      } else {
-        teller.style.display = 'none';
-      }
+    const status = window._statusFilter || 'open';
+
+    // Gearchiveerd: filter de archiefweergave (niet de verborgen actieve lijst)
+    if (status === 'gearchiveerd') {
+      pasArchiefZoekToe(term);
+      werkZoekTellerBij();
+      return;
     }
+    // Doorgegeven heeft eigen filters; zoekbalk doet hier niets
+    if (status === 'doorgegeven') {
+      werkZoekTellerBij();
+      return;
+    }
+
+    // 'open' of 'alle' — filter de actieve lijst (volgt de actieve filter-knop)
+    filterBezichtigingen();
     updateBulkTeller();
-    // Ook archief doorzoeken zodra er een zoekterm is (debounce 250ms)
+
+    // Archief alleen meenemen in 'alle'-modus
     if (window._archiefZoekTimer) clearTimeout(window._archiefZoekTimer);
-    if (term.length >= 2) {
-      window._archiefZoekTimer = setTimeout(() => toonArchiefTreffers(term), 250);
+    if (status === 'alle') {
+      window._archiefZoekTimer = setTimeout(() => { toonArchiefTreffers(term); werkZoekTellerBij(); }, 250);
     } else {
       verbergArchiefTreffers();
     }
+    werkZoekTellerBij();
   }
   window.zoekFilter = zoekFilter;
 
