@@ -2257,7 +2257,8 @@
     const d = new Date(start + 'T12:00:00');
     d.setDate(d.getDate() + dagDelta);
     window._datumFilter = d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' });
-    filterBezichtigingen();
+    // Bladeren per dag = bladermodus: zet de 'Open feedback'-filter uit zodat de dagfilter werkt
+    filterBezichtigingen('alles');
   }
   window.datumNav = datumNav;
 
@@ -2270,6 +2271,14 @@
   function updateDatumLabel() {
     const label = document.getElementById('datum-label');
     if (!label) return;
+    // 'Open feedback'-filter actief? Dan toont de lijst alle open feedback ongeacht datum.
+    const openActief = document.getElementById('filter-open')?.classList.contains('actief');
+    if (openActief) {
+      const zichtbaarOpen = document.querySelectorAll('#geven-container .bez-card:not([style*="display: none"])').length;
+      label.innerHTML = `📋 Alle open feedback<span class="datum-nav-teller">(${zichtbaarOpen})</span>`;
+      label.classList.remove('actief');
+      return;
+    }
     const filter = window._datumFilter;
     if (!filter) {
       label.textContent = '📅 Alle datums';
@@ -2475,8 +2484,8 @@
       const isOpen = card.classList.contains('bez-open');
       let toon = true;
       if (modus === 'open') toon = isOpen && !inPool;
-      // Datum-filter
-      if (toon && datumFilter) {
+      // Datum-filter — alleen in bladermodus ('alles'); 'open' toont alle open feedback ongeacht datum
+      if (toon && modus !== 'open' && datumFilter) {
         const cardDatum = card.dataset.datum || '';
         toon = cardDatum === datumFilter;
       }

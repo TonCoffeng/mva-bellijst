@@ -5,6 +5,22 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-06-04 — 'Open feedback'-teller en -lijst lopen nu gelijk
+
+Melding van Rogier: de teller toonde "48 open feedback", maar bij klikken verschenen er veel minder.
+
+### Oorzaak
+De teller `stat-geven-nieuw` telt álle open feedback over alle datums (`items.filter(b => !b.actie_status)`), terwijl de lijst standaard op de dagfilter stond (default: vandaag) én de "Open feedback"-filter die dagfilter respecteerde. Teller = alle dagen, lijst = alleen de gekozen dag → mismatch.
+
+### Fix (`public/index.html`)
+- `filterBezichtigingen`: in de 'open'-modus wordt de dagfilter genegeerd — "Open feedback" toont nu álle open feedback ongeacht datum, zodat teller en lijst gelijk lopen.
+- `updateDatumLabel`: toont "📋 Alle open feedback (n)" wanneer de open-filter actief is, i.p.v. een losse dag.
+- `datumNav`: door een dag te bladeren (← →) schakelt de app naar bladermodus ('alles'), zodat de dagfilter dan wél werkt. Open-filter uitzetten → normaal bladeren per dag.
+
+**Gedrag:** de gevende kant landt nu standaard op de volledige open-feedback-backlog; de ← → pijltjes blijven voor het bladeren per dag.
+
+---
+
 ## 2026-06-03 — Geannuleerde bezichtigingen blijven zichtbaar als lead
 
 Melding van Rogier: geannuleerde afspraken verdwenen uit de app, terwijl het wél leads zijn.
