@@ -33,6 +33,10 @@ Eerste versie had twee filterrijen boven elkaar (stat-tegels + pillen) ver bóve
 - **Volgorde van boven naar beneden:** zoekveld → filter-pillen → resultaat-teller → datum-nav → actiebalk → lijst. Eén kolom, één logica; de filter zit waar je 'm verwacht.
 - Modusdetectie en actieve-staat lopen nu volledig via `window._statusFilter` en de pillen; alle `.filter-knop`-afhankelijkheid voor bezichtigingen is verwijderd (de Leads-tab houdt z'n eigen tegels).
 
+### Layout-iteratie 2 — getallen uit pills + Doorgegeven doorzoekbaar
+- **Telling-badges uit de pillen** (oogde druk). De `x van y`-regel onder het zoekveld geeft de telling waar nodig. De IDs `stat-geven-nieuw`/`stat-geven-archief` blijven verborgen bestaan zodat de tel-logica intact blijft.
+- **Doorgegeven-lijst filtert nu mee op de zoekterm.** Voorheen negeerde die view de zoekbalk (toonde alle 59). Elke rij heeft een `data-zoek`-attribuut (naam + adres + ontvanger + datum); `pasDoorgegevenZoekToe()` filtert client-side bovenop de eigen datum/status/ontvanger-filters en toont "x van y zichtbaar — gefilterd op …". Wordt toegepast bij typen én bij wisselen naar Doorgegeven met actieve zoekterm.
+
 
 
 Melding van Rogier: de teller toonde "48 open feedback", maar bij klikken verschenen er veel minder.

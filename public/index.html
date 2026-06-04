@@ -1663,10 +1663,10 @@
 
   <!-- STATUS-FILTER — primaire filter, pal onder het zoekveld; telling per status ingebouwd -->
   <div class="status-pills" id="status-pills">
-    <button class="status-pill actief" id="pill-open" onclick="zetStatusFilter('open')">📋 Open feedback <span class="pill-count" id="stat-geven-nieuw">0</span></button>
+    <button class="status-pill actief" id="pill-open" onclick="zetStatusFilter('open')">📋 Open feedback<span id="stat-geven-nieuw" style="display:none">0</span></button>
     <button class="status-pill" id="pill-alle" onclick="zetStatusFilter('alle')">🔁 Alles</button>
     <button class="status-pill" id="pill-doorgegeven" onclick="zetStatusFilter('doorgegeven')">📂 Doorgegeven</button>
-    <button class="status-pill" id="pill-archief" onclick="zetStatusFilter('gearchiveerd')">📦 Archief <span class="pill-count" id="stat-geven-archief">0</span></button>
+    <button class="status-pill" id="pill-archief" onclick="zetStatusFilter('gearchiveerd')">📦 Archief<span id="stat-geven-archief" style="display:none">0</span></button>
   </div>
   <div id="filter-teller" style="display:none;font-size:11px;color:var(--grijs-tekst);margin:2px 0 10px;padding-left:16px"></div>
 
@@ -2864,8 +2864,9 @@
       : doorgegevenData.map(d => {
           const bel = belStatusChips[d.bel_status] || { cls: 'chip-wacht', label: d.bel_status };
           const leadChip = d.lead_status ? leadStatusChips[d.lead_status] : null;
+          const zoek = ((d.naam||'') + ' ' + (d.adres||'') + ' ' + (d.ontvanger_naam||'') + ' ' + (d.doorgegeven_op||'')).toLowerCase().replace(/"/g,'&quot;');
           return `
-            <tr>
+            <tr class="dg-rij" data-zoek="${zoek}">
               <td>${fmtDatum(d.doorgegeven_op)}</td>
               <td><strong>${d.naam || '(geen naam)'}</strong></td>
               <td style="color:var(--grijs-tekst);font-size:12px">${d.adres || '—'}</td>
@@ -2925,7 +2926,7 @@
         </div>
 
         <!-- Aantal indicator -->
-        <div style="color:var(--grijs-tekst);font-size:13px;margin-bottom:10px">
+        <div id="dg-aantal" style="color:var(--grijs-tekst);font-size:13px;margin-bottom:10px">
           ${doorgegevenData.length} ${doorgegevenData.length === 1 ? 'lead' : 'leads'} gevonden
         </div>
 
@@ -2964,7 +2965,30 @@
         }
       </style>
     `;
+    // Pas een eventueel actieve zoekterm meteen toe (bv. bij wisselen naar Doorgegeven)
+    pasDoorgegevenZoekToe((document.getElementById('filter-adres')?.value || '').trim().toLowerCase());
   }
+
+  // Filter de Doorgegeven-rijen op zoekterm (client-side, bovenop de eigen filters)
+  function pasDoorgegevenZoekToe(term) {
+    const t = (term || '').trim().toLowerCase();
+    const rijen = document.querySelectorAll('#doorgegeven-container .dg-rij');
+    let zichtbaar = 0;
+    rijen.forEach(r => {
+      const hooi = r.getAttribute('data-zoek') || '';
+      const toon = !t || hooi.includes(t);
+      r.style.display = toon ? '' : 'none';
+      if (toon) zichtbaar++;
+    });
+    const aantalEl = document.getElementById('dg-aantal');
+    if (aantalEl) {
+      const totaal = rijen.length;
+      aantalEl.textContent = t
+        ? `${zichtbaar} van ${totaal} ${totaal === 1 ? 'lead' : 'leads'} zichtbaar — gefilterd op "${term}"`
+        : `${totaal} ${totaal === 1 ? 'lead' : 'leads'} gevonden`;
+    }
+  }
+  window.pasDoorgegevenZoekToe = pasDoorgegevenZoekToe;
   // Expose voor inline onchange handlers
   window.doorgegevenFilters = doorgegevenFilters;
   window.laadEnRenderDoorgegeven = laadEnRenderDoorgegeven;
@@ -3940,8 +3964,9 @@
       werkZoekTellerBij();
       return;
     }
-    // Doorgegeven heeft eigen filters; zoekbalk doet hier niets
+    // Doorgegeven: filter de rijen op zoekterm (heeft daarnaast eigen filters)
     if (status === 'doorgegeven') {
+      pasDoorgegevenZoekToe(term);
       werkZoekTellerBij();
       return;
     }
