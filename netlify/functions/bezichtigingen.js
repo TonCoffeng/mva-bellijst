@@ -170,6 +170,44 @@ exports.handler = async (event) => {
       console.warn('[bezichtigingen] bezoekteller faalde (niet kritiek):', e.message);
     }
 
+    // Stap 2c: TOEWIJZING ─────────────────────────────────────────────
+    // Aan welke makelaar is een doorgegeven lead toegewezen? Pool-leads
+    // worden via Round Robin (of direct) toegewezen; de ontvanger staat in
+    // bellijst_items (eigenaar_id, bron). Eén query, daarna in-memory mappen.
+    // Faalt stil (niet kritiek voor de hoofdrespons).
+    const toewijzingPerBez = {};
+    try {
+      const ids = gefilterdeRows.map(r => Number(r.id)).filter(Boolean);
+      if (ids.length) {
+        const belRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/bellijst_items?bezichtiging_id=in.(${ids.join(',')})&select=bezichtiging_id,bron,eigenaar:gebruikers!bellijst_items_eigenaar_id_fkey(naam)`,
+          {
+            headers: {
+              'apikey': SUPABASE_SERVICE_KEY,
+              'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+            },
+          }
+        );
+        if (belRes.ok) {
+          const bel = await belRes.json();
+          for (const r of bel) {
+            const bid = Number(r.bezichtiging_id);
+            if (!bid) continue;
+            // Pool-toewijzing heeft voorrang als er meerdere items zijn.
+            const bestaat = toewijzingPerBez[bid];
+            if (!bestaat || r.bron === 'pool') {
+              toewijzingPerBez[bid] = {
+                naam: (r.eigenaar && r.eigenaar.naam) || null,
+                bron: r.bron || null,
+              };
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[bezichtigingen] toewijzing-lookup faalde (niet kritiek):', e.message);
+    }
+
     // Stap 3: map naar Monday-style output (zodat frontend code ongewijzigd blijft)
     const bezichtigingen = gefilterdeRows.map(row => {
       // Splits datum_tijd naar datum + tijdstip in Europe/Amsterdam tijdzone
@@ -239,6 +277,8 @@ exports.handler = async (event) => {
         bezoeken_totaal: bezoekenTot,
         bezoeken_dit_adres: bezoekenAdr,
         eerdere_feedback: eerdereFeedback,
+        toegewezen_aan: (toewijzingPerBez[Number(row.id)] && toewijzingPerBez[Number(row.id)].naam) || null,
+        toegewezen_bron: (toewijzingPerBez[Number(row.id)] && toewijzingPerBez[Number(row.id)].bron) || null,
       };
     });
 
