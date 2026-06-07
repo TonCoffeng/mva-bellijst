@@ -5,6 +5,16 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-06-07 — Toewijzingsstatus zichtbaar in leadoverzicht (wens Rogier)
+
+Melding van Rogier via de portal-assistent: in het leadoverzicht was wel te zien aan welke leads feedback is gegeven, maar niet of een lead al was toegewezen aan een makelaar (en aan wie).
+
+### Toegevoegd
+- **`netlify/functions/bezichtigingen.js`**: per lead een toewijzing-lookup in `bellijst_items` (eigenaar + bron) via één extra query, in-memory gemapt. De function geeft nu `toegewezen_aan` (naam ontvangende makelaar) en `toegewezen_bron` (pool/zelf/openhuis) mee. Pool-toewijzing krijgt voorrang; faalt stil als niet-kritiek.
+- **`public/index.html`**: blauw label `👤 [makelaar]` op de lead-kaart (spiekbrief-rij) voor doorgegeven (pool) leads, zodat in één oogopslag zichtbaar is aan wie een lead is toegewezen. Nieuwe stijl `.sb-toegewezen`.
+
+---
+
 ## 2026-06-04 — Statusfilter-pillen + zoeken over alle statussen (incl. archief)
 
 Melding van Rogier: de bezichtigingen waren een "zoekplaatje". Zoeken op een straat (bv. "iepen") gaf "0 van 80 zichtbaar" terwijl het archief er ongefilterd onder bleef staan — verwarrend. Hij wil na een bezichtigingsronde makkelijk opschonen, panden uit het archief terugzetten en doorsturen naar collega's.

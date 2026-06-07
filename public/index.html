@@ -981,6 +981,16 @@
     }
     .spiekbrief-rij .sb-status.is-feedback { color: var(--groen); }
     .spiekbrief-rij .sb-status.is-doorgezet { color: var(--oranje); }
+    .spiekbrief-rij .sb-toegewezen {
+      background: #dbeafe;
+      color: #1e40af;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 20px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
     /* Geannuleerde Realworks-afspraak — blijft een lead, maar duidelijk gemarkeerd */
     .spiekbrief-rij .sb-geannuleerd {
       flex-shrink: 0;
@@ -3612,6 +3622,7 @@
               ${b.afspraak_status === 'geannuleerd' ? `<span class="sb-geannuleerd">✕ geannuleerd</span>` : ''}
               ${b.adres ? `<span class="sb-adres">${esc(b.adres)}</span>` : ''}
               ${b.telefoon ? `<span class="sb-tel">${b.telefoon}</span>` : ''}
+              ${b.toegewezen_aan && b.toegewezen_bron === 'pool' ? `<span class="sb-toegewezen" title="Doorgegeven en toegewezen aan deze makelaar">👤 ${esc(b.toegewezen_aan)}</span>` : ''}
               <span class="sb-status ${heeftFeedback ? 'is-feedback' : (alGedeeld ? 'is-doorgezet' : '')}">${heeftFeedback ? '✓' : (alGedeeld ? '↗' : '●')}</span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
