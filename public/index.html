@@ -2624,7 +2624,7 @@
       window._datumFilter = null;
       filterBezichtigingen('alles');
       const term = (document.getElementById('filter-adres')?.value || '').trim().toLowerCase();
-      toonArchiefTreffers(term);               // lege term → volledig archief tonen
+      toonArchiefTreffers(term);               // toont archief alleen bij een zoekterm
     }
     werkZoekTellerBij();
   }
@@ -4043,6 +4043,12 @@
 
   // Toon archief-treffers in een aparte sectie onder de actieve lijst
   function toonArchiefTreffers(term) {
+    // Zonder zoekterm géén archief tonen. Een lege term matcht anders álles
+    // (adres.includes('') === true), waardoor het volledige archief ongevraagd
+    // onder de actieve lijst werd geplakt — ook in de 'Alles'-modus op een lege
+    // dag (bv. 'morgen (0)'). Het archief is bedoeld om mee te zóeken, niet om
+    // standaard te dumpen. Wie het hele archief wil: gebruik de pil '📦 Archief'.
+    if (!term || !term.trim()) { verbergArchiefTreffers(); return; }
     const archiefData = window._archiefCache;
     // Als cache nog niet geladen is, fetch nu (eenmalig)
     if (!archiefData) {
