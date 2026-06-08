@@ -5,6 +5,23 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-06-08 (deel 2) — Open(-huis) leads niet meer onbedoeld in Archief + Alles dumpt geen archief meer
+
+Vervolg op de melding van Rogier. Nadat doorgegeven (pool/zelf) leads uit het Archief waren gefilterd, bleven er nog steeds leads "ineens in Archief" opduiken — o.a. open-huis bezichtigingen op de Curaçaostraat. Diagnose via de database (Leadpool `bezichtigingen`):
+
+### Oorzaak (twee samenlopende dingen)
+1. **Inconsistente staat in de data.** De losse actie `archiveer_bezichtiging` zette alleen `gearchiveerd=true` en liet `actie_status` ongemoeid. Een open-huis bezichtiging (`actie_status='open'`, `type='open_huis'`) of open-feedback (lege status) raakte zo gearchiveerd terwijl de status `'open'`/leeg bleef. Resultaat: weg uit de actieve lijst én zichtbaar in het Archief als "spook". De pool/zelf-filter ving deze niet (status was immers `'open'`, niet `'pool'`/`'zelf'`). Bevestigd: 4 echte leads van Rogier (mét feedback) waren zo gearchiveerd; handmatig hersteld (`gearchiveerd=false`).
+2. **Alles-modus dumpte het volledige archief.** In de `🔁 Alles`-modus werd `toonArchiefTreffers('')` aangeroepen met lege zoekterm. Omdat `adres.includes('') === true` voor élk item, werd het complete archief ongevraagd onder de actieve lijst geplakt — ook op een lege dag (bv. "morgen (0)"). Dat oogde als "leads voor morgen staan in archief".
+
+### Gewijzigd
+- **`netlify/functions/monday.js`** (`archiveer_bezichtiging`): zet `actie_status` nu consistent mee — `'afgehandeld'` bij archiveren, `''` (open feedback) bij herstellen. Voorkomt de inconsistente staat (`gearchiveerd=true` + `'open'`/leeg) aan de bron. Het open-huis-karakter blijft behouden via de kolom `type`.
+- **`public/index.html`** (`toonArchiefTreffers`): toont het archief alleen nog bij een echte zoekterm. Bij lege/whitespace term wordt de archief-sectie verborgen i.p.v. het hele archief te dumpen. Wie het volledige archief wil ziet dat via de pil `📦 Archief`.
+
+### Niet geraakt
+Bewust gearchiveerde testleads van Ton (id 10) en Hans (id 11) blijven in het archief staan.
+
+---
+
 ## 2026-06-08 — Doorgegeven leads niet langer in Archief (melding Rogier)
 
 Melding van Rogier: tijdens het in de pool zetten van bezichtigingen verschenen er "ineens weer mensen in Archief" — precies de panden die hij zojuist had doorgegeven. Dit voelde als een terugval, maar bleek een aparte oorzaak dan de op 7 juni uitgeschakelde auto-archivering op de droplet.
