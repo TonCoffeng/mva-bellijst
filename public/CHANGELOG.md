@@ -5,6 +5,21 @@ Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 ---
 
+## 2026-06-08 — Doorgegeven leads niet langer in Archief (melding Rogier)
+
+Melding van Rogier: tijdens het in de pool zetten van bezichtigingen verschenen er "ineens weer mensen in Archief" — precies de panden die hij zojuist had doorgegeven. Dit voelde als een terugval, maar bleek een aparte oorzaak dan de op 7 juni uitgeschakelde auto-archivering op de droplet.
+
+### Oorzaak
+`push_naar_pool` en `push_naar_eigen_bellijst` roepen `archiveerBezichtiging(item_id, 'pool'|'zelf')` aan, dat in één PATCH zowel `actie_status` als `gearchiveerd=true` zet. Dat is bewust (de bezichtiging moet uit de open-feedbacklijst verdwijnen), maar het Archief-filter (`get_gearchiveerde_bezichtigingen`) haalde álles met `gearchiveerd=true` op — dus ook de zojuist doorgegeven panden. Gevolg: een doorgegeven bezichtiging stond tegelijk in **Doorgegeven** én in **Archief**.
+
+### Gewijzigd
+- **`netlify/functions/monday.js`** (`get_gearchiveerde_bezichtigingen`): server-side filter toegevoegd dat `actie_status` `'pool'` en `'zelf'` uit het Archief weglaat. Null-veilig (lege/oude `actie_status` blijft zichtbaar). Echt Archief = alleen `'afgehandeld'` + oude/automatisch gearchiveerde bezichtigingen. De archief-teller gebruikt dezelfde call en corrigeert dus automatisch mee.
+
+### Geen vindbaarheidsverlies
+Pool-leads blijven zichtbaar in de **Doorgegeven**-weergave, 'zelf'-leads in de eigen bellijst / Leads-tab. Alleen de dubbele weergave in Archief verdwijnt.
+
+---
+
 ## 2026-06-07 — Toewijzingsstatus zichtbaar in leadoverzicht (wens Rogier)
 
 Melding van Rogier via de portal-assistent: in het leadoverzicht was wel te zien aan welke leads feedback is gegeven, maar niet of een lead al was toegewezen aan een makelaar (en aan wie).
