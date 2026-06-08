@@ -729,7 +729,16 @@ exports.handler = async (event) => {
         `&gearchiveerd=eq.true&order=datum_tijd.desc&limit=500`
       );
 
-      const bezichtigingen = rows.map(r => rowToMondayShape(r, makelaarNaam));
+      // Doorgegeven leads worden weliswaar gearchiveerd (gearchiveerd=true) om uit de
+      // open-feedbacklijst te verdwijnen, maar horen NIET thuis in het Archief:
+      //   - actie_status 'pool' → vindbaar in de Doorgegeven-weergave
+      //   - actie_status 'zelf' → vindbaar in de eigen bellijst / Leads-tab
+      // Alleen écht afgehandelde ('afgehandeld') en oude/automatisch gearchiveerde
+      // bezichtigingen (actie_status leeg/null) blijven hier zichtbaar.
+      // Null-veilig: r.actie_status !== 'pool' is true bij null/'' → blijft zichtbaar.
+      const zichtbaar = rows.filter(r => r.actie_status !== 'pool' && r.actie_status !== 'zelf');
+
+      const bezichtigingen = zichtbaar.map(r => rowToMondayShape(r, makelaarNaam));
       return { statusCode: 200, headers, body: JSON.stringify({ bezichtigingen }) };
     }
 
