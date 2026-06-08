@@ -747,8 +747,19 @@ exports.handler = async (event) => {
       const { item_id, archiveer } = data;
       const naarArchief = archiveer !== false;
 
+      // Houd actie_status consistent met de archiefstatus. Voorheen zette deze
+      // actie alleen `gearchiveerd` en liet actie_status ongemoeid; daardoor kon
+      // een open(-huis) bezichtiging (actie_status 'open') of open-feedback (leeg)
+      // gearchiveerd raken terwijl de status 'open'/leeg bleef → de lead verdween
+      // uit de actieve lijst én dook als 'spook' op in het archief.
+      //   • archiveren  → 'afgehandeld'  (bewust uit de werklijst, hoort in Archief)
+      //   • herstellen  → ''             (terug als open feedback in de actieve lijst)
+      // Het open-huis-karakter blijft behouden: dat zit in de kolom `type`
+      // ('open_huis'), niet in actie_status. Pool/zelf-leads lopen via een eigen
+      // flow (helper archiveerBezichtiging) en komen hier in de praktijk niet langs.
       const updated = await sbPatch(`bezichtigingen?id=eq.${item_id}`, {
         gearchiveerd:        naarArchief,
+        actie_status:        naarArchief ? 'afgehandeld' : '',
         status_gewijzigd_op: new Date().toISOString(),
       });
 
