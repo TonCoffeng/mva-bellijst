@@ -1586,45 +1586,16 @@
     <h2 id="login-titel">Welkom 👋</h2>
     <p id="login-subtitel">Log in om verder te gaan.</p>
 
-    <!-- STAP 1: Email + wachtwoord -->
+    <!-- Directe login uitgeschakeld - het portal is de ingang -->
     <div id="login-stap-auth">
-      <form id="login-form" onsubmit="event.preventDefault(); probeerInloggen();">
-        <div class="form-group">
-          <label for="login-email">E-mailadres</label>
-          <input type="email" id="login-email" name="email" placeholder="naam@makelaarsvan.nl" autocomplete="username" inputmode="email" />
-        </div>
-        <div class="form-group">
-          <label for="login-wachtwoord">Wachtwoord</label>
-          <div class="pw-wrap">
-            <input type="password" id="login-wachtwoord" name="password" placeholder="••••••••" autocomplete="current-password" />
-            <button type="button" class="pw-oog" id="pw-oog" onclick="toggleWachtwoord()" aria-label="Wachtwoord tonen of verbergen" title="Wachtwoord tonen">👁️</button>
-          </div>
-        </div>
-        <div id="login-fout" style="display:none;color:#c2410c;font-size:13px;margin-bottom:10px"></div>
-        <button type="submit" class="btn-rol btn-rol-geven" style="width:100%" id="login-btn">
-          <span class="rol-titel">🔐 Inloggen</span>
-        </button>
-      </form>
-
-      <button type="button" class="login-hulp-knop" onclick="toggleLoginHulp()" id="login-hulp-knop">
-        ❓ Wachtwoord opslaan / app op beginscherm
-      </button>
-      <div class="login-hulp-paneel" id="login-hulp-paneel">
-        <h4>🔑 Wachtwoord laten onthouden</h4>
-        <p>Zo hoef je niet elke keer je wachtwoord in te typen:</p>
-        <ol>
-          <li>Vul je e-mail en wachtwoord in en log in.</li>
-          <li>Safari vraagt dan: <strong>"Wachtwoord bewaren?"</strong> — kies <strong>Bewaar</strong>.</li>
-          <li>Volgende keer tikt Safari het wachtwoord automatisch voor je in.</li>
-        </ol>
-        <h4>📲 App op je beginscherm zetten</h4>
-        <p>Dan blijf je langer ingelogd en open je 'm met één tik:</p>
-        <ol>
-          <li>Tik onderin Safari op het <strong>deel-icoon</strong> (vierkantje met pijl omhoog).</li>
-          <li>Kies <strong>"Zet op beginscherm"</strong>.</li>
-          <li class="laatste">Open de app voortaan via dat icoon, niet via Safari.</li>
-        </ol>
+      <div style="text-align:left;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:16px 18px;margin-bottom:18px">
+        <p style="margin:0 0 8px;color:var(--navy);font-weight:600">Direct inloggen werkt niet meer</p>
+        <p style="margin:0;font-size:14px;color:var(--grijs-tekst);line-height:1.5">Het MvA-portal is voortaan de ingang. Log &eacute;&eacute;n keer in op het portal; daarna open je de Leadpool &mdash; en alle andere modules &mdash; zonder opnieuw in te loggen.</p>
       </div>
+      <a href="https://portal.makelaarsvan.nl" class="btn-rol btn-rol-geven" style="width:100%;display:flex;align-items:center;justify-content:center;text-decoration:none">
+        <span class="rol-titel">&rarr; Naar het portal</span>
+      </a>
+      <div id="login-fout" style="display:none;color:#c2410c;font-size:13px;margin-top:12px"></div>
     </div>
 
     <!-- STAP 2: Rol kiezen (verschijnt na login) -->

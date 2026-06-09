@@ -3,6 +3,14 @@
 Korte log van wijzigingen aan de Leadpool app (`mvaleadpool.netlify.app` / repo `mva-bellijst`).
 Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
+
+## 2026-06-09 - Directe login uitgeschakeld; portal is de ingang
+
+De directe e-mail/wachtwoord-login op het loginscherm is vervangen door een doorverwijzing naar het MvA-portal (portal.makelaarsvan.nl). Het portal wordt de centrale ingang voor alle modules: een keer inloggen, daarna overal binnen via de gedeelde sessie.
+
+- `public/index.html`: formulier in `#login-stap-auth` vervangen door een melding ("Direct inloggen werkt niet meer") + knop "Naar het portal". `#login-fout` behouden voor het account-gedeactiveerd-geval. De automatische SSO-overname van de portal-sessie (cookie op `.makelaarsvan.nl`) en de rol-keuze ("Welkom terug") blijven ongewijzigd.
+- Let op: bestaande lokale sessies (localStorage) blijven geldig tot ze verlopen; die gebruikers zien de melding pas daarna.
+
 ---
 
 ## 2026-06-08 (deel 2) — Open(-huis) leads niet meer onbedoeld in Archief + Alles dumpt geen archief meer
