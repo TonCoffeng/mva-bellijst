@@ -68,6 +68,18 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers, body: '' };
   }
 
+  // ── GET: makelaarslijst voor het formulier-dropdown ──
+  if (event.httpMethod === 'GET') {
+    try {
+      const makelaars = await sbGet(
+        `gebruikers?select=id,naam&actief=eq.true&rol=in.(makelaar,makelaar-mentor,directie)&order=naam.asc`
+      );
+      return { statusCode: 200, headers, body: JSON.stringify({ makelaars }) };
+    } catch (err) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
   try {
     const b = JSON.parse(event.body || '{}');
 
