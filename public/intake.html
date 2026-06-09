@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MVA — Intake</title>
+<style>
+  :root { --navy:#1F3A5F; --line:#e3e3e0; --muted:#6b6b6b; --bg:#f7f6f3; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background:var(--bg); color:#222; }
+  .wrap { max-width: 560px; margin: 32px auto; padding: 0 16px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:24px 28px; }
+  h1 { font-size:20px; margin:0 0 4px; color:var(--navy); }
+  .sub { color:var(--muted); font-size:14px; margin:0 0 20px; }
+  label { display:block; font-size:13px; font-weight:600; margin:0 0 6px; }
+  .grp { margin-bottom:16px; }
+  input, select { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:inherit; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { padding:8px 14px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; font-size:13px; }
+  .chip.sel { border-color:var(--navy); background:#eef2f7; color:var(--navy); font-weight:600; }
+  button.submit { width:100%; padding:12px; border:0; border-radius:8px; background:var(--navy); color:#fff; font-weight:600; font-size:14px; cursor:pointer; }
+  button.submit:disabled { opacity:.5; cursor:default; }
+  .err { color:#b00020; font-size:13px; margin-top:8px; }
+  .result { margin-top:16px; padding:16px; border-radius:8px; background:#eef6ee; border:1px solid #cfe6cf; font-size:14px; }
+  .result.bad { background:#fdeeee; border-color:#f0cccc; }
+  .muted { color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card" id="formCard">
+    <h1>Intake — nieuwe klant</h1>
+    <p class="sub">Start de klantreis. Dit maakt een klant aan en opent een dossier bij de gekozen makelaar.</p>
+
+    <div class="grp">
+      <label>Dienst</label>
+      <div class="chips" id="dienst">
+        <button type="button" class="chip" data-v="Verkoop">Verkoop</button>
+        <button type="button" class="chip" data-v="Aankoop">Aankoop</button>
+        <button type="button" class="chip" data-v="Verhuur">Verhuur</button>
+        <button type="button" class="chip" data-v="Aanhuur">Aanhuur</button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <label for="makelaar">Toegewezen makelaar</label>
+      <select id="makelaar"><option value="">Laden…</option></select>
+    </div>
+
+    <div class="grp">
+      <label for="naam">Naam</label>
+      <input id="naam" type="text" placeholder="Voor- en achternaam">
+    </div>
+
+    <div class="grp">
+      <div class="row">
+        <div><label for="email">E-mail</label><input id="email" type="email" placeholder="naam@voorbeeld.nl"></div>
+        <div><label for="telefoon">Telefoon</label><input id="telefoon" type="tel" placeholder="06 …"></div>
+      </div>
+      <p class="muted" style="margin-top:6px;">Minimaal e-mail óf telefoon.</p>
+    </div>
+
+    <div class="grp">
+      <label for="adres">Adres van de woning</label>
+      <input id="adres" type="text" placeholder="Straat en huisnummer" style="margin-bottom:10px;">
+      <div class="row">
+        <input id="postcode" type="text" placeholder="Postcode">
+        <input id="plaats" type="text" placeholder="Plaats" value="Amsterdam">
+      </div>
+    </div>
+
+    <button class="submit" id="verstuur">Aanvraag aanmaken</button>
+    <p class="err" id="err" style="display:none;"></p>
+  </div>
+
+  <div class="result" id="result" style="display:none;"></div>
+</div>
+
+<script>
+const API = '/.netlify/functions/intake';
+let dienstSel = null;
+
+document.querySelectorAll('#dienst .chip').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#dienst .chip').forEach(x => x.classList.remove('sel'));
+    b.classList.add('sel');
+    dienstSel = b.dataset.v;
+  });
+});
+
+async function laadMakelaars() {
+  const sel = document.getElementById('makelaar');
+  try {
+    const res = await fetch(API);
+    const data = await res.json();
+    sel.innerHTML = '<option value="">— kies makelaar —</option>';
+    (data.makelaars || []).forEach(m => {
+      const o = document.createElement('option');
+      o.value = m.id; o.textContent = m.naam;
+      sel.appendChild(o);
+    });
+  } catch (e) {
+    sel.innerHTML = '<option value="">Makelaars laden mislukt</option>';
+  }
+}
+laadMakelaars();
+
+const val = id => document.getElementById(id).value.trim();
+function toonFout(msg) {
+  const el = document.getElementById('err');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+document.getElementById('verstuur').addEventListener('click', async () => {
+  document.getElementById('err').style.display = 'none';
+  const makelaar_id = document.getElementById('makelaar').value;
+  const email = val('email'), telefoon = val('telefoon');
+
+  if (!dienstSel) return toonFout('Kies een dienst.');
+  if (!makelaar_id) return toonFout('Kies een makelaar.');
+  if (!email && !telefoon) return toonFout('Vul minimaal e-mail of telefoon in.');
+
+  const btn = document.getElementById('verstuur');
+  btn.disabled = true; btn.textContent = 'Bezig…';
+
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dienst: dienstSel,
+        naam: val('naam'),
+        email, telefoon,
+        adres: val('adres'), postcode: val('postcode'), plaats: val('plaats'),
+        makelaar_id: Number(makelaar_id),
+      }),
+    });
+    const data = await res.json();
+    const box = document.getElementById('result');
+    if (res.ok && data.ok) {
+      document.getElementById('formCard').style.display = 'none';
+      box.className = 'result';
+      box.innerHTML = 'Aangemaakt.' +
+        (data.klant_hergebruikt ? ' Bestaande klant herkend en hergebruikt.' : ' Nieuwe klant aangemaakt.') +
+        '<br><span class="muted">klant: ' + data.klant_id + ' · dossier: ' + data.dossier_id + '</span>';
+      box.style.display = 'block';
+    } else {
+      toonFout(data.error || 'Er ging iets mis.');
+      btn.disabled = false; btn.textContent = 'Aanvraag aanmaken';
+    }
+  } catch (e) {
+    toonFout('Netwerkfout: ' + e.message);
+    btn.disabled = false; btn.textContent = 'Aanvraag aanmaken';
+  }
+});
+</script>
+</body>
+</html>
