@@ -369,6 +369,154 @@ const createBellijstItem = async (bezichtiging, eigenaarId, bron) => {
   });
 };
 
+// ── DUPLICAATCHECK: staat deze persoon al in een bellijst? ────────────
+// Melding Anthonie via Meldpunt (10-06-2026) + besluit Ton (10-06-2026):
+//   1. Zelfde persoon + ZELFDE ADRES (laatste 30 dagen) = dubbele
+//      aanvraag (dubbel formulier) → samenvoegen bij de bestaande
+//      eigenaar, géén tweede item.
+//   2. Zelfde persoon, ANDER ADRES = nieuwe lead, maar de Round Robin
+//      sluit de huidige eigenaren uit → nooit twee keer in dezelfde
+//      lijst, en commercieel krijgt een ándere makelaar de kans.
+// Persoonsmatch op email (hoofdletterongevoelig) óf telefoon
+// (genormaliseerd: alleen cijfers, laatste 9 — zodat 06-12345678,
+// +31612345678 en 0612345678 als gelijk gelden).
+const DUPLICAAT_VENSTER_DAGEN     = 90; // venster voor eigenaar-uitsluiting
+const ZELFDE_ADRES_VENSTER_DAGEN  = 30; // venster voor samenvoegen zelfde pand
+
+const normaliseerTelefoon = (t) => {
+  const cijfers = String(t || '').replace(/\D/g, '');
+  return cijfers.length >= 9 ? cijfers.slice(-9) : cijfers;
+};
+
+const normaliseerAdres = (a) =>
+  String(a || '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+const analyseerDuplicaten = async (bez) => {
+  const leeg = { items: [], zelfdeAdresItem: null, eigenaarIds: [] };
+  const email = String(bez.bezichtiger_email || '').trim().toLowerCase();
+  const tel   = normaliseerTelefoon(bez.bezichtiger_telefoon);
+  if (!email && !tel) return leeg; // niets om op te matchen
+
+  const sinds = new Date(Date.now() - DUPLICAAT_VENSTER_DAGEN * 24 * 3600 * 1000).toISOString();
+  const rows = await sbGet(
+    `bellijst_items?select=id,eigenaar_id,bezichtiger_naam,bezichtiger_email,` +
+    `bezichtiger_telefoon,adres,gever_opmerking,bel_status,toegevoegd_op` +
+    `&toegevoegd_op=gte.${sinds}&order=toegevoegd_op.desc&limit=500`
+  );
+
+  const items = rows.filter(r => {
+    const rEmail = String(r.bezichtiger_email || '').trim().toLowerCase();
+    const rTel   = normaliseerTelefoon(r.bezichtiger_telefoon);
+    return (email && rEmail && rEmail === email) || (tel && rTel && rTel === tel);
+  });
+
+  const adresNorm  = normaliseerAdres(bez.adres);
+  const adresGrens = Date.now() - ZELFDE_ADRES_VENSTER_DAGEN * 24 * 3600 * 1000;
+  const zelfdeAdresItem = (adresNorm && items.find(r =>
+    normaliseerAdres(r.adres) === adresNorm &&
+    new Date(r.toegevoegd_op).getTime() >= adresGrens
+  )) || null;
+
+  return {
+    items,
+    zelfdeAdresItem,
+    eigenaarIds: [...new Set(items.map(r => Number(r.eigenaar_id)))],
+  };
+};
+
+// Voeg een nieuwe bezichtigingsaanvraag samen met een bestaand
+// bellijst-item: datumregel in gever_opmerking, bezichtiging uit de
+// gevende lijst, mail naar de huidige eigenaar. Retourneert de eigenaar.
+const voegAanvraagSamenMetBestaand = async (bez, bestaand, itemId) => {
+  const fmtAms = (d, metTijd) => new Intl.DateTimeFormat('nl-NL', {
+    timeZone: 'Europe/Amsterdam', day: '2-digit', month: '2-digit', year: 'numeric',
+    ...(metTijd ? { hour: '2-digit', minute: '2-digit' } : {}),
+  }).format(d);
+
+  const wanneer = bez.datum_tijd ? fmtAms(new Date(bez.datum_tijd), true) : '';
+  const extraRegel =
+    `[${fmtAms(new Date(), false)}] Nieuwe bezichtigingsaanvraag: ${bez.adres || 'adres onbekend'}` +
+    (wanneer ? ` (${wanneer})` : '') +
+    (bez.feedback_opmerking ? ` — ${bez.feedback_opmerking}` : '');
+
+  await sbPatch(`bellijst_items?id=eq.${bestaand.id}`, {
+    gever_opmerking: bestaand.gever_opmerking
+      ? `${bestaand.gever_opmerking}\n${extraRegel}`
+      : extraRegel,
+  });
+
+  // Uit de gevende lijst, terugvindbaar via Doorgegeven/Archief
+  await archiveerBezichtiging(itemId, 'pool');
+
+  // Huidige eigenaar informeren (mail faalt stilletjes)
+  let eigenaar = null;
+  try {
+    const eRows = await sbGet(`gebruikers?select=id,naam,email&id=eq.${bestaand.eigenaar_id}`);
+    eigenaar = eRows[0] || null;
+  } catch { /* mag falen */ }
+
+  if (eigenaar?.email) {
+    await stuurMail({
+      to:      eigenaar.email,
+      subject: `Je lead ${bez.bezichtiger_naam || bestaand.bezichtiger_naam || ''} heeft een nieuwe aanvraag · ${bez.adres || ''}`.trim(),
+      html:    renderDuplicaatMail({
+        ontvangerNaam: eigenaar.naam,
+        klantNaam:     bez.bezichtiger_naam || bestaand.bezichtiger_naam || 'Onbekend',
+        adres:         bez.adres || '—',
+        telefoon:      bez.bezichtiger_telefoon || bestaand.bezichtiger_telefoon || '',
+        email:         bez.bezichtiger_email || bestaand.bezichtiger_email || '',
+        leadpoolUrl:   'https://mvaleadpool.netlify.app/',
+      }),
+    });
+  }
+
+  return eigenaar;
+};
+
+// Mail aan de eigenaar van het bestaande bellijst-item: zijn lead heeft
+// een nieuwe bezichtigingsaanvraag gedaan. Zelfde huisstijl als de
+// gewone notificatiemail.
+const renderDuplicaatMail = ({ ontvangerNaam, klantNaam, adres, telefoon, email, leadpoolUrl }) => {
+  const esc = s => String(s || '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+  const veiligeTel = esc(telefoon || '—');
+  const veiligEmail = esc(email || '—');
+  return `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f4f6fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f4f6fa;padding:24px 0">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden">
+        <tr><td style="background:#1A2B5F;padding:20px 24px;color:white">
+          <div style="font-size:12px;letter-spacing:0.05em;opacity:0.8;text-transform:uppercase">MVA Leadpool</div>
+          <div style="font-size:20px;font-weight:700;margin-top:4px">Je lead heeft een nieuwe aanvraag</div>
+        </td></tr>
+        <tr><td style="padding:24px">
+          <div style="font-size:15px;color:#1A2B5F;margin-bottom:18px">
+            Hoi ${esc(ontvangerNaam)}, <strong>${esc(klantNaam)}</strong> staat al in jouw bellijst en heeft
+            een nieuwe bezichtigingsaanvraag gedaan. Er is géén tweede lead aangemaakt — de aanvraag is
+            bij je bestaande lead gezet (zie de opmerking op de kaart).
+          </div>
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse">
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px;width:140px">Nieuwe aanvraag</td>
+                <td style="padding:8px 0;color:#1A2B5F;font-size:14px;font-weight:600">${esc(adres)}</td></tr>
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px">Telefoon</td>
+                <td style="padding:8px 0;color:#1A2B5F;font-size:14px"><a href="tel:${veiligeTel}" style="color:#E8500A;text-decoration:none">${veiligeTel}</a></td></tr>
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px">Email</td>
+                <td style="padding:8px 0;color:#1A2B5F;font-size:14px"><a href="mailto:${veiligEmail}" style="color:#E8500A;text-decoration:none">${veiligEmail}</a></td></tr>
+          </table>
+          <div style="margin-top:24px;text-align:center">
+            <a href="${leadpoolUrl}" style="display:inline-block;background:#E8500A;color:white;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px">
+              Open in Leadpool →
+            </a>
+          </div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+};
+
 // ── BEZICHTIGING: archiveer + zet actie_status tegelijk in 1 PATCH ────
 // Gebruikt voor markeer_afgehandeld, push_naar_pool, push_naar_eigen_bellijst
 // zodat een lead na uitgaan uit de gevende lijst altijd terugvindbaar is.
@@ -387,7 +535,7 @@ const archiveerBezichtiging = async (id, actieStatus) => {
 //   3. Pak nummer 1 → die is langst niet aan de beurt geweest
 //   4. Update zijn volgnummer naar (max + 1)
 //   5. Schrijf record in toewijzingen tabel als audit trail (status='open')
-const roundRobinPick = async (bezichtigingId, gevendeMakelaarId) => {
+const roundRobinPick = async (bezichtigingId, gevendeMakelaarId, uitsluitenIds = []) => {
   // 1. Pool ophalen — alle gebruikers met doet_mee_round_robin=true en actief=true
   // Vakantie-filter doen we lokaal (datum-vergelijking is leesbaarder dan PostgREST or-clauses)
   const pool = await sbGet(
@@ -403,9 +551,18 @@ const roundRobinPick = async (bezichtigingId, gevendeMakelaarId) => {
     return g.vakantie_van <= vandaag && vandaag <= g.vakantie_tot;
   };
 
-  const candidates = pool.filter(g =>
+  const basis = pool.filter(g =>
     g.id !== gevendeMakelaarId && !opVakantie(g)
   );
+
+  // Duplicaatregel (Ton, 10-06-2026): makelaars die deze persoon al in
+  // hun bellijst hebben, slaan we over — een tweede aanvraag gaat naar
+  // een ánder gezicht. Vangnet: als daardoor niemand overblijft (kleine
+  // pool), vervalt de uitsluiting; de aanroeper voegt dan samen met het
+  // bestaande item zodat er nooit twee items in dezelfde lijst komen.
+  const uitsluiten = new Set((uitsluitenIds || []).map(Number));
+  let candidates = basis.filter(g => !uitsluiten.has(Number(g.id)));
+  if (candidates.length === 0) candidates = basis;
 
   if (candidates.length === 0) {
     throw new Error(
@@ -797,6 +954,33 @@ exports.handler = async (event) => {
       }
       const bez = bezRows[0];
 
+      // ── DUPLICAATCHECK vóór toewijzen (Meldpunt Anthonie + besluit Ton, 10-06) ─
+      // Zelfde persoon + zelfde adres (30 dgn) → samenvoegen bij de
+      // bestaande eigenaar. Zelfde persoon, ander adres → nieuwe lead,
+      // maar RR sluit de huidige eigenaren uit (ander gezicht belt).
+      let dup = { items: [], zelfdeAdresItem: null, eigenaarIds: [] };
+      try {
+        dup = await analyseerDuplicaten(bez);
+      } catch (e) {
+        // Check mag de pool-flow nooit blokkeren — bij twijfel gewoon door
+        console.warn(`[push_naar_pool] duplicaatcheck faalde (we gaan door): ${e.message}`);
+      }
+
+      if (dup.zelfdeAdresItem) {
+        const eigenaar = await voegAanvraagSamenMetBestaand(bez, dup.zelfdeAdresItem, item_id);
+        return {
+          statusCode: 200, headers,
+          body: JSON.stringify({
+            ok: true,
+            duplicaat: true,
+            item_id,
+            toegewezen_aan:   eigenaar?.naam || 'de huidige eigenaar',
+            bellijst_item_id: dup.zelfdeAdresItem.id,
+            bericht: `Dubbele aanvraag: ${bez.bezichtiger_naam || 'deze persoon'} staat voor dit pand al in de bellijst van ${eigenaar?.naam || 'een collega'}. Geen tweede lead aangemaakt — de aanvraag is bij de bestaande lead gezet.`,
+          }),
+        };
+      }
+
       // Bepaal ontvanger: direct toewijzen of via Round Robin
       let rr;
       const useDirectAssign = !!direct_naar_email;
@@ -870,13 +1054,33 @@ exports.handler = async (event) => {
             };
           }
         } else {
-          // ── Standaard: Round Robin ──────────────────────────────────
+          // ── Standaard: Round Robin (huidige eigenaren uitgesloten) ──
           try {
-            rr = await roundRobinPick(parseInt(item_id), bez.gevende_makelaar_id);
+            rr = await roundRobinPick(parseInt(item_id), bez.gevende_makelaar_id, dup.eigenaarIds);
           } catch (e) {
             return { statusCode: 500, headers, body: JSON.stringify({ error: `Round Robin faalde: ${e.message}` }) };
           }
         }
+      }
+
+      // ── Vangnet: nooit twee items in dezelfde lijst ──────────────────
+      // Heeft de gekozen ontvanger deze persoon al (kan bij directe
+      // toewijzing, extern-route of RR-vangnet bij een kleine pool)?
+      // Dan samenvoegen met zijn bestaande item i.p.v. een tweede aanmaken.
+      const bestaandBijOntvanger = dup.items.find(i => Number(i.eigenaar_id) === Number(rr.gekozen_id));
+      if (bestaandBijOntvanger) {
+        const eigenaar = await voegAanvraagSamenMetBestaand(bez, bestaandBijOntvanger, item_id);
+        return {
+          statusCode: 200, headers,
+          body: JSON.stringify({
+            ok: true,
+            duplicaat: true,
+            item_id,
+            toegewezen_aan:   eigenaar?.naam || rr.gekozen_naam,
+            bellijst_item_id: bestaandBijOntvanger.id,
+            bericht: `${bez.bezichtiger_naam || 'Deze persoon'} staat al in de bellijst van ${eigenaar?.naam || rr.gekozen_naam}. Geen tweede lead aangemaakt — de nieuwe aanvraag is bij de bestaande lead gezet.`,
+          }),
+        };
       }
 
       // Maak bellijst_item voor de gekozen ontvanger (snapshot van bezichtiger)
