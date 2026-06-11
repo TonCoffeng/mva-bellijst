@@ -4710,6 +4710,8 @@
             item_id: itemId,
             makelaar_naam: huidigeMakelaar.naam,
             makelaar_email: huidigeMakelaar.email,
+            // Onopgeslagen kaartnotitie meesturen (melding Rogier 10-06)
+            opmerking_concept: document.getElementById(`opmerking-${itemId}`)?.value?.trim() || '',
           }
         })
       });
@@ -4769,6 +4771,8 @@
           data: {
             item_id: itemId,
             makelaar_naam: huidigeMakelaar.naam,
+            // Onopgeslagen kaartnotitie meesturen (melding Rogier 10-06)
+            opmerking_concept: document.getElementById(`opmerking-${itemId}`)?.value?.trim() || '',
             // Optioneel: bypass Round Robin en wijs direct toe
             ...(directNaarEmail && { direct_naar_email: directNaarEmail }),
           }
@@ -5130,6 +5134,8 @@
             item_id: itemId,
             makelaar_naam: huidigeMakelaar.naam,
             direct_naar_email: collegaEmail,
+            // Onopgeslagen kaartnotitie meesturen (melding Rogier 10-06)
+            opmerking_concept: document.getElementById(`opmerking-${itemId}`)?.value?.trim() || '',
           }
         })
       });

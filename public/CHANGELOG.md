@@ -4,6 +4,17 @@ Korte log van wijzigingen aan de Leadpool app (`mvaleadpool.netlify.app` / repo 
 Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 
+## 2026-06-10 — Kaartnotitie gaat nu altijd mee bij doorgeven (melding Rogier)
+
+Melding van Rogier: zijn opmerking bij een bezichtiging kwam niet mee in de leadpool naar de beller. Diagnose: het kopieer-mechanisme (`feedback_opmerking` → `gever_opmerking`, gebouwd 22 mei) werkt correct — overal waar de bezichtiging een opgeslagen opmerking had, stond die op het bellijst-item én in de mail. Het gat zat ervóór: het notitieveld op de gever-kaart wordt alleen opgeslagen via de knop "Feedback opslaan". Wie een notitie typt en direct op "Geef door aan pool" klikt (zoals bij het in bulk doorzetten van 17 leads op 8 juni), verloor de notitie ongemerkt.
+
+### Gewijzigd
+- **`public/index.html`**: alle drie de doorzet-acties (Geef door aan pool, Direct toewijzen, Zelf bellen) sturen nu de actuele inhoud van het kaartnotitieveld mee als `opmerking_concept`.
+- **`netlify/functions/monday.js`**: nieuwe helper `verwerkOpmerkingConcept` — is het meegekomen concept gevuld en anders dan wat al was opgeslagen, dan wordt het alsnog op de bezichtiging vastgelegd vóór de snapshot. Daardoor komt de notitie gegarandeerd terecht in `gever_opmerking` op het bellijst-item, in de notificatie-/alertmail naar de ontvanger, én in de feedback-historie. Faalt nooit blokkerend.
+- Aangevinkte feedback-pillen die niet zijn opgeslagen gaan níét automatisch mee (alleen de tekstnotitie) — pillen opslaan blijft via "Feedback opslaan".
+
+---
+
 ## 2026-06-10 — Duplicaatregel in de pool (melding Anthonie via Meldpunt, besluit Ton)
 
 Melding via het Meldpunt: als iemand twee bezichtigingsaanvragen doet, kwam hij twee keer in de leadpool en werd hij door twee verschillende makelaars gebeld (concreet geval: twee aanvragen voor hetzelfde pand, zeven minuten na elkaar, via Round Robin aan twee makelaars toegewezen). De oude Monday-route had een dubbele-relatie-check; de Supabase-pipeline nog niet.
