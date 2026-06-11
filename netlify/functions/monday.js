@@ -517,6 +517,29 @@ const renderDuplicaatMail = ({ ontvangerNaam, klantNaam, adres, telefoon, email,
 </body></html>`;
 };
 
+// ── KAARTNOTITIE MEENEMEN BIJ DOORGEVEN (melding Rogier, 10-06-2026) ──
+// De gever typt zijn notitie op de kaart, maar als hij direct op
+// "Geef door aan pool" / "Zelf bellen" / "Toewijzen" klikt zonder eerst
+// "Feedback opslaan", stond die notitie nergens. De frontend stuurt het
+// veld nu mee als `opmerking_concept`; hier leggen we het alsnog vast op
+// de bezichtiging vóór de snapshot, zodat het in gever_opmerking, de
+// notificatiemail én de feedback-historie terechtkomt.
+const verwerkOpmerkingConcept = async (bez, opmerkingConcept) => {
+  const concept = String(opmerkingConcept || '').trim();
+  if (!concept || concept === (bez.feedback_opmerking || '')) return bez;
+  try {
+    await sbPatch(`bezichtigingen?id=eq.${bez.id}`, {
+      feedback_opmerking:  concept,
+      status_gewijzigd_op: new Date().toISOString(),
+    });
+    bez.feedback_opmerking = concept;
+  } catch (e) {
+    // Mag de flow nooit blokkeren — dan blijft de oude (lege) notitie staan
+    console.warn(`[opmerking_concept] vastleggen faalde: ${e.message}`);
+  }
+  return bez;
+};
+
 // ── BEZICHTIGING: archiveer + zet actie_status tegelijk in 1 PATCH ────
 // Gebruikt voor markeer_afgehandeld, push_naar_pool, push_naar_eigen_bellijst
 // zodat een lead na uitgaan uit de gevende lijst altijd terugvindbaar is.
@@ -954,6 +977,9 @@ exports.handler = async (event) => {
       }
       const bez = bezRows[0];
 
+      // Onopgeslagen kaartnotitie van de gever alsnog vastleggen
+      await verwerkOpmerkingConcept(bez, data.opmerking_concept);
+
       // ── DUPLICAATCHECK vóór toewijzen (Meldpunt Anthonie + besluit Ton, 10-06) ─
       // Zelfde persoon + zelfde adres (30 dgn) → samenvoegen bij de
       // bestaande eigenaar. Zelfde persoon, ander adres → nieuwe lead,
@@ -1274,6 +1300,9 @@ exports.handler = async (event) => {
         return { statusCode: 404, headers, body: JSON.stringify({ error: `Bezichtiging ${item_id} niet gevonden` }) };
       }
       const bez = bezRows[0];
+
+      // Onopgeslagen kaartnotitie van de gever alsnog vastleggen
+      await verwerkOpmerkingConcept(bez, data.opmerking_concept);
 
       if (!bez.gevende_makelaar_id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: `Bezichtiging ${item_id} heeft geen gevende_makelaar_id` }) };
