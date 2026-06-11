@@ -4,6 +4,27 @@ Korte log van wijzigingen aan de Leadpool app (`mvaleadpool.netlify.app` / repo 
 Vanaf 28 april 2026. Niet met terugwerkende kracht.
 
 
+## 2026-06-10 — Duplicaatregel in de pool (melding Anthonie via Meldpunt, besluit Ton)
+
+Melding via het Meldpunt: als iemand twee bezichtigingsaanvragen doet, kwam hij twee keer in de leadpool en werd hij door twee verschillende makelaars gebeld (concreet geval: twee aanvragen voor hetzelfde pand, zeven minuten na elkaar, via Round Robin aan twee makelaars toegewezen). De oude Monday-route had een dubbele-relatie-check; de Supabase-pipeline nog niet.
+
+### De regel (besluit Ton, 10-06-2026)
+1. **Zelfde persoon + zelfde adres** (laatste 30 dagen) = dubbele aanvraag (dubbel formulier) → **samenvoegen** bij de bestaande eigenaar: geen tweede item, de aanvraag komt als datumregel in `gever_opmerking`, de eigenaar krijgt een mail.
+2. **Zelfde persoon, ander adres** = wél een nieuwe lead (nieuw koopintentie-moment, klant mag opnieuw gebeld worden), maar de **Round Robin sluit de huidige eigenaren uit** — een ándere makelaar krijgt de kans, en niemand krijgt dezelfde persoon twee keer in zijn lijst.
+3. **Vangnet**: komt de keuze tóch uit bij iemand die de persoon al heeft (directe toewijzing, extern-route, of kleine pool waardoor de uitsluiting vervalt), dan wordt samengevoegd met zijn bestaande item. Garantie: nooit twee items voor dezelfde persoon in dezelfde lijst.
+
+Persoonsmatch op **email** (hoofdletterongevoelig) óf **telefoon** (genormaliseerd: alleen cijfers, laatste 9 — zodat 06…, +316… en 0031 6… als gelijk gelden). Venster eigenaar-uitsluiting: 90 dagen.
+
+### Gewijzigd
+- **`netlify/functions/monday.js`**: nieuwe helpers `analyseerDuplicaten` en `voegAanvraagSamenMetBestaand` + mail-template `renderDuplicaatMail` ("Je lead heeft een nieuwe aanvraag", huisstijl). `roundRobinPick` accepteert nu een lijst uit te sluiten makelaars (volgnummers blijven onaangeroerd bij samenvoegen). `push_naar_pool` past de regel toe op alle routes. De duplicaatcheck faalt nooit blokkerend: bij een fout loopt de normale pool-flow gewoon door.
+- **`public/index.html`**: beide aanroepen van `push_naar_pool` (pool-knop en direct toewijzen) herkennen `duplicaat:true` in de response — knop wordt "✅ Al in bellijst" en de toast meldt bij wie de lead al staat.
+
+### Bewust niet geraakt
+- `push_naar_eigen_bellijst` (bron `zelf`): als de gever bewust kiest "ik bel zelf" wordt niet ontdubbeld — dat is een eigen, expliciete keuze. Eventueel later toevoegen.
+- Bestaande dubbelen in de database zijn niet automatisch opgeruimd; het concrete geval uit de melding is handmatig volgens regel 1 afgehandeld.
+
+---
+
 ## 2026-06-09 - Directe login uitgeschakeld; portal is de ingang
 
 De directe e-mail/wachtwoord-login op het loginscherm is vervangen door een doorverwijzing naar het MvA-portal (portal.makelaarsvan.nl). Het portal wordt de centrale ingang voor alle modules: een keer inloggen, daarna overal binnen via de gedeelde sessie.

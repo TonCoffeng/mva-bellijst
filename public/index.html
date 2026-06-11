@@ -4778,6 +4778,16 @@
 
       if (json.error) throw new Error(json.error);
 
+      // Duplicaat: persoon stond al in een bellijst — geen tweede lead
+      if (json.duplicaat === true) {
+        btn.textContent = '✅ Al in bellijst';
+        btn.classList.add('gedeeld');
+        vergrendelAndereActies(itemId, 'pool');
+        markeerKaartAfgesloten(itemId, "pool");
+        toonToast(json.bericht || `${naam} staat al in een bellijst — geen tweede lead aangemaakt.`, 'succes');
+        return;
+      }
+
       btn.textContent = directNaarEmail
         ? `✅ Naar ${andereEigenaar.naam}!`
         : '✅ In de pool!';
@@ -5125,6 +5135,16 @@
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
+
+      // Duplicaat: persoon stond al in een bellijst — geen tweede lead
+      if (json.duplicaat === true) {
+        if (btn) { btn.textContent = '✅ Al in bellijst'; btn.disabled = true; }
+        if (poolBtn) { poolBtn.disabled = true; poolBtn.textContent = '✅ Al in bellijst'; poolBtn.classList.add('gedeeld'); }
+        vergrendelAndereActies(itemId, 'pool');
+        markeerKaartAfgesloten(itemId, 'pool');
+        toonToast(json.bericht || `${naam} staat al in een bellijst — geen tweede lead aangemaakt.`, 'succes');
+        return;
+      }
 
       if (btn) {
         btn.textContent = `✅ Naar ${collegaNaam.split(' ')[0]}!`;
